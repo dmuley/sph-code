@@ -53,6 +53,15 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0]) 
 
+
+#refractoryu specie information array
+max_radius_array = np.array([]) #array of the max radii of each refractory species
+min_radius_array = np.array([]) #array of the min radii of each refractory species
+mineral_density = np.array([]) #mineral density of each specie
+num_dens_ref = np.array([]) #array of the initial number densities of each refractory species
+m_ref_species = np.array([]) #array of the molecular weights of each refractory specie
+sputtering_yield = np.array([]) #average sputtering yield of each refractory specie
+
 def kroupa_imf(base_imf):
     coeff_0 = 1
     imf_final = np.zeros(len(base_imf))
@@ -96,9 +105,9 @@ def luminosity_relation(base_imf, imf, lifetime=0):
     luminosity_relation = coeff_luminosity * base_imf**exp_luminosity
     lifetime_relation = coeff_luminosity**(-1) * base_imf**(1 - exp_luminosity)
     if lifetime == 0:
-    	return luminosity_relation
+        return luminosity_relation
     if lifetime == 1:
-    	return lifetime_relation
+        return lifetime_relation
 
 def planck_law(temp, wl, dwl):
     emission = np.nan_to_num((2 * h * c**2 / wl**5)/(np.exp(h * c/(wl * k * temp)) - 1))
@@ -108,9 +117,9 @@ def planck_law(temp, wl, dwl):
     return np.nan_to_num(emission/norm_constant)
 
 def laplacian_weight(x, x_0, m):
-	sq_norms = np.sum((x - x_0)**2, axis=1)
-	const = -945/(32*np.pi*d**9)
-	
+    sq_norms = np.sum((x - x_0)**2, axis=1)
+    const = -945/(32*np.pi*d**9)
+    
 
 def Laplacian_Weight(x):#laplacian of the weight for the viscosity function
     x_norm = x[0]*x[0]+x[1]*x[1]+x[2]*x[2]
@@ -133,34 +142,34 @@ def viscosity(j): #viscosity introduced to make the simulation more stable
     return(f_visc)
     
 def bin_generator(masses, positions, subdivisions):
-	positional_masses = np.array([masses[np.argsort(positions.T[b])] for b in range(len(subdivisions))])
-	positional_masses = np.cumsum(positional_masses, axis = 1)
-	
-	subdivision_cutoffs = [np.sort(positions.T[c])[np.in1d(positional_masses[c], stats.scoreatpercentile(positional_masses[c], list(np.linspace(0., 100., subdivisions[c] + 1)), interpolation_method = 'lower'))] for c in range(len(subdivisions))]
-	subdivision_intervals = [np.vstack([u[:-1], u[1:]]).T for u in subdivision_cutoffs]
-	length_scale = np.sqrt(np.sum([np.average(np.diff(u)**2) for u in subdivision_cutoffs]))
-	
-	subdivision_boxes = [s for s in itertools.product(*subdivision_intervals)]
-	object_indices = [[] for s in subdivision_boxes]
-	
-	position_indices = np.array(range(len(positions)))
-	
-	for q in range(len(subdivision_boxes)):
-		for_removal = []
-		for r in range(len(position_indices)):
-			in_range = np.sum((np.array(subdivision_boxes[q]).T - positions[position_indices[r]]) < 0, axis=1)
-			if np.array_equal(in_range, np.array([0, 3])) or np.array_equal(in_range, np.array([3, 0])):
-				#print(r)
-				object_indices[q].append(position_indices[r])
-				for_removal.append(r)
-		position_indices = np.delete(position_indices, np.array(for_removal))
-		#print len(position_indices)
-		
-	com = [np.sum(masses[np.array(object_indices[v])] * positions[np.array(object_indices[v])].T, axis=1)/np.sum(masses[np.array(object_indices[v])]) for v in range(len(object_indices))]
-	com = np.array(com)
-	grid_masses = np.array([np.sum(masses[np.array(object_indices[v])]) for v in range(len(object_indices))])
-	
-	return com, grid_masses, length_scale, np.array(subdivision_boxes), object_indices
+    positional_masses = np.array([masses[np.argsort(positions.T[b])] for b in range(len(subdivisions))])
+    positional_masses = np.cumsum(positional_masses, axis = 1)
+    
+    subdivision_cutoffs = [np.sort(positions.T[c])[np.in1d(positional_masses[c], stats.scoreatpercentile(positional_masses[c], list(np.linspace(0., 100., subdivisions[c] + 1)), interpolation_method = 'lower'))] for c in range(len(subdivisions))]
+    subdivision_intervals = [np.vstack([u[:-1], u[1:]]).T for u in subdivision_cutoffs]
+    length_scale = np.sqrt(np.sum([np.average(np.diff(u)**2) for u in subdivision_cutoffs]))
+    
+    subdivision_boxes = [s for s in itertools.product(*subdivision_intervals)]
+    object_indices = [[] for s in subdivision_boxes]
+    
+    position_indices = np.array(range(len(positions)))
+    
+    for q in range(len(subdivision_boxes)):
+        for_removal = []
+        for r in range(len(position_indices)):
+            in_range = np.sum((np.array(subdivision_boxes[q]).T - positions[position_indices[r]]) < 0, axis=1)
+            if np.array_equal(in_range, np.array([0, 3])) or np.array_equal(in_range, np.array([3, 0])):
+                #print(r)
+                object_indices[q].append(position_indices[r])
+                for_removal.append(r)
+        position_indices = np.delete(position_indices, np.array(for_removal))
+        #print len(position_indices)
+        
+    com = [np.sum(masses[np.array(object_indices[v])] * positions[np.array(object_indices[v])].T, axis=1)/np.sum(masses[np.array(object_indices[v])]) for v in range(len(object_indices))]
+    com = np.array(com)
+    grid_masses = np.array([np.sum(masses[np.array(object_indices[v])]) for v in range(len(object_indices))])
+    
+    return com, grid_masses, length_scale, np.array(subdivision_boxes), object_indices
 
 
 def compute_gravitational_force(particle_positions, grid_com, grid_masses, length_scale):
@@ -171,294 +180,314 @@ def compute_gravitational_force(particle_positions, grid_com, grid_masses, lengt
     return (forces)
 
 def Weigh2(x, x_0, m):
-	norms_sq = np.sum((x - x_0)**2, axis=1)
-	W = m * 315*(m_0/m)**3*((m/m_0)**(2./3.)*d**2-norms_sq)**3/(64*np.pi*d**9)
-	return(W)
+    norms_sq = np.sum((x - x_0)**2, axis=1)
+    W = m * 315*(m_0/m)**3*((m/m_0)**(2./3.)*d**2-norms_sq)**3/(64*np.pi*d**9)
+    return(W)
 
 def density(j):
-	x_0 = points[j]
-	x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
-	m = np.append(mass[j], mass[np.array(neighbor[j])])
-	
-	rho = Weigh2(x, x_0, m) * (particle_type[np.append(j, np.array(neighbor[j]))] == 0)
-	return np.sum(rho[rho > 0])
-	
+    x_0 = points[j]
+    x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
+    m = np.append(mass[j], mass[np.array(neighbor[j])])
+    
+    rho = Weigh2(x, x_0, m) * (particle_type[np.append(j, np.array(neighbor[j]))] == 0)
+    return np.sum(rho[rho > 0])
+    
 def num_dens(j):
-	x_0 = points[j]
-	x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
-	m = np.append(mass[j], mass[np.array(neighbor[j])])
-	
-	n_dens = Weigh2(x, x_0, m)/(mu_array[np.append(j, neighbor[j])] * m_h)
-	return np.sum(n_dens[n_dens > 0])
+    x_0 = points[j]
+    x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
+    m = np.append(mass[j], mass[np.array(neighbor[j])])
+    
+    n_dens = Weigh2(x, x_0, m)/(mu_array[np.append(j, neighbor[j])] * m_h)
+    return np.sum(n_dens[n_dens > 0])
 
    
 def grad_weight(x, x_0, m, type_particle):
-	vec = (x - x_0)
-	norms_sq = np.sum((x - x_0)**2, axis=1)
-	
-	W = -315 * 6 * (m_0/m)**3 / (64*np.pi*d**9) * ((m/m_0)**(2./3.)*d**2-norms_sq)**2 * (type_particle == 0) * vec.T
-	#W = W.T
-	
-	return((np.nan_to_num(W.astype('float') * ((m/m_0)**(2./3.)*d**2-norms_sq > 0))).T)
+    vec = (x - x_0)
+    norms_sq = np.sum((x - x_0)**2, axis=1)
+    
+    W = -315 * 6 * (m_0/m)**3 / (64*np.pi*d**9) * ((m/m_0)**(2./3.)*d**2-norms_sq)**2 * (type_particle == 0) * vec.T
+    #W = W.T
+    
+    return((np.nan_to_num(W.astype('float') * ((m/m_0)**(2./3.)*d**2-norms_sq > 0))).T)
 
 def del_pressure(i): #gradient of the pressure
-	if (particle_type[i] != 0):
-		return(np.zeros(3))
-	else:
-		x_0 = points[i]
-		x = np.append([x_0], points[np.array(neighbor[i])],axis=0)
-		m = np.append(mass[i], mass[np.array(neighbor[i])])
-		pt = np.append(particle_type[i], particle_type[neighbor[i]])
-		
-		gw = grad_weight(x, x_0, m, pt)
-		
-		del_pres = np.sum((gw.T * E_internal[np.append(i, neighbor[i])]/gamma_array[np.append(i, neighbor[i])]).T, axis=0)
-		
-		return del_pres
-
-def gamma_j(j):
-    species = 13
-    gamma_j = 0
-    if (num_dens(j) == 0):
-        return(0)
-    for u in range(species):
-        gamma_j = gamma_j + num_dens_u(j,u)*gamma[u]
-    gamma_j = gamma_j/num_dens(j)
-    return(gamma_j)
+    if (particle_type[i] != 0):
+        return(np.zeros(3))
+    else:
+        x_0 = points[i]
+        x = np.append([x_0], points[np.array(neighbor[i])],axis=0)
+        m = np.append(mass[i], mass[np.array(neighbor[i])])
+        pt = np.append(particle_type[i], particle_type[neighbor[i]])
+        
+        gw = grad_weight(x, x_0, m, pt)
+        
+        del_pres = np.sum((gw.T * E_internal[np.append(i, neighbor[i])]/gamma_array[np.append(i, neighbor[i])]).T, axis=0)
+        
+        return del_pres
 
 def neighbors(points, dist):
-	kdt = spatial.cKDTree(points)  
-	qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
-	
-	return qbp
-	
+    kdt = spatial.cKDTree(points)  
+    qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
+    
+    return qbp
+    
 def neighbors_arb(points, arb_points):
-	kdt = spatial.cKDTree(points)  
-	qbp = kdt.query_ball_point(arb_points, d, p=2, eps=0.1)
-	
-	return qbp
+    kdt = spatial.cKDTree(points)  
+    qbp = kdt.query_ball_point(arb_points, d, p=2, eps=0.1)
+    
+    return qbp
 
 def density_arb(arb_points):
-	density_array = []
-	narb = neighbors_arb(points, arb_points)
-	for j in range(len(arb_points)):
-		if len(narb[j]) > 1:
-			x_0 = arb_points[j]
-			#print np.array(narb[j])
-			x = points[np.array(narb[j])]
-			m = mass[np.array(narb[j])]
-			rho = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0)
-		
-			density_array.append(np.sum(rho[rho > 0]))
-		else:
-			density_array.append(0)
-			
-	return np.array(density_array)
+    density_array = []
+    narb = neighbors_arb(points, arb_points)
+    for j in range(len(arb_points)):
+        if len(narb[j]) > 1:
+            x_0 = arb_points[j]
+            #print np.array(narb[j])
+            x = points[np.array(narb[j])]
+            m = mass[np.array(narb[j])]
+            rho = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0)
+        
+            density_array.append(np.sum(rho[rho > 0]))
+        else:
+            density_array.append(0)
+            
+    return np.array(density_array)
 
 def temperature_arb(arb_points):
-	density_array = []
-	narb = neighbors_arb(points, arb_points)
-	for j in range(len(arb_points)):
-		if len(narb[j]) > 1:
-			x_0 = arb_points[j]
-			#print np.array(narb[j])
-			x = points[np.array(narb[j])]
-			m = mass[np.array(narb[j])]
-			temps = T[np.array(narb[j])]
-		
-			temp_sum = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0) * temps
-			temp_w = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0)
-			
-			#print temp_sum
-			#print temp_w
-			
-			tsgo = np.nan_to_num(np.sum(temp_sum[temp_sum > 0])/np.sum(temp_w[temp_sum > 0]))
-			
-			density_array.append(tsgo)
-		else:
-			density_array.append(0)
-			
-	return np.array(density_array)
+    density_array = []
+    narb = neighbors_arb(points, arb_points)
+    for j in range(len(arb_points)):
+        if len(narb[j]) > 1:
+            x_0 = arb_points[j]
+            #print np.array(narb[j])
+            x = points[np.array(narb[j])]
+            m = mass[np.array(narb[j])]
+            temps = T[np.array(narb[j])]
+        
+            temp_sum = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0) * temps
+            temp_w = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0)
+            
+            #print temp_sum
+            #print temp_w
+            
+            tsgo = np.nan_to_num(np.sum(temp_sum[temp_sum > 0])/np.sum(temp_w[temp_sum > 0]))
+            
+            density_array.append(tsgo)
+        else:
+            density_array.append(0)
+            
+    return np.array(density_array)
     
 def supernova_explosion():
-	#supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
-	total_release = np.array([[.86,.14,0,0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
-	trsum = np.sum(total_release)
+    #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
+    total_release = np.array([[.86,.14,0,0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
+    trsum = np.sum(total_release)
 
-	gas_release = np.array([[.86,.14,0,0,0.0,0.,0.,0.,0.,0.,0.,0.,0.]])
-	grsum = np.sum(gas_release)
-	
-	dust_release = total_release - gas_release
-	drsum = np.sum(dust_release)
-	
-	#total_release /= trsum
-	gas_release /= grsum
-	dust_release /= drsum
-	
-	dust_masses = mass[supernova_pos] * drsum/trsum
-	gas_masses = mass[supernova_pos] * grsum/trsum
-	
-	dust_comps = (np.vstack([dust_release] * len(supernova_pos)).T).T
-	gas_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
-	star_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
-	
-	dust_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/trsum
-	gas_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/grsum
-	stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
-	
-	newpoints = points[supernova_pos]
-	newvels = velocities[supernova_pos]
-	#newaccel = accel[supernova_pos]
-	
-	newgastype = np.zeros(len(supernova_pos))
-	newdusttype = np.ones(len(supernova_pos)) * 2
-	
-	new_eint_stars = np.zeros(len(supernova_pos))
-	new_eint_dust = np.zeros(len(supernova_pos))
-	new_eint_gas = E_internal[supernova_pos]
-	
-	return dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos
-	
-	#for cross-sections: use integrals in paper of the MRN distribution
-	# to find cross-sectional area per species particle; use relative mass
-	#fractions to figure out total cross-sectional area intercepted
-	#by dust grains
+    gas_release = np.array([[.86,.14,0,0,0.0,0.,0.,0.,0.,0.,0.,0.,0.]])
+    grsum = np.sum(gas_release)
+    
+    dust_release = total_release - gas_release
+    drsum = np.sum(dust_release)
+    
+    #total_release /= trsum
+    gas_release /= grsum
+    dust_release /= drsum
+    
+    dust_masses = mass[supernova_pos] * drsum/trsum
+    gas_masses = mass[supernova_pos] * grsum/trsum
+    
+    dust_comps = (np.vstack([dust_release] * len(supernova_pos)).T).T
+    gas_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
+    star_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
+    
+    dust_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/trsum
+    gas_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/grsum
+    stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
+    
+    newpoints = points[supernova_pos]
+    newvels = velocities[supernova_pos]
+    #newaccel = accel[supernova_pos]
+    
+    newgastype = np.zeros(len(supernova_pos))
+    newdusttype = np.ones(len(supernova_pos)) * 2
+    
+    new_eint_stars = np.zeros(len(supernova_pos))
+    new_eint_dust = np.zeros(len(supernova_pos))
+    new_eint_gas = E_internal[supernova_pos]
+    
+    return dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos
+    
+    #for cross-sections: use integrals in paper of the MRN distribution
+    # to find cross-sectional area per species particle; use relative mass
+    #fractions to figure out total cross-sectional area intercepted
+    #by dust grains
+
+def supernovae_impulse(j): #adds differential velocity based on supernovae shockwave
+    M_d0 = 194.28 #total number of SPH particles dispersed by a supernovae (in terms of solar masses)
+    Md = 0
+    gas_neighbors = np.array([]) #indices of the gas neighbors
+    for ii in range(N_PARTICLES):
+        if(particle_type[ii] == 0): #if the particle is a gas particle
+            gas_neighbors = np.append(gas_neighbors, [ii], axis = 0)
+    distance_array = np.sum(points[j]**2-points[gas_neighbors]**2,axis = 1) #lists the distance of the supernovae to each gas neighbor
+    sorted_index = np.argsort(distance_array) #sorted indices of masses, from closest to furthest
+    b = 0;
+    while(Md<M_d0):
+        if(b != j):
+            Md += mass[sorted_index[b]]
+        b+=1
+    diff_velocity = np.sqrt(194.28/(Md*0.736))*points(j)-points(np.arange(0,b))+np.sqrt(194.28/(Md*0.264))*points(j)-points(np.arange(0,b)) #impulse due to blast added to radiation 
+    return(diff_velocity)
+            
+
+def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timestep, and Temperature. Returns accreated dust mass
+    #Still need to add n_h, sputtering yield, mineral density, initial number density, etc.
+    n_H = 1
+    #K_u calculation divided into 3 for convenience 
+    K_u = (min_radius_array[u]**(-0.5)-max_radius_array[u]**(-0.5))/(3*mineral_density[u]*(max_radius_array[u]**(0.5)-min_radius_array[u]**(0.5)))
+    K_u = K_u*(k*T/(2*np.pi*m_ref_species[u]))**0.5 
+    K_u = K_u*(m_ref_species[u]*num_dens_ref[u]+mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])
+    rho = mineral_density[u]*K_u*np.exp(K_u*dt)/(m_ref_species[u]*num_dens_ref[u]+np.exp(K_u*dt)*mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])     
+    n_u = num_dens_ref[u]-(rho-mineral_density[u])/mol_weights[u]                                              
+    return(rho,n_u)
+    
 
 def overall_spectrum(base_imf, imf):
-	exp_radius = np.zeros(len(base_imf))
-	coeff_radius = np.zeros(len(base_imf))
-	exp_luminosity = np.zeros(len(base_imf))
-	coeff_luminosity = np.zeros(len(base_imf))
-	
-	exp_radius[base_imf < 1.66] = 0.945
-	exp_radius[base_imf >= 1.66] = 0.555
-	coeff_radius[base_imf < 1.66] = 1.06
-	coeff_radius[base_imf >= 1.66] = 1.2916594319
-	
-	exp_luminosity[base_imf < 0.7] = 2.62
-	exp_luminosity[base_imf >= 0.7] = 3.92
-	coeff_luminosity[base_imf < 0.7] = 0.35
-	coeff_luminosity[base_imf >= 0.7] = 1.02
-	
-	dimf = 1.
-	
-	luminosity_relation = coeff_luminosity * base_imf**exp_luminosity
-	temperature_relation = (coeff_luminosity/coeff_radius)**(1./4.) * base_imf**((exp_luminosity - exp_radius)/4.)
-	wl = np.logspace(np.log10(wien/t_solar) - 5, np.log10(wien/t_solar) + 3, 10000)
-	dwl = np.append(wl[0], np.diff(wl))
-	planck_final = np.zeros(len(wl))
-	
-	for u in range(len(base_imf)):
-		pl = np.nan_to_num(planck_law(temperature_relation[u] * t_solar, wl, dwl))
-		#plt.plot(wl, pl, alpha=0.2)
-		planck_final += np.nan_to_num(pl * imf[u] * luminosity_relation[u])
-	
-	total_luminosity = np.sum(imf * luminosity_relation * dimf)
-	total_mass = np.sum(base_imf * imf * dimf)
-	
-	planck_final /= np.sum(dwl * planck_final)
-	
-	planck_final *= total_luminosity/total_mass * solar_luminosity/solar_mass
-	
-	return wl, planck_final, dwl
+    exp_radius = np.zeros(len(base_imf))
+    coeff_radius = np.zeros(len(base_imf))
+    exp_luminosity = np.zeros(len(base_imf))
+    coeff_luminosity = np.zeros(len(base_imf))
+    
+    exp_radius[base_imf < 1.66] = 0.945
+    exp_radius[base_imf >= 1.66] = 0.555
+    coeff_radius[base_imf < 1.66] = 1.06
+    coeff_radius[base_imf >= 1.66] = 1.2916594319
+    
+    exp_luminosity[base_imf < 0.7] = 2.62
+    exp_luminosity[base_imf >= 0.7] = 3.92
+    coeff_luminosity[base_imf < 0.7] = 0.35
+    coeff_luminosity[base_imf >= 0.7] = 1.02
+    
+    dimf = 1.
+    
+    luminosity_relation = coeff_luminosity * base_imf**exp_luminosity
+    temperature_relation = (coeff_luminosity/coeff_radius)**(1./4.) * base_imf**((exp_luminosity - exp_radius)/4.)
+    wl = np.logspace(np.log10(wien/t_solar) - 5, np.log10(wien/t_solar) + 3, 10000)
+    dwl = np.append(wl[0], np.diff(wl))
+    planck_final = np.zeros(len(wl))
+    
+    for u in range(len(base_imf)):
+        pl = np.nan_to_num(planck_law(temperature_relation[u] * t_solar, wl, dwl))
+        #plt.plot(wl, pl, alpha=0.2)
+        planck_final += np.nan_to_num(pl * imf[u] * luminosity_relation[u])
+    
+    total_luminosity = np.sum(imf * luminosity_relation * dimf)
+    total_mass = np.sum(base_imf * imf * dimf)
+    
+    planck_final /= np.sum(dwl * planck_final)
+    
+    planck_final *= total_luminosity/total_mass * solar_luminosity/solar_mass
+    
+    return wl, planck_final, dwl
 
 def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
-	random_stars = positions[ptypes == 1]
-	rs2 = np.array([])
-	if len(random_stars > 0):
-		star_selection = (np.random.rand(len(random_stars)) < len(random_stars)**-0.5)
-		rs2 = random_stars[star_selection]
-		if len(rs2) == 0:
-			rs2 = random_stars
-			
-	lum_base = luminosity_relation(masses[ptypes == 1][star_selection]/solar_mass, 1)
-	tot_luminosity = np.sum(luminosity_relation(masses[ptypes == 1]/solar_mass, 1))
-	
-	luminosities = lum_base/np.sum(lum_base) * tot_luminosity
-	
-	random_gas = positions[ptypes == 0]
-	rg2 = np.array([])
-	if len(random_gas > 0):
-		gas_selection = (np.random.rand(len(random_gas)) < len(random_gas)**-0.5)
-		rg2 = random_gas[gas_selection]
-		if len(rs2) == 0:
-			rg2 = random_gas
-			
-	blocked = np.zeros((len(rs2), len(rg2)))
-	star_distance = np.zeros((len(rs2), len(rg2)))
-	for i in np.arange(0, len(rs2)):
-		for j in np.arange(0, len(rg2)):
-			ray = np.array([rs2[i], rg2[j]])
-			dists = (np.sum(np.cross(points - ray[0], ray[1] - ray[0])**2, axis=1)/(np.sum((ray[1] - ray[0])**2)))
-			blocking_kernel = np.sum(((315./512.) * sizes[dists < sizes**2]**(-2) * masses[dists < sizes**2]/(mu_array[dists < sizes**2] * amu) * cross_array[dists < sizes**2]))
-			
-			blocked[i][j] += blocking_kernel
-			star_distance[i][j] = np.sum((ray[1] - ray[0])**2)**0.5
-	
-	star_distance_2 = np.zeros((len(rs2), len(random_gas)))
-	gas_distance = np.zeros((len(rg2), len(random_gas)))
-	
-	star_unit_norm = []
-	
-	for q in np.arange(0, len(rg2)):
-		gas_distance[q] = np.sum((random_gas - rg2[q])**2, axis = 1)**0.5
-	
-	for r in np.arange(0, len(rs2)):
-		star_distance_2[r] = np.sum((random_gas - rs2[r])**2, axis = 1)**0.5
-		star_unit_norm.append(((random_gas - rs2[r]).T/star_distance_2[r]).T)
-	
-	lum_factor = []
-	for ei in range(len(star_distance)):
-		lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + 1).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + 1)**-2, axis=0)))
-	
-	lum_factor = np.array(lum_factor)
-	extinction = ((315./512.) * masses[particle_type == 0]/(mu_array[particle_type == 0] * amu) * cross_array[particle_type == 0]) * sizes[particle_type == 0]**(-2)
-	
-	exponential = np.exp(-np.nan_to_num(lum_factor))
-	distance_factor = (np.nan_to_num(star_distance_2)**2 + np.ones(np.shape(star_distance_2)))
-	a_intercepted = (np.pi * sizes**2)[ptypes == 0]
-	
-	lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
-	lum_factor_2 = np.nan_to_num(lum_factor_2)
-	
-	lf2 = np.sum(lum_factor_2, axis=0) * dt_0 * solar_luminosity
-	
-	momentum = (np.sum(np.array([star_unit_norm[ak].T * lum_factor_2[ak] for ak in range(len(lum_factor_2))]), axis=0)/masses[ptypes == 0]).T * dt_0/c
-	
-	overall = overall_spectrum(masses[ptypes == 1]/solar_mass, np.ones(len(masses[ptypes == 1])))
-	dest_wavelengths = destruction_energies**(-1) * (h * c)
-	frac_dest = np.array([np.sum((overall[1] * overall[2] * overall[0])[overall[0] < dest_wavelengths[ai]]) for ai in np.arange(len(dest_wavelengths))])
-	total_em = np.sum(overall[1] * overall[2] * overall[0])
-	
-	frac_dest /= total_em
-	
-	n_photons = np.sum(overall[0] * overall[1] * overall[2]/(h * c))/(np.sum(overall[1] * overall[2])) * lf2
-	mols = masses[ptypes == 0]/np.sum((f_un[ptypes == 0] * mu_specie * amu), axis=1)
-	
-	weighted_interception = ((f_un * cross_sections).T/np.sum(cross_sections * f_un, axis=1)).T
-	atoms_destroyed = ((weighted_interception * frac_dest)[ptypes == 0].T * n_photons).T
-	atoms_total = (f_un[ptypes == 0].T * mols).T
-	
-	frac_destroyed_by_species = atoms_destroyed/atoms_total
-	frac_destroyed_by_species = 1. - np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
-	
-	new_fun = f_un.T
+    random_stars = positions[ptypes == 1]
+    rs2 = np.array([])
+    if len(random_stars > 0):
+        star_selection = (np.random.rand(len(random_stars)) < len(random_stars)**-0.5)
+        rs2 = random_stars[star_selection]
+        if len(rs2) == 0:
+            rs2 = random_stars
+            
+    lum_base = luminosity_relation(masses[ptypes == 1][star_selection]/solar_mass, 1)
+    tot_luminosity = np.sum(luminosity_relation(masses[ptypes == 1]/solar_mass, 1))
+    
+    luminosities = lum_base/np.sum(lum_base) * tot_luminosity
+    
+    random_gas = positions[ptypes == 0]
+    rg2 = np.array([])
+    if len(random_gas > 0):
+        gas_selection = (np.random.rand(len(random_gas)) < len(random_gas)**-0.5)
+        rg2 = random_gas[gas_selection]
+        if len(rs2) == 0:
+            rg2 = random_gas
+            
+    blocked = np.zeros((len(rs2), len(rg2)))
+    star_distance = np.zeros((len(rs2), len(rg2)))
+    for i in np.arange(0, len(rs2)):
+        for j in np.arange(0, len(rg2)):
+            ray = np.array([rs2[i], rg2[j]])
+            dists = (np.sum(np.cross(points - ray[0], ray[1] - ray[0])**2, axis=1)/(np.sum((ray[1] - ray[0])**2)))
+            blocking_kernel = np.sum(((315./512.) * sizes[dists < sizes**2]**(-2) * masses[dists < sizes**2]/(mu_array[dists < sizes**2] * amu) * cross_array[dists < sizes**2]))
+            
+            blocked[i][j] += blocking_kernel
+            star_distance[i][j] = np.sum((ray[1] - ray[0])**2)**0.5
+    
+    star_distance_2 = np.zeros((len(rs2), len(random_gas)))
+    gas_distance = np.zeros((len(rg2), len(random_gas)))
+    
+    star_unit_norm = []
+    
+    for q in np.arange(0, len(rg2)):
+        gas_distance[q] = np.sum((random_gas - rg2[q])**2, axis = 1)**0.5
+    
+    for r in np.arange(0, len(rs2)):
+        star_distance_2[r] = np.sum((random_gas - rs2[r])**2, axis = 1)**0.5
+        star_unit_norm.append(((random_gas - rs2[r]).T/star_distance_2[r]).T)
+    
+    lum_factor = []
+    for ei in range(len(star_distance)):
+        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + 1).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + 1)**-2, axis=0)))
+    
+    lum_factor = np.array(lum_factor)
+    extinction = ((315./512.) * masses[particle_type == 0]/(mu_array[particle_type == 0] * amu) * cross_array[particle_type == 0]) * sizes[particle_type == 0]**(-2)
+    
+    exponential = np.exp(-np.nan_to_num(lum_factor))
+    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.ones(np.shape(star_distance_2)))
+    a_intercepted = (np.pi * sizes**2)[ptypes == 0]
+    
+    lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
+    lum_factor_2 = np.nan_to_num(lum_factor_2)
+    
+    lf2 = np.sum(lum_factor_2, axis=0) * dt_0 * solar_luminosity
+    
+    momentum = (np.sum(np.array([star_unit_norm[ak].T * lum_factor_2[ak] for ak in range(len(lum_factor_2))]), axis=0)/masses[ptypes == 0]).T * dt_0/c
+    
+    overall = overall_spectrum(masses[ptypes == 1]/solar_mass, np.ones(len(masses[ptypes == 1])))
+    dest_wavelengths = destruction_energies**(-1) * (h * c)
+    frac_dest = np.array([np.sum((overall[1] * overall[2] * overall[0])[overall[0] < dest_wavelengths[ai]]) for ai in np.arange(len(dest_wavelengths))])
+    total_em = np.sum(overall[1] * overall[2] * overall[0])
+    
+    frac_dest /= total_em
+    
+    n_photons = np.sum(overall[0] * overall[1] * overall[2]/(h * c))/(np.sum(overall[1] * overall[2])) * lf2
+    mols = masses[ptypes == 0]/np.sum((f_un[ptypes == 0] * mu_specie * amu), axis=1)
+    
+    weighted_interception = ((f_un * cross_sections).T/np.sum(cross_sections * f_un, axis=1)).T
+    atoms_destroyed = ((weighted_interception * frac_dest)[ptypes == 0].T * n_photons).T
+    atoms_total = (f_un[ptypes == 0].T * mols).T
+    
+    frac_destroyed_by_species = atoms_destroyed/atoms_total
+    frac_destroyed_by_species = 1. - np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
+    
+    new_fun = f_un.T
 
-	new_fun[2][ptypes == 0] += new_fun[0][ptypes == 0] * frac_destroyed_by_species.T[0] * 2.
-	new_fun[3][ptypes == 0] += new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
-	new_fun[4][ptypes == 0] += new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
-	
-	new_fun[0][ptypes == 0] -= new_fun[0][ptypes == 0] * frac_destroyed_by_species.T[0]
-	new_fun[2][ptypes == 0] -= new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
-	
-	subt = new_fun[3][ptypes == 0] * new_fun[4][ptypes == 0] * cross_sections[3] * c * dt_0
-	
-	new_fun[2][ptypes == 0] += subt
-	new_fun[3][ptypes == 0] -= subt
-	new_fun[4][ptypes == 0] -= subt
-	
-	#energy, composition change, impulse
-	return lf2, new_fun.T, momentum
+    new_fun[2][ptypes == 0] += new_fun[0][ptypes == 0] * frac_destroyed_by_species.T[0] * 2.
+    new_fun[3][ptypes == 0] += new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
+    new_fun[4][ptypes == 0] += new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
+    
+    new_fun[0][ptypes == 0] -= new_fun[0][ptypes == 0] * frac_destroyed_by_species.T[0]
+    new_fun[2][ptypes == 0] -= new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
+    
+    subt = new_fun[3][ptypes == 0] * new_fun[4][ptypes == 0] * cross_sections[3] * c * dt_0
+    
+    new_fun[2][ptypes == 0] += subt
+    new_fun[3][ptypes == 0] -= subt
+    new_fun[4][ptypes == 0] -= subt
+    
+    #energy, composition change, impulse
+    return lf2, new_fun.T, momentum
 
 DIAMETER = 0.7e6 * AU
 N_PARTICLES = 1500
@@ -510,43 +539,43 @@ star_ages = np.ones(len(points)) * -1.
 age = 0
 for iq in range(400): 
     if np.sum(particle_type[particle_type == 1]) > 0:
-    	rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un)
-    	E_internal[particle_type == 0] += rh[0]
-    	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
-    	E_internal[E_internal < 0] == 5 * (gamma_array * mass * k)/(mu_array * m_h)
-    	f_un = rh[1]
-    	velocities[particle_type == 0] += rh[2]
-    	
-    	#on supernova event--- add new dust particle (particle_type == 2)
-    	
-    	print np.max(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))
-    	print np.max(mass[particle_type == 1]/solar_mass)
-    	
-    	supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
-    	print len(supernova_pos)
-    	#print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
-    	if len(supernova_pos) > 0:
-    		dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos = supernova_explosion()
-    		E_internal[supernova_pos] = new_eint_stars
-    		f_un[supernova_pos] = star_comps
-    		mass[supernova_pos] = stars_mass
-    		E_internal = np.concatenate((E_internal, new_eint_dust, new_eint_gas))
-    		particle_type = np.concatenate((particle_type, newdusttype, newgastype))
-    		mass = np.concatenate((mass, dust_mass, gas_mass))
-    		f_un = np.vstack([f_un, dust_comps, gas_comps])
-    		velocities = np.concatenate((velocities, newvels, newvels))
-    		star_ages = np.concatenate((star_ages, np.ones(len(supernova_pos))* (-2), np.ones(len(supernova_pos))* (-2)))
-    		points = np.vstack([points, newpoints, newpoints])
-    		
-    		neighbor = neighbors(points, d)
-    		
-    	#specie_fraction_array's retention is deliberate; number densities are in fact increasing
-    	#so we want to divide by the same base
-    	mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(specie_fraction_array)
-    	gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(specie_fraction_array)
-    	cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(specie_fraction_array)
-    	optical_depth = mass/(m_h * mu_array) * cross_array
-    	
+        rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un)
+        E_internal[particle_type == 0] += rh[0]
+        E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
+        E_internal[E_internal < 0] == 5 * (gamma_array * mass * k)/(mu_array * m_h)
+        f_un = rh[1]
+        velocities[particle_type == 0] += rh[2]
+        
+        #on supernova event--- add new dust particle (particle_type == 2)
+        
+        print (np.max(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10)))
+        print (np.max(mass[particle_type == 1]/solar_mass))
+        
+        supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
+        print (len(supernova_pos))
+        #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
+        if len(supernova_pos) > 0:
+            dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos = supernova_explosion()
+            E_internal[supernova_pos] = new_eint_stars
+            f_un[supernova_pos] = star_comps
+            mass[supernova_pos] = stars_mass
+            E_internal = np.concatenate((E_internal, new_eint_dust, new_eint_gas))
+            particle_type = np.concatenate((particle_type, newdusttype, newgastype))
+            mass = np.concatenate((mass, dust_mass, gas_mass))
+            f_un = np.vstack([f_un, dust_comps, gas_comps])
+            velocities = np.concatenate((velocities, newvels, newvels))
+            star_ages = np.concatenate((star_ages, np.ones(len(supernova_pos))* (-2), np.ones(len(supernova_pos))* (-2)))
+            points = np.vstack([points, newpoints, newpoints])
+            
+            neighbor = neighbors(points, d)
+            
+        #specie_fraction_array's retention is deliberate; number densities are in fact increasing
+        #so we want to divide by the same base
+        mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(specie_fraction_array)
+        gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(specie_fraction_array)
+        cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(specie_fraction_array)
+        optical_depth = mass/(m_h * mu_array) * cross_array
+        
     neighbor = neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
     #age += dt_0
@@ -626,18 +655,18 @@ for iq in range(400):
     sst2 = sstars[(xstars > min(xmin, ymin)) & (xstars < max(xmax, ymax))]
     
     if len(xst2) > 0:
-    	plt.scatter(max(np.abs(np.append(xst2, yst2))), max(np.abs(np.append(xst2, yst2))), alpha=0.001)
-    	plt.scatter(-max(np.abs(np.append(xst2, yst2))), -max(np.abs(np.append(xst2, yst2))), alpha=0.001)
+        plt.scatter(max(np.abs(np.append(xst2, yst2))), max(np.abs(np.append(xst2, yst2))), alpha=0.001)
+        plt.scatter(-max(np.abs(np.append(xst2, yst2))), -max(np.abs(np.append(xst2, yst2))), alpha=0.001)
     
     plt.scatter(max(np.abs(np.append(xpts2, ypts2))), max(np.abs(np.append(xpts2, ypts2))), alpha=0.001)
     plt.scatter(-max(np.abs(np.append(xpts2, ypts2))), -max(np.abs(np.append(xpts2, ypts2))), alpha=0.001)
     
     '''if (len(xst2) < len(xstars)) or (len(xpts2) < len(xpts)):
-    	plt.scatter(4 * DIAMETER, 4 * DIAMETER, s=0.1)
-    	plt.scatter(4 * DIAMETER,-4 * DIAMETER, s=0.1)
-    	plt.scatter(4 * DIAMETER, 4 * DIAMETER, s=0.1)
-    	plt.scatter(-4 * DIAMETER,4 * DIAMETER, s=0.1)'''
-    	
+        plt.scatter(4 * DIAMETER, 4 * DIAMETER, s=0.1)
+        plt.scatter(4 * DIAMETER,-4 * DIAMETER, s=0.1)
+        plt.scatter(4 * DIAMETER, 4 * DIAMETER, s=0.1)
+        plt.scatter(-4 * DIAMETER,4 * DIAMETER, s=0.1)'''
+        
     [plt.axis('equal')]
     [plt.scatter(xpts2, ypts2, c = cols2, s=20, edgecolor='none', alpha=0.1)]
     [plt.colorbar()]
