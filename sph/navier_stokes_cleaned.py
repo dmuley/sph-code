@@ -30,21 +30,23 @@ solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
 t_solar = 5776
-mean_opacity = 1e-7
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 dt_0 = 60. * 60. * 24. * 365 * 100000. # 100000 years
 year = 60. * 60. * 24. * 365.
-base_sfr = 1.0e-13
 mu_specie = np.array([2.0159,1.0079,1.0074,4.0026,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
 #molecular hydrogen, helium, neutral hydrogen, H+, e-
 #Later, add various gas-phase metals to this array
-mol_weights = np.array([1.00794 * 2, 4.002602, 1.00794, 1.00727647, 548.579909e-6])
 cross_sections = np.array([3.34e-30, 3.34e-30, 6.3e-28, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0., 0.]) 
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
-adiab_indices = (np.array([7./5., 5./3., 5./3., 5./3., 5./3.]) - 1)**(-1)
+mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
+sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,0,5./3,5./3,5./3,5./3,5./3,0,0])#the polytropes of species in each SPH, an array of arrays
+supernova_base_release = np.array([[.86,.14,0,0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
 
+mrn_constants = np.array([50e-10, 2500e-10]) #minimum and maximum radii for MRN distribution
+
+#DUMMY VALUES
 DIAMETER = 1e6 * AU
 N_PARTICLES = 15000
 N_INT_PER_PARTICLE = 100
@@ -53,14 +55,12 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0]) 
 
-
-#refractoryu specie information array
-max_radius_array = np.array([]) #array of the max radii of each refractory species
-min_radius_array = np.array([]) #array of the min radii of each refractory species
-mineral_density = np.array([]) #mineral density of each specie
-num_dens_ref = np.array([]) #array of the initial number densities of each refractory species
-m_ref_species = np.array([]) #array of the molecular weights of each refractory specie
-sputtering_yield = np.array([]) #average sputtering yield of each refractory specie
+def sigma_effective(mineral_densities, mrn_constants,mu_specie):
+	#computes effective cross-sectional area per particle
+	#assuming an MRN distribution. This gives a measure of
+	#the optical activity of dust
+	seff = mu_specie * amu/mineral_densities * (3./4.) * -np.diff(mrn_constants**-0.5)/np.diff(mrn_constants**0.5)
+	return seff
 
 def kroupa_imf(base_imf):
     coeff_0 = 1
@@ -281,10 +281,10 @@ def temperature_arb(arb_points):
     
 def supernova_explosion():
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
-    total_release = np.array([[.86,.14,0,0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
+    total_release = supernova_base_release
     trsum = np.sum(total_release)
 
-    gas_release = np.array([[.86,.14,0,0,0.0,0.,0.,0.,0.,0.,0.,0.,0.]])
+    gas_release = f_u
     grsum = np.sum(gas_release)
     
     dust_release = total_release - gas_release
@@ -351,7 +351,6 @@ def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timest
     rho = mineral_density[u]*K_u*np.exp(K_u*dt)/(m_ref_species[u]*num_dens_ref[u]+np.exp(K_u*dt)*mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])     
     n_u = num_dens_ref[u]-(rho-mineral_density[u])/mol_weights[u]                                              
     return(rho,n_u)
-    
 
 def overall_spectrum(base_imf, imf):
     exp_radius = np.zeros(len(base_imf))
@@ -405,7 +404,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     
     luminosities = lum_base/np.sum(lum_base) * tot_luminosity
     
-    random_gas = positions[ptypes == 0]
+    random_gas = positions[ptypes != 1]
     rg2 = np.array([])
     if len(random_gas > 0):
         gas_selection = (np.random.rand(len(random_gas)) < len(random_gas)**-0.5)
@@ -441,18 +440,18 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
         lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + 1).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + 1)**-2, axis=0)))
     
     lum_factor = np.array(lum_factor)
-    extinction = ((315./512.) * masses[particle_type == 0]/(mu_array[particle_type == 0] * amu) * cross_array[particle_type == 0]) * sizes[particle_type == 0]**(-2)
+    extinction = ((315./512.) * masses[ptypes != 1]/(mu_array[ptypes != 1] * amu) * cross_array[ptypes != 1]) * sizes[ptypes != 1]**(-2)
     
     exponential = np.exp(-np.nan_to_num(lum_factor))
     distance_factor = (np.nan_to_num(star_distance_2)**2 + np.ones(np.shape(star_distance_2)))
-    a_intercepted = (np.pi * sizes**2)[ptypes == 0]
+    a_intercepted = (np.pi * sizes**2)[ptypes != 1]
     
     lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
     lum_factor_2 = np.nan_to_num(lum_factor_2)
     
     lf2 = np.sum(lum_factor_2, axis=0) * dt_0 * solar_luminosity
     
-    momentum = (np.sum(np.array([star_unit_norm[ak].T * lum_factor_2[ak] for ak in range(len(lum_factor_2))]), axis=0)/masses[ptypes == 0]).T * dt_0/c
+    momentum = (np.sum(np.array([star_unit_norm[ak].T * lum_factor_2[ak] for ak in range(len(lum_factor_2))]), axis=0)/masses[ptypes != 1]).T * dt_0/c
     
     overall = overall_spectrum(masses[ptypes == 1]/solar_mass, np.ones(len(masses[ptypes == 1])))
     dest_wavelengths = destruction_energies**(-1) * (h * c)
@@ -461,8 +460,10 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     
     frac_dest /= total_em
     
+    
+    #Only gas particles suffer from ionization, not dust particles
     n_photons = np.sum(overall[0] * overall[1] * overall[2]/(h * c))/(np.sum(overall[1] * overall[2])) * lf2
-    mols = masses[ptypes == 0]/np.sum((f_un[ptypes == 0] * mu_specie * amu), axis=1)
+    mols = masses[ptypes != 1]/np.sum((f_un[ptypes != 1] * mu_specie * amu), axis=1)
     
     weighted_interception = ((f_un * cross_sections).T/np.sum(cross_sections * f_un, axis=1)).T
     atoms_destroyed = ((weighted_interception * frac_dest)[ptypes == 0].T * n_photons).T
@@ -473,18 +474,18 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     
     new_fun = f_un.T
 
-    new_fun[2][ptypes == 0] += new_fun[0][ptypes == 0] * frac_destroyed_by_species.T[0] * 2.
-    new_fun[3][ptypes == 0] += new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
-    new_fun[4][ptypes == 0] += new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
+    new_fun[2][ptypes != 1] += new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0] * 2.
+    new_fun[3][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
+    new_fun[4][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    new_fun[0][ptypes == 0] -= new_fun[0][ptypes == 0] * frac_destroyed_by_species.T[0]
-    new_fun[2][ptypes == 0] -= new_fun[2][ptypes == 0] * frac_destroyed_by_species.T[2]
+    new_fun[0][ptypes != 1] -= new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0]
+    new_fun[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    subt = new_fun[3][ptypes == 0] * new_fun[4][ptypes == 0] * cross_sections[3] * c * dt_0
+    subt = new_fun[3][ptypes != 1] * new_fun[4][ptypes != 1] * cross_sections[3] * c * dt_0
     
-    new_fun[2][ptypes == 0] += subt
-    new_fun[3][ptypes == 0] -= subt
-    new_fun[4][ptypes == 0] -= subt
+    new_fun[2][ptypes != 1] += subt
+    new_fun[3][ptypes != 1] -= subt
+    new_fun[4][ptypes != 1] -= subt
     
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
@@ -496,6 +497,7 @@ V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
+cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 
 base_imf = np.logspace(-1,2, 200)
@@ -692,6 +694,16 @@ ax = fig.add_subplot(111, projection='3d')
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.colorbar()]
+[plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
+[plt.axis('equal'), plt.show()]
+plt.xlabel('Position (astronomical units)')
+plt.ylabel('Position (astronomical units)')
+plt.title('Density in H II region')
+
+[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.colorbar()]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
