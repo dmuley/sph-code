@@ -663,12 +663,6 @@ for iq in range(400):
     
     plt.scatter(max(np.abs(np.append(xpts2, ypts2))), max(np.abs(np.append(xpts2, ypts2))), alpha=0.001)
     plt.scatter(-max(np.abs(np.append(xpts2, ypts2))), -max(np.abs(np.append(xpts2, ypts2))), alpha=0.001)
-    
-    '''if (len(xst2) < len(xstars)) or (len(xpts2) < len(xpts)):
-        plt.scatter(4 * DIAMETER, 4 * DIAMETER, s=0.1)
-        plt.scatter(4 * DIAMETER,-4 * DIAMETER, s=0.1)
-        plt.scatter(4 * DIAMETER, 4 * DIAMETER, s=0.1)
-        plt.scatter(-4 * DIAMETER,4 * DIAMETER, s=0.1)'''
         
     [plt.axis('equal')]
     [plt.scatter(xpts2, ypts2, c = cols2, s=20, edgecolor='none', alpha=0.1)]
@@ -701,21 +695,6 @@ ax = fig.add_subplot(111, projection='3d')
 plt.xlabel('Position (astronomical units)')
 plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
-
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.colorbar()]
-[plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
-[plt.axis('equal'), plt.show()]
-plt.xlabel('Position (astronomical units)')
-plt.ylabel('Position (astronomical units)')
-plt.title('Density in H II region')
-
-[plt.scatter(points2.T[1:][0][particle_type == 0]/AU, points2.T[1:][1][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=20, edgecolor='none', alpha=0.1)]
-[plt.colorbar()]
-[plt.scatter(points.T[1:][0][particle_type == 1]/AU, points.T[1:][1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
-[plt.axis('equal'), plt.show()]
 
 arb_points = (np.random.rand(N_PARTICLES * 5000, 3) - 0.5) * 100 * DIAMETER
 #narb = neighbors_arb(points, arb_points)
