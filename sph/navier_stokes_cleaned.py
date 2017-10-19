@@ -542,11 +542,12 @@ age = 0
 for iq in range(400): 
     if np.sum(particle_type[particle_type == 1]) > 0:
         rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un)
-        E_internal[particle_type == 0] += rh[0]
+        E_internal[particle_type != 1] += rh[0]
         E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
+        E_internal[particle_type == 2] *= np.nan_to_num((((4 * sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 2]
         E_internal[E_internal < 0] == 5 * (gamma_array * mass * k)/(mu_array * m_h)
         f_un = rh[1]
-        velocities[particle_type == 0] += rh[2]
+        velocities[particle_type != 1] += rh[2]
         
         #on supernova event--- add new dust particle (particle_type == 2)
         
