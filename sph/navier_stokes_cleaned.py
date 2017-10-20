@@ -500,6 +500,7 @@ N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
+base_sfr = 0.02
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
@@ -604,7 +605,7 @@ for iq in range(400):
     E_internal = np.nan_to_num(E_internal)
 
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt_0
-    probability = 0.02 * (densities/critical_density)**(1.4) * ((dt_0/year)/T_FF)
+    probability = base_sfr * (densities/critical_density)**(1.4) * ((dt_0/year)/T_FF)
     diceroll = np.random.rand(len(probability))
     particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
     #this helps ensure that lone SPH particles don't form stars at late times in the simulation
@@ -630,7 +631,8 @@ for iq in range(400):
     #moreover, this gives us a greater dynamic range of possible densities
     #to work with, and helps avoid star formation at some arbitrary density floor
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
-    d = (V_new/len(points) * N_INT_PER_PARTICLE)**(1./3.) 
+    d = (V_new/len(points) * N_INT_PER_PARTICLE)**(1./3.)
+    d_sq = d**2 
     sizes = (mass/m_0)**(1./3.) * d
     
     plt.clf()
