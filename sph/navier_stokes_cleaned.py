@@ -341,14 +341,16 @@ def supernovae_impulse(j): #adds differential velocity based on supernovae shock
 
 def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timestep, and Temperature. Returns accreated dust mass
     #Still need to add n_h, sputtering yield, mineral density, initial number density, etc.
-    n_H = 1
+    n_H = 1;
+    num_dens_ref = dust_comps[j]*mass[j]/m_ref_species[u] #initial number density of species, n_u_0
     #K_u calculation divided into 3 for convenience 
     K_u = (min_radius_array[u]**(-0.5)-max_radius_array[u]**(-0.5))/(3*mineral_density[u]*(max_radius_array[u]**(0.5)-min_radius_array[u]**(0.5)))
     K_u = K_u*(k*T/(2*np.pi*m_ref_species[u]))**0.5 
-    K_u = K_u*(m_ref_species[u]*num_dens_ref[u]+mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])
-    rho = mineral_density[u]*K_u*np.exp(K_u*dt)/(m_ref_species[u]*num_dens_ref[u]+np.exp(K_u*dt)*mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])     
-    n_u = num_dens_ref[u]-(rho-mineral_density[u])/mol_weights[u]                                              
+    K_u = K_u*(m_ref_species[u]*num_dens_ref+mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])
+    rho = mineral_density[u]*K_u*np.exp(K_u*dt)/(m_ref_species[u]*num_dens_ref+np.exp(K_u*dt)*mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])     
+    n_u = num_dens_ref-(rho-mineral_density[u])/mol_weights[u]                                              
     return(rho,n_u)
+
 
 def overall_spectrum(base_imf, imf):
     exp_radius = np.zeros(len(base_imf))
