@@ -33,10 +33,9 @@ t_solar = 5776
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 dt_0 = 60. * 60. * 24. * 365 * 100000. # 100000 years
 year = 60. * 60. * 24. * 365.
-mu_specie = np.array([2.0159,1.0079,1.0074,4.0026,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-#molecular hydrogen, helium, neutral hydrogen, H+, e-
-#Later, add various gas-phase metals to this array
-cross_sections = np.array([3.34e-30, 3.34e-30, 6.3e-28, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0., 0.]) 
+#properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
+mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
+cross_sections = np.array([3.34e-30, 3.34e-30, 6.3e-28, 5e-26, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0.]) 
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
@@ -206,7 +205,6 @@ def grad_weight(x, x_0, m, type_particle):
     norms_sq = np.sum((x - x_0)**2, axis=1)
     
     W = -315 * 6 * (m_0/m)**3 / (64*np.pi*d**9) * ((m/m_0)**(2./3.)*d**2-norms_sq)**2 * (type_particle == 0) * vec.T
-    #W = W.T
     
     return((np.nan_to_num(W.astype('float') * ((m/m_0)**(2./3.)*d**2-norms_sq > 0))).T)
 
@@ -305,7 +303,7 @@ def supernova_explosion():
     gas_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/grsum
     stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
     
-    newpoints = points[supernova_pos]
+    newpoints = points[supernova_pos] + np.random.rand(3) * d
     newvels = velocities[supernova_pos]
     #newaccel = accel[supernova_pos]
     
@@ -313,8 +311,8 @@ def supernova_explosion():
     newdusttype = np.ones(len(supernova_pos)) * 2
     
     new_eint_stars = np.zeros(len(supernova_pos))
-    new_eint_dust = np.zeros(len(supernova_pos))
-    new_eint_gas = E_internal[supernova_pos]
+    new_eint_dust = E_internal[supernova_pos]/2.
+    new_eint_gas = E_internal[supernova_pos]/2.
     
     return dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos
     
@@ -466,8 +464,8 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     mols = masses[ptypes != 1]/np.sum((f_un[ptypes != 1] * mu_specie * amu), axis=1)
     
     weighted_interception = ((f_un * cross_sections).T/np.sum(cross_sections * f_un, axis=1)).T
-    atoms_destroyed = ((weighted_interception * frac_dest)[ptypes == 0].T * n_photons).T
-    atoms_total = (f_un[ptypes == 0].T * mols).T
+    atoms_destroyed = ((weighted_interception * frac_dest)[ptypes != 1].T * n_photons).T
+    atoms_total = (f_un[ptypes != 1].T * mols).T
     
     frac_destroyed_by_species = atoms_destroyed/atoms_total
     frac_destroyed_by_species = 1. - np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
@@ -476,16 +474,22 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
 
     new_fun[2][ptypes != 1] += new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0] * 2.
     new_fun[3][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
-    new_fun[4][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
+    new_fun[4][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
+    
+    new_fun[5][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
+    new_fun[5][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     
     new_fun[0][ptypes != 1] -= new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0]
+    new_fun[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    subt = new_fun[3][ptypes != 1] * new_fun[4][ptypes != 1] * cross_sections[3] * c * dt_0
+    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * cross_sections[3] * c * dt_0
+    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * cross_sections[4] * c * dt_0
     
     new_fun[2][ptypes != 1] += subt
     new_fun[3][ptypes != 1] -= subt
-    new_fun[4][ptypes != 1] -= subt
+    new_fun[4][ptypes != 1] -= subt2
+    new_fun[5][ptypes != 1] -= subt + subt2
     
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
@@ -496,10 +500,10 @@ N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
+#relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
-#relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
-
+plt.ion()
 base_imf = np.logspace(-1,2, 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = kroupa_imf(base_imf) * d_base_imf
@@ -545,7 +549,7 @@ for iq in range(400):
         E_internal[particle_type != 1] += rh[0]
         E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
         E_internal[particle_type == 2] *= np.nan_to_num((((4 * sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 2]
-        E_internal[E_internal < 0] == 5 * (gamma_array * mass * k)/(mu_array * m_h)
+        E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] == t_cmb * (gamma_array * mass * k)/(mu_array * m_h)
         f_un = rh[1]
         velocities[particle_type != 1] += rh[2]
         
@@ -581,7 +585,6 @@ for iq in range(400):
         
     neighbor = neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-    #age += dt_0
     bg = bin_generator(mass, points, [4, 4, 4]); age += dt_0
     com = bg[0] #center of masses of each bin
     grav_accel = compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
@@ -596,7 +599,6 @@ for iq in range(400):
         
     points += ((total_accel * (dt_0)**2)/2.) + velocities * dt_0
     velocities += (total_accel * dt_0)
-    #velocities *= 0.95
     
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
     E_internal = np.nan_to_num(E_internal)
@@ -632,8 +634,6 @@ for iq in range(400):
     sizes = (mass/m_0)**(1./3.) * d
     
     plt.clf()
-    #plt.xlim(-0.5e7, 0.5e7)
-    #plt.ylim(-0.5e7, 0.5e7)
     
     xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
@@ -642,20 +642,15 @@ for iq in range(400):
     ystars = points.T[1:][1][particle_type == 1]/AU
     sstars = (mass[particle_type == 1]/solar_mass) * 5.
     
-    #xmin = np.percentile(points.T[1], 2)/AU
-    #xmax =  np.percentile(points.T[2], 98)/AU
-    #ymin =  np.percentile(points.T[1], 2)/AU
-    #ymax =  np.percentile(points.T[2], 98)/AU
-    
     colors = np.log10(densities/critical_density)[particle_type == 0]
     
-    xpts2 = xpts[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax))]
-    ypts2 = ypts[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax))]
-    cols2 = colors[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax))]
+    xpts2 = xpts[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax)) | (ypts > min(xmin, ymin)) & (ypts < max(xmax, ymax))]
+    ypts2 = ypts[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax)) | (ypts > min(xmin, ymin)) & (ypts < max(xmax, ymax))]
+    cols2 = colors[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax)) | (ypts > min(xmin, ymin)) & (ypts < max(xmax, ymax))]
     
-    xst2 = xstars[(xstars > min(xmin, ymin)) & (xstars < max(xmax, ymax))]
-    yst2 = ystars[(xstars > min(xmin, ymin)) & (xstars < max(xmax, ymax))]
-    sst2 = sstars[(xstars > min(xmin, ymin)) & (xstars < max(xmax, ymax))]
+    xst2 = xstars[(xstars > min(xmin, ymin)) & (xstars < max(xmax, ymax)) | (ystars > min(xmin, ymin)) & (ystars < max(xmax, ymax))]
+    yst2 = ystars[(xstars > min(xmin, ymin)) & (xstars < max(xmax, ymax)) | (ystars > min(xmin, ymin)) & (ystars < max(xmax, ymax))]
+    sst2 = sstars[(xstars > min(xmin, ymin)) & (xstars < max(xmax, ymax)) | (ystars > min(xmin, ymin)) & (ystars < max(xmax, ymax))]
     
     if len(xst2) > 0:
         plt.scatter(max(np.abs(np.append(xst2, yst2))), max(np.abs(np.append(xst2, yst2))), alpha=0.001)
@@ -671,7 +666,8 @@ for iq in range(400):
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Density in H II region')
-    plt.pause(1)        
+    plt.pause(1)
+    
     print ('age=', age/year)
     #print (d/AU)
     print ('stars/total = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
@@ -686,17 +682,20 @@ ax = fig.add_subplot(111, projection='3d')
 [ax.set_zlim3d(-DIAMETER/2/AU, DIAMETER/2/AU)]
 [plt.show()]
 
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+
+#[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, s=30, edgecolor='black', alpha=0.1)]
+
 [plt.colorbar()]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
 plt.xlabel('Position (astronomical units)')
 plt.ylabel('Position (astronomical units)')
-plt.title('Density in H II region')
+plt.title('Temperature in H II region')
 
-arb_points = (np.random.rand(N_PARTICLES * 5000, 3) - 0.5) * 100 * DIAMETER
+arb_points = (np.random.rand(N_PARTICLES * 10, 3) - 0.5) * (max(ymax, xmax) - min(xmin, ymin))
 #narb = neighbors_arb(points, arb_points)
 darb = density_arb(arb_points)
 tarb = temperature_arb(arb_points)
