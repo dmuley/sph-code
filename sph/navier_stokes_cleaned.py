@@ -31,7 +31,7 @@ solar_lifespan = 1e10 #years
 t_cmb = 2.732
 t_solar = 5776
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
-dt_0 = 60. * 60. * 24. * 365 * 50000. # 50000 years
+dt_0 = 60. * 60. * 24. * 365 * 100000. # 100000 years
 year = 60. * 60. * 24. * 365.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
@@ -393,10 +393,11 @@ def overall_spectrum(base_imf, imf):
 def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     random_stars = positions[ptypes == 1]
     rs2 = np.array([])
+    rs2 = random_stars
     if len(random_stars > 0):
-        star_selection = (np.random.rand(len(random_stars)) < len(random_stars)**-0.5)
+        star_selection = (np.random.rand(len(random_stars)) < (masses[ptypes == 1]/solar_mass > 4.).astype('float') + len(random_stars)**-0.5 ) #selecting all stars over 4 solar masses for proper H II regions
         rs2 = random_stars[star_selection]
-        if len(rs2) == 0:
+        if len(rs2) < 0:
             rs2 = random_stars
             
     lum_base = luminosity_relation(masses[ptypes == 1][star_selection]/solar_mass, 1)
@@ -485,8 +486,8 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     new_fun[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * cross_sections[3] * c * dt_0
-    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * cross_sections[4] * c * dt_0
+    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[3] * c * dt_0 * 1e3,1.)
+    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[4] * c * dt_0 * 1e3,1.)
     
     new_fun[2][ptypes != 1] += subt
     new_fun[3][ptypes != 1] -= subt
@@ -507,7 +508,7 @@ base_sfr = 0.02
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
 plt.ion()
-base_imf = np.logspace(-1,2, 200)
+base_imf = np.logspace(-1,1.5, 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
@@ -527,7 +528,7 @@ E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 #copy of generate_E_array
 #fills in E_internal array specified at the beginning
 T = 5 * np.ones([N_PARTICLES]) #5 kelvins
-T_FF = 3000000. #years
+T_FF = 5000000. #years
 #fills the f_u array
 f_un = np.array([specie_fraction_array] * N_PARTICLES)
 mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(specie_fraction_array)
@@ -614,12 +615,12 @@ for iq in range(400):
     #ideally, there is an infinite number of SPH particles, each with infinitesimal density
     #that only has any real physical effects in conjunction with other particles
     
-    xmin = np.percentile(points.T[0], 5)/AU
-    xmax =  np.percentile(points.T[0], 95)/AU
-    ymin =  np.percentile(points.T[1], 5)/AU
-    ymax =  np.percentile(points.T[1], 95)/AU
-    zmin = np.percentile(points.T[2], 5)/AU
-    zmax = np.percentile(points.T[2], 95)/AU
+    xmin = np.percentile(points.T[0], 10)/AU
+    xmax =  np.percentile(points.T[0], 90)/AU
+    ymin =  np.percentile(points.T[1], 10)/AU
+    ymax =  np.percentile(points.T[1], 90)/AU
+    zmin = np.percentile(points.T[2], 10)/AU
+    zmax = np.percentile(points.T[2], 90)/AU
 
     x_dist = zmax - zmin
     y_dist = xmax - xmin
@@ -633,7 +634,7 @@ for iq in range(400):
     #moreover, this gives us a greater dynamic range of possible densities
     #to work with, and helps avoid star formation at some arbitrary density floor
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
-    d = (V_new/len(points) * N_INT_PER_PARTICLE)**(1./3.)
+    d = (V_new/len(points)/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2 
     sizes = (mass/m_0)**(1./3.) * d
     
@@ -646,7 +647,7 @@ for iq in range(400):
     ystars = points.T[1:][1][particle_type == 1]/AU
     sstars = (mass[particle_type == 1]/solar_mass) * 5.
     
-    colors = np.log10(densities/critical_density)[particle_type == 0]
+    colors = (f_un.T[5]/np.sum(f_un, axis=1))[particle_type == 0]
     
     xpts2 = xpts[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax)) | (ypts > min(xmin, ymin)) & (ypts < max(xmax, ymax))]
     ypts2 = ypts[(xpts > min(xmin, ymin)) & (xpts < max(xmax, ymax)) | (ypts > min(xmin, ymin)) & (ypts < max(xmax, ymax))]
@@ -669,7 +670,7 @@ for iq in range(400):
     [plt.scatter(xst2,yst2, c = 'black', s=sst2, alpha=1)]
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
-    plt.title('Density in H II region (t = ' + str(age/year/1e6) + ' Myr)')
+    plt.title('Ionization fraction in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
     print ('age=', age/year)
