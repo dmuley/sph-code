@@ -40,7 +40,7 @@ destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
-gamma = np.array([7./5,5./3,5./3,5./3,5./3,0,5./3,5./3,5./3,5./3,5./3,0,0])#the polytropes of species in each SPH, an array of arrays
+gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,7.09,4.91,1.03,2.41,3.022,1.,1.])#the polytropes of species in each SPH, an array of arrays
 supernova_base_release = np.array([[.86,.14,0,0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
 
 mrn_constants = np.array([50e-10, 2500e-10]) #minimum and maximum radii for MRN distribution
