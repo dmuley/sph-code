@@ -31,11 +31,11 @@ solar_lifespan = 1e10 #years
 t_cmb = 2.732
 t_solar = 5776
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
-dt_0 = 60. * 60. * 24. * 365 * 100000. # 100000 years
+dt_0 = 60. * 60. * 24. * 365 * 50000. # 50000 years
 year = 60. * 60. * 24. * 365.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-cross_sections = np.array([3.34e-30, 3.34e-30, 6.3e-28, 5e-26, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0.]) 
+cross_sections = np.array([3.34e-30, 3.34e-30, 6.3e-28, 5e-26, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0.])
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
@@ -68,7 +68,7 @@ def kroupa_imf(base_imf):
     coeff_1 = 2.133403503
     imf_final[(base_imf >= 0.08) & (base_imf < 0.5)] = coeff_1 * (base_imf/0.08)[(base_imf >= 0.08) & (base_imf < 0.5)]**-1.3
     coeff_2 = 0.09233279398
-    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.0 #fattened tail from 2.3!
+    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.3 #fattened tail from 2.3!
     
     return (imf_final)
 
@@ -494,8 +494,8 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
 
-DIAMETER = 0.7e6 * AU
-N_PARTICLES = 1500
+DIAMETER = 1e6 * AU
+N_PARTICLES = 3000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -667,7 +667,7 @@ for iq in range(400):
     [plt.scatter(xst2,yst2, c = 'black', s=sst2, alpha=1)]
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
-    plt.title('Density in H II region')
+    plt.title('Density in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
     print ('age=', age/year)
