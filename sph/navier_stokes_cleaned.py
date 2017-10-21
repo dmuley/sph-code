@@ -45,6 +45,9 @@ supernova_base_release = np.array([[.86,.14,0,0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 
 mrn_constants = np.array([50e-10, 2500e-10]) #minimum and maximum radii for MRN distribution
 
+
+heat_capacity_array = np.array([]) #heat capacities of refractory species
+
 #DUMMY VALUES
 DIAMETER = 1e6 * AU
 N_PARTICLES = 15000
@@ -54,6 +57,8 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0]) 
 
+
+	
 def sigma_effective(mineral_densities, mrn_constants,mu_specie):
 	#computes effective cross-sectional area per particle
 	#assuming an MRN distribution. This gives a measure of
