@@ -58,11 +58,6 @@ d_sq = d**2
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0]) 
 
 
-def adiab_index(u,T): #returns adiabatic indices
-	C = heat_capacity_array[u]
-	mass = mu_species[u]
-	adiab_index = C*mass/k
-	return(adiab_index)
 	
 def sigma_effective(mineral_densities, mrn_constants,mu_specie):
 	#computes effective cross-sectional area per particle
