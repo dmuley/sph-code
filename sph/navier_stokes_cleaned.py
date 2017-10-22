@@ -324,23 +324,6 @@ def supernova_explosion():
     # to find cross-sectional area per species particle; use relative mass
     #fractions to figure out total cross-sectional area intercepted
     #by dust grains
-
-def supernovae_impulse(j): #adds differential velocity based on supernovae shockwave
-    M_d0 = 194.28 #total number of SPH particles dispersed by a supernovae (in terms of solar masses)
-    Md = 0
-    gas_neighbors = np.array([]) #indices of the gas neighbors
-    for ii in range(N_PARTICLES):
-        if(particle_type[ii] == 0): #if the particle is a gas particle
-            gas_neighbors = np.append(gas_neighbors, [ii], axis = 0)
-    distance_array = np.sum(points[j]**2-points[gas_neighbors]**2,axis = 1) #lists the distance of the supernovae to each gas neighbor
-    sorted_index = np.argsort(distance_array) #sorted indices of masses, from closest to furthest
-    b = 0;
-    while(Md<M_d0):
-        if(b != j):
-            Md += mass[sorted_index[b]]
-        b+=1
-    diff_velocity = np.sqrt(194.28/(Md*0.736))*points(j)-points(np.arange(0,b))+np.sqrt(194.28/(Md*0.264))*points(j)-points(np.arange(0,b)) #impulse due to blast added to radiation 
-    return(diff_velocity)
     
 def supernova_impulse(points, masses, supernova_pos, ptypes):
 	mass_displaced = 194.28 * solar_mass #calculated from paper
@@ -367,7 +350,6 @@ def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timest
     rho = mineral_density[u]*K_u*np.exp(K_u*dt)/(m_ref_species[u]*num_dens_ref+np.exp(K_u*dt)*mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])     
     n_u = num_dens_ref-(rho-mineral_density[u])/mol_weights[u]                                              
     return(rho,n_u)
-
 
 def overall_spectrum(base_imf, imf):
     exp_radius = np.zeros(len(base_imf))
@@ -707,9 +689,6 @@ ax = fig.add_subplot(111, projection='3d')
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-
-#[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, s=30, edgecolor='black', alpha=0.1)]
-
 [plt.colorbar()]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
