@@ -46,9 +46,6 @@ supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,
 
 mrn_constants = np.array([50e-10, 2500e-10]) #minimum and maximum radii for MRN distribution
 
-
-heat_capacity_array = np.array([]) #heat capacities of refractory species
-
 #DUMMY VALUES
 DIAMETER = 1e6 * AU
 N_PARTICLES = 15000
@@ -677,7 +674,13 @@ for iq in range(400):
     print ('stars/total = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
     print ('==================================')
     
-'''fig = plt.figure()
+'''
+VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
+TO REPRESENT THE FINAL STATE OF THE SIMULATION
+
+
+3D PLOTTING:
+fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 [ax.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, alpha=0.1)]
 [ax.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, points.T[2][particle_type == 1]/AU, alpha=0.2)]
@@ -686,6 +689,7 @@ ax = fig.add_subplot(111, projection='3d')
 [ax.set_zlim3d(-DIAMETER/2/AU, DIAMETER/2/AU)]
 [plt.show()]
 
+PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
@@ -696,11 +700,11 @@ plt.xlabel('Position (astronomical units)')
 plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
+INTERPOLATED PLOTTING:
 arb_points = (np.random.rand(N_PARTICLES * 10, 3) - 0.5) * (max(ymax, xmax) - min(xmin, ymin))
 #narb = neighbors_arb(points, arb_points)
 darb = density_arb(arb_points)
 tarb = temperature_arb(arb_points)
-plt.ion()
 #[ax.scatter(points.T[0][particle_type == 0]/AU, points2.T[1][particle_type == 0]/AU, points2.T[2][particle_type == 0]/AU, alpha=0.1)]
 [plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=8, alpha=0.7, edgecolor='none'), plt.colorbar()]
 [plt.scatter(points.T[1:][0][particle_type == 1]/AU, points.T[1:][1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1)]
