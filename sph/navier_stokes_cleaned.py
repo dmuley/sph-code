@@ -616,12 +616,14 @@ for iq in range(400):
     #ideally, there is an infinite number of SPH particles, each with infinitesimal density
     #that only has any real physical effects in conjunction with other particles
     
-    xmin = np.percentile(points.T[0], 10)/AU
-    xmax =  np.percentile(points.T[0], 90)/AU
-    ymin =  np.percentile(points.T[1], 10)/AU
-    ymax =  np.percentile(points.T[1], 90)/AU
-    zmin = np.percentile(points.T[2], 10)/AU
-    zmax = np.percentile(points.T[2], 90)/AU
+    vel_condition = np.sum(velocities**2, axis=1)
+    
+    xmin = np.percentile(points.T[0][vel_condition < 80000**2], 10)/AU
+    xmax =  np.percentile(points.T[0][vel_condition < 80000**2], 90)/AU
+    ymin =  np.percentile(points.T[1][vel_condition < 80000**2], 10)/AU
+    ymax =  np.percentile(points.T[1][vel_condition < 80000**2], 90)/AU
+    zmin = np.percentile(points.T[2][vel_condition < 80000**2], 10)/AU
+    zmax = np.percentile(points.T[2][vel_condition < 80000**2], 90)/AU
 
     x_dist = zmax - zmin
     y_dist = xmax - xmin
@@ -640,8 +642,8 @@ for iq in range(400):
     sizes = (mass/m_0)**(1./3.) * d
     
     dist_sq = np.sum(points**2,axis=1)
-    min_dist = np.percentile(dist_sq, 0)
-    max_dist = np.percentile(dist_sq, 90)
+    min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
+    max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     
     xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
