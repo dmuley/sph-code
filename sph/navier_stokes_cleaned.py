@@ -127,6 +127,25 @@ def Laplacian_Weight(x):#laplacian of the weight for the viscosity function
     lap_W = const*(d*d-x_norm)*(3*d*d-7*x_norm)
     return(lap_W)
 
+
+def artificial_viscosity(j): #artificial viscosity introduced to make the simulation more stable
+    eta = 0.1*d#idk the actual eta
+    beta = 2
+    x = points[j]
+    v = velocities[j]
+    momentum_change = 0 #dv/dt, which is technically speed change
+    indices_nearest = neighbor[j]
+    for i in range(len(indices_nearest)):
+        if(density(i)==0):
+            continue
+        v_diff = v-velocities[indices_nearest[i]] #velocity differences
+        r_diff = x - points[indices_nearest[i]] #position differences
+        mu = d*np.inner(v_diff,r_diff)/(np.inner(r_diff,r_diff)+eta*eta)
+        rho_avg = (density(j)+density(i))/2
+        pi = beta*mu*mu/rho_avg
+        momentum_change += mass[i]*(pressure(i)/density(i)**2+pressure(i)/density(i)**2+pi)*grad_weight(x, points[i], m[j], particle_type[j]) 
+    return(momentum_change*-1) #returns dv/dt for each particle j
+
 def viscosity(j): #viscosity introduced to make the simulation more stable
     visc_coeff = 0.5 #vicsosity coefficient
     f_visc = 0
