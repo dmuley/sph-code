@@ -405,7 +405,7 @@ def overall_spectrum(base_imf, imf):
     
     return wl, planck_final, dwl
 
-def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
+def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos):
     random_stars = positions[ptypes == 1]
     rs2 = np.array([])
     rs2 = random_stars
@@ -414,8 +414,10 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
         rs2 = random_stars[star_selection]
         if len(rs2) < 0:
             rs2 = random_stars
-            
-    lum_base = luminosity_relation(masses[ptypes == 1][star_selection]/solar_mass, 1)
+    
+    suppos = np.zeros(len(masses))
+    suppos[supernova_pos] += 1            
+    lum_base = luminosity_relation(masses[ptypes == 1][star_selection]/solar_mass, 1) + 0.264 * supernova_energy/solar_luminosity/dt * suppos[ptypes == 1][star_selection]
     tot_luminosity = np.sum(luminosity_relation(masses[ptypes == 1]/solar_mass, 1))
     
     luminosities = lum_base/np.sum(lum_base) * tot_luminosity
@@ -465,9 +467,9 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
     lum_factor_2 = np.nan_to_num(lum_factor_2)
     
-    lf2 = np.sum(lum_factor_2, axis=0) * dt_0 * solar_luminosity
+    lf2 = np.sum(lum_factor_2, axis=0) * dt * solar_luminosity
     
-    momentum = (np.sum(np.array([star_unit_norm[ak].T * lum_factor_2[ak] for ak in range(len(lum_factor_2))]), axis=0)/masses[ptypes != 1]).T * dt_0/c
+    momentum = (np.sum(np.array([star_unit_norm[ak].T * lum_factor_2[ak] for ak in range(len(lum_factor_2))]), axis=0)/masses[ptypes != 1]).T * dt/c
     
     overall = overall_spectrum(masses[ptypes == 1]/solar_mass, np.ones(len(masses[ptypes == 1])))
     dest_wavelengths = destruction_energies**(-1) * (h * c)
@@ -501,8 +503,8 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un):
     new_fun[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[3] * c * dt_0 * 1e3,1.)
-    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[4] * c * dt_0 * 1e3,1.)
+    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[3] * c * dt * 1e3,1.)
+    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[4] * c * dt * 1e3,1.)
     
     new_fun[2][ptypes != 1] += subt
     new_fun[3][ptypes != 1] -= subt
@@ -519,6 +521,7 @@ V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
+dt = dt_0
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
@@ -564,12 +567,13 @@ print("Begin SPH")
 star_ages = np.ones(len(points)) * -1.
 age = 0
 plt.ion()
-for iq in range(400): 
+for iq in range(400):
     if np.sum(particle_type[particle_type == 1]) > 0:
-        rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un)
+        supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
+        rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
         E_internal[particle_type != 1] += rh[0]
-        E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
-        E_internal[particle_type == 2] *= np.nan_to_num((((4 * sb * optical_depth * dt_0)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 2]
+        E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
+        E_internal[particle_type == 2] *= np.nan_to_num((((4 * sb * optical_depth * dt)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 2]
         E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] == t_cmb * (gamma_array * mass * k)/(mu_array * m_h)
         f_un = rh[1]
         velocities[particle_type != 1] += rh[2]
@@ -579,7 +583,7 @@ for iq in range(400):
         print (np.max(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10)))
         print (np.max(mass[particle_type == 1]/solar_mass))
         
-        supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
+        #supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         print (len(supernova_pos))
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
@@ -609,7 +613,7 @@ for iq in range(400):
         
     neighbor = neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-    bg = bin_generator(mass, points, [4, 4, 4]); age += dt_0
+    bg = bin_generator(mass, points, [4, 4, 4]); age += dt
     com = bg[0] #center of masses of each bin
     grav_accel = compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
     
@@ -621,14 +625,14 @@ for iq in range(400):
     
     total_accel = grav_accel + pressure_accel
         
-    points += ((total_accel * (dt_0)**2)/2.) + velocities * dt_0
-    velocities += (total_accel * dt_0)
+    points += ((total_accel * (dt)**2)/2.) + velocities * dt
+    velocities += (total_accel * dt)
     
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
     E_internal = np.nan_to_num(E_internal)
 
-    star_ages[(particle_type == 1) & (star_ages > -2)] += dt_0
-    probability = base_sfr * (densities/critical_density)**(1.4) * ((dt_0/year)/T_FF)
+    star_ages[(particle_type == 1) & (star_ages > -2)] += dt
+    probability = base_sfr * (densities/critical_density)**(1.4) * ((dt/year)/T_FF)
     diceroll = np.random.rand(len(probability))
     particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
     #this helps ensure that lone SPH particles don't form stars at late times in the simulation
@@ -656,7 +660,7 @@ for iq in range(400):
     #moreover, this gives us a greater dynamic range of possible densities
     #to work with, and helps avoid star formation at some arbitrary density floor
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
-    d = (V_new/len(points)/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
+    d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2 
     sizes = (mass/m_0)**(1./3.) * d
     
@@ -680,11 +684,10 @@ for iq in range(400):
     max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     
-    plt.scatter(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)], ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)], c=colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],s=20, edgecolor='none', alpha=0.1)
+    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,1]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 60, [0.01, 0.01]), edgecolor='none', alpha=0.1)
+    #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
     plt.colorbar()
     plt.scatter(xstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], ystars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], c='black', s=sstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)])
-    plt.scatter(max(max_val, np.abs(min_val)),max(max_val, np.abs(min_val)),alpha=0.001)
-    plt.scatter(-max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val)),alpha=0.001)
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Ionization fraction in H II region (t = ' + str(age/year/1e6) + ' Myr)')
