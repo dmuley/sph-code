@@ -43,7 +43,6 @@ sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,7.09,4.91,1.03,2.41,3.022,1.,1.])#the polytropes of species in each SPH, an array of arrays
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
-
 mrn_constants = np.array([50e-10, 2500e-10]) #minimum and maximum radii for MRN distribution
 
 #DUMMY VALUES
@@ -54,6 +53,7 @@ V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0]) 
+N_RADIATIVE = 25
 	
 def sigma_effective(mineral_densities, mrn_constants,mu_specie):
 	#computes effective cross-sectional area per particle
@@ -69,7 +69,7 @@ def kroupa_imf(base_imf):
     coeff_1 = 2.133403503
     imf_final[(base_imf >= 0.08) & (base_imf < 0.5)] = coeff_1 * (base_imf/0.08)[(base_imf >= 0.08) & (base_imf < 0.5)]**-1.3
     coeff_2 = 0.09233279398
-    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.2 #fattened tail from 2.3!
+    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.3 #fattened tail from 2.3!
     
     return (imf_final)
 
@@ -503,13 +503,18 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     new_fun[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
+    #recombination of protons/electrons back into H and He
     subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[3] * c * dt * 1e3,1.)
     subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[4] * c * dt * 1e3,1.)
     
-    new_fun[2][ptypes != 1] += subt
-    new_fun[3][ptypes != 1] -= subt
-    new_fun[4][ptypes != 1] -= subt2
-    new_fun[5][ptypes != 1] -= subt + subt2
+    ew_subt = np.minimum(new_fun[3][ptypes != 1], subt)
+    ew_subt2= np.minimum(new_fun[4][ptypes != 1], subt2)
+    
+    new_fun[1][ptypes != 1] += ew_subt2
+    new_fun[2][ptypes != 1] += ew_subt
+    new_fun[3][ptypes != 1] -= ew_subt
+    new_fun[4][ptypes != 1] -= ew_subt2
+    new_fun[5][ptypes != 1] -= ew_subt + ew_subt2
     
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
@@ -567,14 +572,27 @@ print("Begin SPH")
 star_ages = np.ones(len(points)) * -1.
 age = 0
 plt.ion()
+mult_factor = cross_array * 0
 for iq in range(400):
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
-        E_internal[particle_type != 1] += rh[0]
-        E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
-        E_internal[particle_type == 2] *= np.nan_to_num((((4 * sb * optical_depth * dt)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 2]
-        E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] == t_cmb * (gamma_array * mass * k)/(mu_array * m_h)
+        #better accounting for temperature changes to avoid wild oscillation
+        for nrad in range(N_RADIATIVE):
+			E_internal[particle_type != 1] += rh[0]/N_RADIATIVE
+		
+			eff_opt_depth = (1 - np.exp(-optical_depth/(4 * np.pi * sizes**2))) * (4 * np.pi * sizes**2)
+			eff_boltzmann = gamma_array * k * mass / (mu_array * amu)
+		
+			mult_factor = eff_boltzmann**(1./3.) * (3 * eff_opt_depth * sb * dt/N_RADIATIVE * T**3 + eff_boltzmann)**(-1./3.)
+			#E_internal[particle_type == 0] *= 
+		
+			E_internal *= mult_factor
+			#E_internal[particle_type == 0] *= np.nan_to_num(((sb * (1 - np.exp(-optical_depth/(4 * np.pi * sizes**2))) * dt)/(gamma_array * k) + T**(-3))**(-1./3.)/T)[particle_type == 0]
+			#E_internal[particle_type == 2] *= np.nan_to_num(((sb * (1 - np.exp(-optical_depth/(1 * np.pi * sizes**2))) * dt)/(gamma_array * k) + T**(-3))**(-1./3.)/T)[particle_type == 2]
+			E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
+			T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
+			T[T < t_cmb] = t_cmb
         f_un = rh[1]
         velocities[particle_type != 1] += rh[2]
         
@@ -630,6 +648,8 @@ for iq in range(400):
     
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
     E_internal = np.nan_to_num(E_internal)
+    
+    points[points > 1e10 * AU] = 1e10 * AU
 
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     probability = base_sfr * (densities/critical_density)**(1.4) * ((dt/year)/T_FF)
@@ -641,12 +661,12 @@ for iq in range(400):
     
     vel_condition = np.sum(velocities**2, axis=1)
     
-    xmin = np.percentile(points.T[0][vel_condition < 80000**2], 10)/AU
-    xmax =  np.percentile(points.T[0][vel_condition < 80000**2], 90)/AU
-    ymin =  np.percentile(points.T[1][vel_condition < 80000**2], 10)/AU
-    ymax =  np.percentile(points.T[1][vel_condition < 80000**2], 90)/AU
-    zmin = np.percentile(points.T[2][vel_condition < 80000**2], 10)/AU
-    zmax = np.percentile(points.T[2][vel_condition < 80000**2], 90)/AU
+    xmin = np.percentile(points.T[0][(vel_condition < 80000**2) & (particle_type == 0)], 10)/AU
+    xmax =  np.percentile(points.T[0][(vel_condition < 80000**2) & (particle_type == 0)], 90)/AU
+    ymin =  np.percentile(points.T[1][(vel_condition < 80000**2) & (particle_type == 0)], 10)/AU
+    ymax =  np.percentile(points.T[1][(vel_condition < 80000**2) & (particle_type == 0)], 90)/AU
+    zmin = np.percentile(points.T[2][(vel_condition < 80000**2) & (particle_type == 0)], 10)/AU
+    zmax = np.percentile(points.T[2][(vel_condition < 80000**2) & (particle_type == 0)], 90)/AU
 
     x_dist = zmax - zmin
     y_dist = xmax - xmin
@@ -660,7 +680,7 @@ for iq in range(400):
     #moreover, this gives us a greater dynamic range of possible densities
     #to work with, and helps avoid star formation at some arbitrary density floor
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
-    d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
+    d = (V_new/len(points[(vel_condition < 80000**2) & (particle_type == 0)])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2 
     sizes = (mass/m_0)**(1./3.) * d
     
@@ -684,15 +704,16 @@ for iq in range(400):
     max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     
-    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,1]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 60, [0.01, 0.01]), edgecolor='none', alpha=0.1)
+    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(np.log10(T[(dist_sq[particle_type == 0] < max_dist * 11./9.)]),[0,7]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 60, [0.01, 0.01]), edgecolor='none', alpha=0.1)
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
     plt.colorbar()
     plt.scatter(xstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], ystars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], c='black', s=sstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)])
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
-    plt.title('Ionization fraction in H II region (t = ' + str(age/year/1e6) + ' Myr)')
+    plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
+    print ('Temperature: ' + str(np.average(T[particle_type == 0])))
     print ('age=', age/year)
     #print (d/AU)
     print ('stars/total = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
