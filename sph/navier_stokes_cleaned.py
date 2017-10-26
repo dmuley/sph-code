@@ -455,13 +455,13 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     
     lum_factor = []
     for ei in range(len(star_distance)):
-        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + 1).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + 1)**-2, axis=0)))
+        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + d).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + d)**-2, axis=0)))
     
     lum_factor = np.array(lum_factor)
     extinction = ((315./512.) * masses[ptypes != 1]/(mu_array[ptypes != 1] * amu) * cross_array[ptypes != 1]) * sizes[ptypes != 1]**(-2)
     
     exponential = np.exp(-np.nan_to_num(lum_factor))
-    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.ones(np.shape(star_distance_2)))
+    distance_factor = (np.nan_to_num(star_distance_2)**2 + d**2 * np.ones(np.shape(star_distance_2)))
     a_intercepted = (np.pi * sizes**2)[ptypes != 1]
     
     lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
@@ -522,7 +522,7 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
 dt = dt_0
-DUST_FRAC = 0.000000
+DUST_FRAC = 0.00100000
 N_RADIATIVE = 100
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
@@ -584,8 +584,10 @@ for iq in range(400):
         f_un0 = f_un
         N_RADIATIVE = int(25 + np.average(np.nan_to_num(T))**(2./3.))
         for nrad in range(N_RADIATIVE):
-        	E_internal[particle_type == 0] *= np.nan_to_num((((sb * cross_array * dt/N_RADIATIVE)/(gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
-        	E_internal[particle_type == 2] *= np.nan_to_num((((sb * cross_array * dt/N_RADIATIVE)/(gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 2]
+        	optd = 1. - np.exp(-optical_depth/(4 * np.pi * sizes**2))
+        	N_PART = mass/(m_h * mu_array)
+        	E_internal[particle_type != 1] *= np.nan_to_num((((sb * optd * (4 * np.pi * sizes**2) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type != 1]
+        	#E_internal[particle_type == 2] *= np.nan_to_num((((sb * cross_array * dt/N_RADIATIVE)/(gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 2]
         	E_internal[particle_type != 1] += rh[0]/N_RADIATIVE
         	E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
         	T[T < t_cmb] = t_cmb
@@ -698,8 +700,8 @@ for iq in range(400):
     xdust = points.T[1:][0][particle_type == 2]/AU
     ydust = points.T[1:][1][particle_type == 2]/AU
     
-    colors = (f_un.T[5]/np.sum(f_un, axis=1))[particle_type == 0]
-    #colors = np.log10(T[particle_type == 0])
+    #colors = (f_un.T[5]/np.sum(f_un, axis=1))[particle_type == 0]
+    colors = np.log10(T[particle_type == 0])
     col_dust = np.log10(T[particle_type == 2])
     
     plt.clf()
@@ -708,7 +710,8 @@ for iq in range(400):
     max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     
-    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,1]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 60, [0.01, 0.01]), edgecolor='none', alpha=0.1)
+    plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
+    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,7]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100, [0.01, 0.01]), edgecolor='none', alpha=0.1)
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
     #plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append((m_0/solar_mass) * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
     plt.colorbar()
@@ -716,7 +719,7 @@ for iq in range(400):
     #plt.scatter(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], c=col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], s = (m_0/solar_mass), alpha=0.25)
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
-    plt.title('Ionization fraction in H II region (t = ' + str(age/year/1e6) + ' Myr)')
+    plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
     print ('age=', age/year)
@@ -734,9 +737,9 @@ fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 [ax.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, alpha=0.1)]
 [ax.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, points.T[2][particle_type == 1]/AU, alpha=0.2)]
-[ax.set_xlim3d(-DIAMETER/2/AU, DIAMETER/2/AU)]
-[ax.set_ylim3d(-DIAMETER/2/AU, DIAMETER/2/AU)]
-[ax.set_zlim3d(-DIAMETER/2/AU, DIAMETER/2/AU)]
+[ax.set_xlim3d(-DIAMETER * 10/AU, DIAMETER * 10/AU)]
+[ax.set_ylim3d(-DIAMETER * 10/AU, DIAMETER * 10/AU)]
+[ax.set_zlim3d(-DIAMETER * 10/AU, DIAMETER * 10/AU)]
 [plt.show()]
 
 PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
