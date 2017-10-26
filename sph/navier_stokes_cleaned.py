@@ -522,7 +522,8 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
 dt = dt_0
-DUST_FRAC = 0.01
+DUST_FRAC = 0.000000
+N_RADIATIVE = 100
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
@@ -559,9 +560,9 @@ fdust = np.array([dust_base[0]] * N_PARTICLES)
 f_un = (fgas.T * dust_fracs + fdust.T * (1 - dust_fracs)).T
 
 #f_un = np.array([specie_fraction_array] * N_PARTICLES)
-mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(specie_fraction_array)
-gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(specie_fraction_array)
-cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(specie_fraction_array)
+mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
 E_internal = gamma_array * mass * k * T/(mu_array * m_h)
 optical_depth = mass/(m_h * mu_array) * cross_array
 
@@ -580,10 +581,20 @@ for iq in range(400):
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
-        E_internal[particle_type != 1] += rh[0]
-        E_internal[particle_type == 0] *= np.nan_to_num((((sb * optical_depth * dt)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 0]
-        E_internal[particle_type == 2] *= np.nan_to_num((((4 * sb * optical_depth * dt)/(gamma_array * (mass/(mu_array * m_h)) * k)) + T**-3)**(-1./3.)/T)[particle_type == 2]
-        E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] == t_cmb * (gamma_array * mass * k)/(mu_array * m_h)
+        f_un0 = f_un
+        N_RADIATIVE = int(25 + np.average(np.nan_to_num(T))**(2./3.))
+        for nrad in range(N_RADIATIVE):
+        	E_internal[particle_type == 0] *= np.nan_to_num((((sb * cross_array * dt/N_RADIATIVE)/(gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
+        	E_internal[particle_type == 2] *= np.nan_to_num((((sb * cross_array * dt/N_RADIATIVE)/(gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 2]
+        	E_internal[particle_type != 1] += rh[0]/N_RADIATIVE
+        	E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
+        	T[T < t_cmb] = t_cmb
+        	f_un = ((N_RADIATIVE - nrad) * f_un0 + nrad * rh[1])/N_RADIATIVE	
+        	mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+        	gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+        	cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
+        	optical_depth = mass/(m_h * mu_array) * cross_array
+        	
         f_un = rh[1]
         velocities[particle_type != 1] += rh[2]
         
@@ -615,9 +626,9 @@ for iq in range(400):
             
         #specie_fraction_array's retention is deliberate; number densities are in fact increasing
         #so we want to divide by the same base
-        mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(specie_fraction_array)
-        gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(specie_fraction_array)
-        cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(specie_fraction_array)
+        mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+        gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+        cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
         optical_depth = mass/(m_h * mu_array) * cross_array
         
     neighbor = neighbors(points, d)#find neighbors in each timestep
@@ -688,7 +699,8 @@ for iq in range(400):
     ydust = points.T[1:][1][particle_type == 2]/AU
     
     colors = (f_un.T[5]/np.sum(f_un, axis=1))[particle_type == 0]
-    
+    #colors = np.log10(T[particle_type == 0])
+    col_dust = np.log10(T[particle_type == 2])
     
     plt.clf()
     plt.axis('equal')
@@ -698,9 +710,10 @@ for iq in range(400):
     
     plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,1]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 60, [0.01, 0.01]), edgecolor='none', alpha=0.1)
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
+    #plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append((m_0/solar_mass) * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
     plt.colorbar()
     plt.scatter(xstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], ystars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], c='black', s=sstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)])
-    plt.scatter(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], c='brown', s = (m_0/solar_mass), alpha=0.25)
+    #plt.scatter(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], c=col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], s = (m_0/solar_mass), alpha=0.25)
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Ionization fraction in H II region (t = ' + str(age/year/1e6) + ' Myr)')
