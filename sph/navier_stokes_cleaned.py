@@ -522,9 +522,12 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
 dt = dt_0
+DUST_FRAC = 0.01
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
+dust_base_frac = (specie_fraction_array - supernova_base_release)
+dust_base = dust_base_frac/np.sum(dust_base_frac)
 cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
 
 base_imf = np.logspace(-1,1.7, 200)
@@ -549,7 +552,13 @@ E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 T = 5 * np.ones([N_PARTICLES]) #5 kelvins
 T_FF = 3000000. #years
 #fills the f_u array
-f_un = np.array([specie_fraction_array] * N_PARTICLES)
+dust_fracs = (np.random.rand(N_PARTICLES) > DUST_FRAC)
+particle_type[dust_fracs == False] = 2
+fgas = np.array([specie_fraction_array] * N_PARTICLES)
+fdust = np.array([dust_base[0]] * N_PARTICLES)
+f_un = (fgas.T * dust_fracs + fdust.T * (1 - dust_fracs)).T
+
+#f_un = np.array([specie_fraction_array] * N_PARTICLES)
 mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(specie_fraction_array)
 gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(specie_fraction_array)
 cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(specie_fraction_array)
@@ -675,6 +684,9 @@ for iq in range(400):
     ystars = points.T[1:][1][particle_type == 1]/AU
     sstars = (mass[particle_type == 1]/solar_mass) * 2.
     
+    xdust = points.T[1:][0][particle_type == 2]/AU
+    ydust = points.T[1:][1][particle_type == 2]/AU
+    
     colors = (f_un.T[5]/np.sum(f_un, axis=1))[particle_type == 0]
     
     
@@ -688,6 +700,7 @@ for iq in range(400):
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
     plt.colorbar()
     plt.scatter(xstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], ystars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], c='black', s=sstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)])
+    plt.scatter(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], c='brown', s = (m_0/solar_mass), alpha=0.25)
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Ionization fraction in H II region (t = ' + str(age/year/1e6) + ' Myr)')
