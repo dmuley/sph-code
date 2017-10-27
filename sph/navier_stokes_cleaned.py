@@ -41,7 +41,7 @@ destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
-gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,7.09,4.91,1.03,2.41,3.022,1.,1.])#the polytropes of species in each SPH, an array of arrays
+gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
 
 mrn_constants = np.array([50e-10, 2500e-10]) #minimum and maximum radii for MRN distribution
@@ -410,7 +410,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     rs2 = np.array([])
     rs2 = random_stars
     if len(random_stars > 0):
-        star_selection = (np.random.rand(len(random_stars)) < (masses[ptypes == 1]/solar_mass > 4.).astype('float') + len(random_stars)**-0.5 ) #selecting all stars over 4 solar masses for proper H II regions
+        star_selection = (np.random.rand(len(random_stars)) < (masses[ptypes == 1]/(4 * solar_mass)).astype('float') + len(random_stars)**-0.5 ) #selecting all stars over 4 solar masses for proper H II regions
         rs2 = random_stars[star_selection]
         if len(rs2) < 0:
             rs2 = random_stars
@@ -474,6 +474,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     overall = overall_spectrum(masses[ptypes == 1]/solar_mass, np.ones(len(masses[ptypes == 1])))
     dest_wavelengths = destruction_energies**(-1) * (h * c)
     frac_dest = np.array([np.sum((overall[1] * overall[2] * overall[0])[overall[0] < dest_wavelengths[ai]]) for ai in np.arange(len(dest_wavelengths))])
+    #frac_dest += np.array([np.sum((overall[1] * overall[2] * (overall[0] - dest_wavelengths[ai]))[overall[0] > dest_wavelengths[ai]]) for ai in np.arange(len(dest_wavelengths))])
     total_em = np.sum(overall[1] * overall[2] * overall[0])
     
     frac_dest /= total_em
@@ -503,13 +504,17 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     new_fun[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[3] * c * dt * 1e3,1.)
-    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * min(cross_sections[4] * c * dt * 1e3,1.)
+    new_fun /= np.sum(new_fun,axis=0)
+    
+    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * (3 * k * T[ptypes != 1])**0.5/(c**2 * mu_specie[3]**0.5 * mu_specie[5]**0.5 * amu)**0.5
+    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * (3 * k * T[ptypes != 1])**0.5/(c**2 * mu_specie[5]**0.5 * mu_specie[4]**0.5 * amu)**0.5
     
     new_fun[2][ptypes != 1] += subt
     new_fun[3][ptypes != 1] -= subt
     new_fun[4][ptypes != 1] -= subt2
     new_fun[5][ptypes != 1] -= subt + subt2
+    
+    new_fun /= np.sum(new_fun,axis=0)
     
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
@@ -522,14 +527,15 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
 dt = dt_0
-DUST_FRAC = 0.00100000
+DUST_FRAC = 0.0100000
+DUST_MASS = 0.01
 N_RADIATIVE = 100
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
 dust_base_frac = (specie_fraction_array - supernova_base_release)
 dust_base = dust_base_frac/np.sum(dust_base_frac)
-cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
+cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie) * 0.0001
 
 base_imf = np.logspace(-1,1.7, 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
@@ -553,11 +559,14 @@ E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 T = 5 * np.ones([N_PARTICLES]) #5 kelvins
 T_FF = 3000000. #years
 #fills the f_u array
-dust_fracs = (np.random.rand(N_PARTICLES) > DUST_FRAC)
+dust_fracs = ((np.random.rand(N_PARTICLES) > DUST_FRAC))
+dust_fracs = dust_fracs.astype('bool')
 particle_type[dust_fracs == False] = 2
 fgas = np.array([specie_fraction_array] * N_PARTICLES)
 fdust = np.array([dust_base[0]] * N_PARTICLES)
 f_un = (fgas.T * dust_fracs + fdust.T * (1 - dust_fracs)).T
+mass[particle_type == 2] = DUST_MASS * solar_mass
+sizes[particle_type == 2] = d
 
 #f_un = np.array([specie_fraction_array] * N_PARTICLES)
 mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -744,8 +753,8 @@ ax = fig.add_subplot(111, projection='3d')
 
 PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.colorbar()]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
