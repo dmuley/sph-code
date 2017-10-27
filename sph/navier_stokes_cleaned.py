@@ -527,15 +527,15 @@ d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
 dt = dt_0
-DUST_FRAC = 0.0100000
-DUST_MASS = 0.01
+DUST_FRAC = 0.00200000
+DUST_MASS = 0.005
 N_RADIATIVE = 100
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
 dust_base_frac = (specie_fraction_array - supernova_base_release)
 dust_base = dust_base_frac/np.sum(dust_base_frac)
-cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie) * 0.0001
+cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
 
 base_imf = np.logspace(-1,1.7, 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
@@ -586,20 +586,26 @@ print("Begin SPH")
 star_ages = np.ones(len(points)) * -1.
 age = 0
 plt.ion()
+time_coord = np.array([])
+dust_temps = np.array([])
 for iq in range(400):
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
         f_un0 = f_un
-        N_RADIATIVE = int(25 + np.average(np.nan_to_num(T))**(2./3.))
+        N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
         for nrad in range(N_RADIATIVE):
         	optd = 1. - np.exp(-optical_depth/(4 * np.pi * sizes**2))
         	N_PART = mass/(m_h * mu_array)
-        	E_internal[particle_type != 1] *= np.nan_to_num((((sb * optd * (4 * np.pi * sizes**2) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type != 1]
-        	#E_internal[particle_type == 2] *= np.nan_to_num((((sb * cross_array * dt/N_RADIATIVE)/(gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 2]
-        	E_internal[particle_type != 1] += rh[0]/N_RADIATIVE
+        	#dust particles function as if always in thermal equilibrium
+        	T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt))**0.25 + t_cmb
+        	E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
+        	
+        	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optd * (4 * np.pi * sizes**2) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
+        	E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/N_RADIATIVE
         	E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
         	T[T < t_cmb] = t_cmb
+        	
         	f_un = ((N_RADIATIVE - nrad) * f_un0 + nrad * rh[1])/N_RADIATIVE	
         	mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
         	gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
@@ -610,11 +616,12 @@ for iq in range(400):
         velocities[particle_type != 1] += rh[2]
         
         #on supernova event--- add new dust particle (particle_type == 2)
+        #in future, want to spew multiple low-mass dust particles
+        #rather than one single very large one
         
         print (np.max(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10)))
         print (np.max(mass[particle_type == 1]/solar_mass))
         
-        #supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         print (len(supernova_pos))
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
@@ -698,7 +705,7 @@ for iq in range(400):
     dist_sq = np.sum(points**2,axis=1)
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    
+    '''
     xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
     
@@ -729,7 +736,10 @@ for iq in range(400):
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)
+    plt.pause(1)'''
+    
+    time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
+    dust_temps = np.append(dust_temps, T[particle_type == 2])
     
     print ('age=', age/year)
     #print (d/AU)
