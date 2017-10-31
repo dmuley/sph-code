@@ -698,7 +698,9 @@ for iq in range(400):
     dust_net_impulse = np.array([net_impulse(j) for j in range(len(neighbor))])
     
     pressure_accel = -np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
+    #very small factor, only seems to matter at the solar-system scale
     viscous_accel_gas = -np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
+    #need to fix this---not the correct formulation!
     viscous_accel_dust = np.nan_to_num(((dust_net_impulse.T) * (particle_type == 2).astype('float')).T)
     
     total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust
@@ -747,7 +749,7 @@ for iq in range(400):
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     
-    xpts = points.T[1:][0][particle_type == 0]/AU
+    '''xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
     
     xstars = points.T[1:][0][particle_type == 1]/AU
@@ -777,7 +779,7 @@ for iq in range(400):
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)
+    plt.pause(1)'''
     
     time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
     dust_temps = np.append(dust_temps, T[particle_type == 2])
