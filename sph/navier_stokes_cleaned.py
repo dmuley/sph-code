@@ -62,6 +62,11 @@ def sigma_effective(mineral_densities, mrn_constants,mu_specie):
 	seff = mu_specie * amu/mineral_densities * (3./4.) * -np.diff(mrn_constants**-0.5)/np.diff(mrn_constants**0.5)
 	return seff
 
+def grain_mass(mineral_densities, mrn_constants):
+	meff = mineral_densities * -np.diff(mrn_constants**0.5)/np.diff(mrn_constants**-2.5) * (4./5.) * 4 * np.pi/3.
+	
+	return meff
+
 def kroupa_imf(base_imf):
     coeff_0 = 1
     imf_final = np.zeros(len(base_imf))
@@ -120,13 +125,11 @@ def laplacian_weight(x, x_0, m):
     sq_norms = np.sum((x - x_0)**2, axis=1)
     const = -945/(32*np.pi*d**9)
     
-
 def Laplacian_Weight(x):#laplacian of the weight for the viscosity function
     x_norm = x[0]*x[0]+x[1]*x[1]+x[2]*x[2]
     const = -945/(32*np.pi*d**9)#d^9replaced by iterations of *d for computational efficiency
     lap_W = const*(d*d-x_norm)*(3*d*d-7*x_norm)
     return(lap_W)
-
 
 def artificial_viscosity(j): #artificial viscosity introduced to make the simulation more stable
     eta = 0.1*d#idk the actual eta
@@ -190,7 +193,6 @@ def bin_generator(masses, positions, subdivisions):
     
     return com, grid_masses, length_scale, np.array(subdivision_boxes), object_indices
 
-
 def compute_gravitational_force(particle_positions, grid_com, grid_masses, length_scale):
     forces = 0;
     for i in range(len(grid_com)):
@@ -203,6 +205,11 @@ def Weigh2(x, x_0, m):
     W = m * 315*(m_0/m)**3*((m/m_0)**(2./3.)*d**2-norms_sq)**3/(64*np.pi*d**9)
     return(W)
 
+def Weigh2_dust(x, x_0, m, dustsize):
+    norms_sq = np.sum((x - x_0)**2, axis=1)
+    W = m * 315*(dustsize**2-norms_sq)**3/(64*np.pi*dustsize**9)
+    return(W)
+
 def density(j):
     x_0 = points[j]
     x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
@@ -211,6 +218,35 @@ def density(j):
     rho = Weigh2(x, x_0, m) * (particle_type[np.append(j, np.array(neighbor[j]))] == 0)
     return np.sum(rho[rho > 0])
     
+def dust_density(j):
+	#evaluating dust density at each gas particle
+	#including only neighboring points so that self-density of dust particles
+	#is not counted
+    x_0 = points[j]
+    x = points[np.array(neighbor[j])]
+    m = mass[np.array(neighbor[j])]
+    ds = sizes[np.array(neighbor[j])]
+    
+    rho = Weigh2_dust(x, x_0, m, ds) * (particle_type[np.array(neighbor[j])] == 2)
+    return np.sum(rho[rho > 0])
+    
+def net_impulse(j):
+	meff = grain_mass(mineral_densities, mrn_constants)
+	seff = sigma_effective(mineral_densities, mrn_constants, mu_specie)
+	mean_grainmass = np.sum(meff * f_un[np.array(neighbor[j])], axis=1)
+	mean_cross = np.sum(seff * f_un[np.array(neighbor[j])], axis=1)
+	net_vels = velocities[np.array(neighbor[j])] - velocities[j]
+	
+	x_0 = points[j]
+	x = points[np.array(neighbor[j])]
+	m = mass[np.array(neighbor[j])]
+	ds = sizes[np.array(neighbor[j])]
+	
+	weight_factor = Weigh2_dust(x, x_0, m, ds)
+	#gives units of m/s^2, which is exactly what we want
+	accel_net = weight_factor/mean_grainmass * mean_cross * np.sum((net_vels.T)**2, axis=0)**0.5 * net_vels.T * (particle_type[np.array(neighbor[j])] == 2) * (weight_factor > 0)
+	return np.sum(accel_net.T,axis=0)
+    
 def num_dens(j):
     x_0 = points[j]
     x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
@@ -218,7 +254,6 @@ def num_dens(j):
     
     n_dens = Weigh2(x, x_0, m)/(mu_array[np.append(j, neighbor[j])] * m_h)
     return np.sum(n_dens[n_dens > 0])
-
    
 def grad_weight(x, x_0, m, type_particle):
     vec = (x - x_0)
@@ -455,13 +490,13 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     
     lum_factor = []
     for ei in range(len(star_distance)):
-        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + d).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + d)**-2, axis=0)))
+        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + sizes[particle_type != 1]/2).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + sizes[particle_type != 1]/2)**-2, axis=0)))
     
     lum_factor = np.array(lum_factor)
     extinction = ((315./512.) * masses[ptypes != 1]/(mu_array[ptypes != 1] * amu) * cross_array[ptypes != 1]) * sizes[ptypes != 1]**(-2)
     
     exponential = np.exp(-np.nan_to_num(lum_factor))
-    distance_factor = (np.nan_to_num(star_distance_2)**2 + d**2 * np.ones(np.shape(star_distance_2)))
+    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.average(sizes[particle_type != 1])**2 * np.ones(np.shape(star_distance_2)))
     a_intercepted = (np.pi * sizes**2)[ptypes != 1]
     
     lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
@@ -520,14 +555,14 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     return lf2, new_fun.T, momentum
 
 DIAMETER = 1e6 * AU
-N_PARTICLES = 3000
+N_PARTICLES = 1500
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
 dt = dt_0
-DUST_FRAC = 0.00200000
+DUST_FRAC = 0.0200000
 DUST_MASS = 0.005
 N_RADIATIVE = 100
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
@@ -597,8 +632,8 @@ for iq in range(400):
         for nrad in range(N_RADIATIVE):
         	optd = 1. - np.exp(-optical_depth/(4 * np.pi * sizes**2))
         	N_PART = mass/(m_h * mu_array)
-        	#dust particles function as if always in thermal equilibrium
-        	T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt))**0.25 + t_cmb
+        	#dust particles function as if always in thermal equilibrium, F proportional to T^6. Last two variables are obtained from integration. http://www.astronomy.ohio-state.edu/~pogge/Ast871/Notes/Dust.pdf pg. 27
+        	T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
         	E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
         	
         	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optd * (4 * np.pi * sizes**2) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
@@ -658,10 +693,15 @@ for iq in range(400):
     densities = np.array([density(j) for j in range(len(neighbor))])
     delp = np.array([del_pressure(j) for j in range(len(neighbor))])
     num_densities = np.array([num_dens(j) for j in range(len(neighbor))])
+    dust_densities = np.array([dust_density(j) for j in range(len(neighbor))])
+    #viscous force causing dust to accelerate/decelerate along with gas
+    dust_net_impulse = np.array([net_impulse(j) for j in range(len(neighbor))])
     
     pressure_accel = -np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
+    viscous_accel_gas = -np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
+    viscous_accel_dust = np.nan_to_num(((dust_net_impulse.T) * (particle_type == 2).astype('float')).T)
     
-    total_accel = grav_accel + pressure_accel
+    total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust
         
     points += ((total_accel * (dt)**2)/2.) + velocities * dt
     velocities += (total_accel * dt)
@@ -700,12 +740,13 @@ for iq in range(400):
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
     d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2 
-    sizes = (mass/m_0)**(1./3.) * d
+    sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
+    sizes[particle_type == 2] = d
     
     dist_sq = np.sum(points**2,axis=1)
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    '''
+    
     xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
     
@@ -736,7 +777,7 @@ for iq in range(400):
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)'''
+    plt.pause(1)
     
     time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
     dust_temps = np.append(dust_temps, T[particle_type == 2])
@@ -749,7 +790,6 @@ for iq in range(400):
 '''
 VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
 TO REPRESENT THE FINAL STATE OF THE SIMULATION
-
 
 3D PLOTTING:
 fig = plt.figure()
@@ -766,6 +806,7 @@ PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
 #[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 #[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.colorbar()]
+[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.1)]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
 plt.xlabel('Position (astronomical units)')
