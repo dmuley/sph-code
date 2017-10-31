@@ -674,6 +674,9 @@ for iq in range(400):
 			velocities = np.concatenate((velocities, newvels, newvels))
 			star_ages = np.concatenate((star_ages, np.ones(len(supernova_pos))* (-2), np.ones(len(supernova_pos))* (-2)))
 			points = np.vstack([points, newpoints, newpoints])
+			sizes = np.zeros(len(points))
+			sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
+			sizes[particle_type == 2] = d
 
 			neighbor = neighbors(points, d)
             
@@ -703,7 +706,7 @@ for iq in range(400):
     #need to fix this---not the correct formulation!
     viscous_accel_dust = np.nan_to_num(((dust_net_impulse.T) * (particle_type == 2).astype('float')).T)
     
-    total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust
+    total_accel = grav_accel + pressure_accel #+ viscous_accel_gas + viscous_accel_dust
         
     points += ((total_accel * (dt)**2)/2.) + velocities * dt
     velocities += (total_accel * dt)
@@ -746,10 +749,10 @@ for iq in range(400):
     sizes[particle_type == 2] = d
     
     dist_sq = np.sum(points**2,axis=1)
-    min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
+    '''min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     
-    '''xpts = points.T[1:][0][particle_type == 0]/AU
+    xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
     
     xstars = points.T[1:][0][particle_type == 1]/AU
