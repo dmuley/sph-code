@@ -630,13 +630,14 @@ for iq in range(400):
         f_un0 = f_un
         N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
         for nrad in range(N_RADIATIVE):
-        	optd = 1. - np.exp(-optical_depth/(4 * np.pi * sizes**2))
+        	area = (4 * np.pi * sizes**2)
+        	W6_integral = 9./area #evaluating integral of W6 kernel
+        	optd = 1. - np.exp(-optical_depth * W6_integral)
         	N_PART = mass/(m_h * mu_array)
         	#dust particles function as if always in thermal equilibrium, F proportional to T^6. Last two variables are obtained from integration. http://www.astronomy.ohio-state.edu/~pogge/Ast871/Notes/Dust.pdf pg. 27
         	T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
         	E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
-        	
-        	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optd * (4 * np.pi * sizes**2) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
+        	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optd * W6_integral**(-1) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
         	E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/N_RADIATIVE
         	E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
         	T[T < t_cmb] = t_cmb
@@ -792,6 +793,14 @@ for iq in range(400):
     print ('stars/total = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
     print ('==================================')
     
+'''utime = np.unique(time_coord)
+dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
+dusts = np.array([np.std(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
+plt.scatter(np.log10(time_coord/year), np.log10(dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
+plt.plot(np.log10(utime/year), np.log10(dustt), c='maroon', alpha=0.5)
+plt.plot(np.log10(utime/year), np.log10(dustt + 2 * dusts), c='maroon', alpha=0.25)
+plt.plot(np.log10(utime/year), np.log10(dustt - 2 * dusts), c='maroon', alpha=0.25)
+'''
 '''
 VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
 TO REPRESENT THE FINAL STATE OF THE SIMULATION
@@ -807,16 +816,16 @@ ax = fig.add_subplot(111, projection='3d')
 [plt.show()]
 
 PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.colorbar()]
 [plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.1)]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
 plt.xlabel('Position (astronomical units)')
 plt.ylabel('Position (astronomical units)')
-plt.title('Density in H II region')
+plt.title('Temperature in H II region')
 
 INTERPOLATED PLOTTING:
 arb_points = (np.random.rand(N_PARTICLES * 10, 3) - 0.5) * (max(ymax, xmax) - min(xmin, ymin))
