@@ -350,26 +350,31 @@ def supernova_explosion():
     dust_masses = mass[supernova_pos] * drsum/trsum
     gas_masses = mass[supernova_pos] * grsum/trsum
     
-    dust_comps = (np.vstack([dust_release] * len(supernova_pos)).T).T
+    supernova_dust_len = int((np.sum(dust_masses)/solar_mass - 2.)/0.01)
+    
+    dust_comps = (np.vstack([dust_release] * len(supernova_dust_len)).T).T
     gas_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
     star_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
     
-    dust_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/trsum
+    dust_mass = np.ones(supernova_dust_len) * 0.01
+    #dust_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/trsum
     gas_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/grsum
     stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
     
+    dustpoints = np.vstack([points[supernova_pos][0]] * supernova_dust_len) + np.random.rand(3) * d
     newpoints = points[supernova_pos] + np.random.rand(3) * d
+    dustvels = np.vstack([velocities[supernova_pos][0]] * supernova_dust_len)
     newvels = velocities[supernova_pos]
     #newaccel = accel[supernova_pos]
     
     newgastype = np.zeros(len(supernova_pos))
-    newdusttype = np.ones(len(supernova_pos)) * 2
+    newdusttype = np.ones(len(supernova_dust_len)) * 2
     
     new_eint_stars = np.zeros(len(supernova_pos))
-    new_eint_dust = E_internal[supernova_pos]/2.
+    new_eint_dust = np.zeros(len(supernova_dust_len))
     new_eint_gas = E_internal[supernova_pos]/2.
     
-    return dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos
+    return dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels
     
     #for cross-sections: use integrals in paper of the MRN distribution
     # to find cross-sectional area per species particle; use relative mass
@@ -664,7 +669,7 @@ for iq in range(400):
         	for ku in supernova_pos:
         		impulse, indices = supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
-			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos = supernova_explosion()
+			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = supernova_explosion()
 			E_internal[supernova_pos] = new_eint_stars
 			f_un[supernova_pos] = star_comps
 			mass[supernova_pos] = stars_mass
@@ -672,9 +677,9 @@ for iq in range(400):
 			particle_type = np.concatenate((particle_type, newdusttype, newgastype))
 			mass = np.concatenate((mass, dust_mass, gas_mass))
 			f_un = np.vstack([f_un, dust_comps, gas_comps])
-			velocities = np.concatenate((velocities, newvels, newvels))
+			velocities = np.concatenate((velocities, dustvels, newvels))
 			star_ages = np.concatenate((star_ages, np.ones(len(supernova_pos))* (-2), np.ones(len(supernova_pos))* (-2)))
-			points = np.vstack([points, newpoints, newpoints])
+			points = np.vstack([points, dustpoints, newpoints])
 			sizes = np.zeros(len(points))
 			sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
 			sizes[particle_type == 2] = d
