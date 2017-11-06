@@ -42,7 +42,7 @@ mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,23
 sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
-supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.05,0.05,0.05,0.05,0.05,0.05,0.05]])
+supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025]])
 W6_constant = (3 * np.pi/80)
 
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
@@ -772,7 +772,8 @@ for iq in range(400):
     sizes[particle_type == 2] = d
     
     dist_sq = np.sum(points**2,axis=1)
-    '''min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
+    '''
+    min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     
     xpts = points.T[1:][0][particle_type == 0]/AU
@@ -805,7 +806,8 @@ for iq in range(400):
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)'''
+    plt.pause(1)
+    '''
     
     time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
     dust_temps = np.append(dust_temps, T[particle_type == 2])
@@ -859,7 +861,6 @@ plt.title('Temperature in H II region')
 plt.xlabel('Position (astronomical units)')
 plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
-
 
 INTERPOLATED PLOTTING:
 arb_points = (np.random.rand(N_PARTICLES * 10, 3) - 0.5) * (max(ymax, xmax) - min(xmin, ymin))
