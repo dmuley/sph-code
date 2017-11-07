@@ -80,8 +80,6 @@ def kroupa_imf(base_imf):
     
     return (imf_final)
 
-
-
 def viscosity_2(i):
     index = 1.4
     accel = 0 #initial acceleration (force) due to viscosity
@@ -489,7 +487,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     if len(random_stars > 0):
         star_selection = (np.random.rand(len(random_stars)) < (masses[ptypes == 1]/(4 * solar_mass)).astype('float') + len(random_stars)**-0.5 ) #selecting all stars over 4 solar masses for proper H II regions
         rs2 = random_stars[star_selection]
-        if len(rs2) < 0:
+        if len(rs2) <= 0:
             rs2 = random_stars
     
     suppos = np.zeros(len(masses))
@@ -758,7 +756,11 @@ for iq in range(400):
     total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust
         
     points += ((total_accel * (dt)**2)/2.) + velocities * dt
-    velocities += (total_accel + old_accel)/2. * dt
+    if np.shape(total_accel) == np.shape(old_accel):
+    	dv = (total_accel + old_accel)/2. * dt
+    else:
+    	dv = total_accel * dt
+    velocities += dv
     
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
     E_internal = np.nan_to_num(E_internal)
