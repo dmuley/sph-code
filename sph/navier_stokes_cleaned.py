@@ -83,13 +83,14 @@ def kroupa_imf(base_imf):
 
 
 def viscosity_2(i):
+    index = 1.4
     accel = 0 #initial acceleration (force) due to viscosity
     indices_nearest = neighbor[i]
     for j in range(len(indices_nearest)):
         if(density(i)==0):
             continue
-        c1 = 0.5 #not the actual value
-        c2 = 0.7 #not the actual value
+        c1 = np.sqrt(index*k*temperature_arb(i)/mass(i))
+        c2 = np.sqrt(index*k*temperature_arb(j)/mass(j))
         alpha = 1
         rho_ij = (density(j)+density(i))/2
         w_ij = np.dot((points[j]-points[i]),(velocities[j]-velocities[i]))/np.dot((points[j]-points[i]),(points[j]-points[i]))
