@@ -515,7 +515,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     extinction = (W6_constant * masses[ptypes != 1]/(mu_array[ptypes != 1] * amu) * cross_array[ptypes != 1]) * sizes[ptypes != 1]**(-2)
     
     exponential = np.exp(-np.nan_to_num(lum_factor))
-    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.average(sizes[particle_type != 1])**2 * np.ones(np.shape(star_distance_2)))
+    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.average(sizes[particle_type != 1])**2 * np.ones(np.shape(star_distance_2))) * 4. * np.pi
     a_intercepted = (np.pi * sizes**2)[ptypes != 1]
     
     lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
@@ -572,9 +572,9 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
 
-DIAMETER = 1e6 * AU
-N_PARTICLES = 1500
-N_INT_PER_PARTICLE = 50
+DIAMETER = 2e6 * AU
+N_PARTICLES = 2000
+N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
@@ -824,6 +824,11 @@ plt.scatter(np.log10(time_coord/year), np.log10(dust_temps), alpha=0.2, c='grey'
 plt.plot(np.log10(utime/year), np.log10(dustt), c='maroon', alpha=0.5)
 plt.plot(np.log10(utime/year), np.log10(dustt + 2 * dusts), c='maroon', alpha=0.25)
 plt.plot(np.log10(utime/year), np.log10(dustt - 2 * dusts), c='maroon', alpha=0.25)
+
+plt.scatter((time_coord/year), (dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
+plt.plot((utime/year), (dustt), c='maroon', alpha=0.5)
+plt.plot((utime/year), (dustt + 2 * dusts), c='maroon', alpha=0.25)
+plt.plot((utime/year), (dustt - 2 * dusts), c='maroon', alpha=0.25)
 '''
 '''
 VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
