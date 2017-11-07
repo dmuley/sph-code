@@ -80,6 +80,29 @@ def kroupa_imf(base_imf):
     
     return (imf_final)
 
+
+
+def viscosity_2(i):
+    index = 1.4
+    accel = 0 #initial acceleration (force) due to viscosity
+    indices_nearest = neighbor[i]
+    for j in range(len(indices_nearest)):
+        if(density(i)==0):
+            continue
+        c1 = np.sqrt(index*k*temperature_arb(i)/mass(i))
+        c2 = np.sqrt(index*k*temperature_arb(j)/mass(j))
+        alpha = 1
+        rho_ij = (density(j)+density(i))/2
+        w_ij = np.dot((points[j]-points[i]),(velocities[j]-velocities[i]))/np.dot((points[j]-points[i]),(points[j]-points[i]))
+        v_ij = c1+c2-3*w_ij
+        if (w_ij < 0):
+            factor = -alpha*v_ij*w_ij/(2*rho_ij)
+        else:
+            factor = 0
+        accel += -mass[j]*factor*grad_weight(points[i], points[j], mass[i],particle_type[i])
+    return(accel)
+        
+	
 def mu_j(j): #mean molecular weight of the SPH particle
     #species = 13
     mu = 0
