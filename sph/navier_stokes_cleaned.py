@@ -488,7 +488,8 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
         star_selection = (np.random.rand(len(random_stars)) < (masses[ptypes == 1]/(4 * solar_mass)).astype('float') + len(random_stars)**-0.5 ) #selecting all stars over 4 solar masses for proper H II regions
         rs2 = random_stars[star_selection]
         if len(rs2) <= 0:
-            rs2 = random_stars
+        	star_selection = np.arange(0, len(random_stars))
+        	rs2 = random_stars
     
     suppos = np.zeros(len(masses))
     suppos[supernova_pos] += 1            
