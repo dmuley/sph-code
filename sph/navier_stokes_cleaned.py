@@ -600,6 +600,7 @@ neighbor = neighbors(points, d)
 #print(nbrs)
 #print(points)
 velocities = (np.random.rand(N_PARTICLES, 3) - 0.5) * 0.0
+total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 mass = np.random.choice(base_imf, N_PARTICLES, p = imf) * solar_mass
 sizes = (mass/m_0)**(1./3.) * d
 
@@ -729,10 +730,12 @@ for iq in range(400):
     viscous_accel_gas = np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
     viscous_accel_dust = -np.nan_to_num(viscous_accel_dust)
     
+    #leapfrog integration
+    old_accel = copy.deepcopy(total_accel)
     total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust
         
     points += ((total_accel * (dt)**2)/2.) + velocities * dt
-    velocities += (total_accel * dt)
+    velocities += (total_accel + old_accel)/2. * dt
     
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
     E_internal = np.nan_to_num(E_internal)
