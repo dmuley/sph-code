@@ -810,7 +810,7 @@ for iq in range(400):
     '''
     
     time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
-    dust_temps = np.append(dust_temps, T[particle_type == 2])
+    dust_temps = np.append(dust_temps, (E_internal/optical_depth)[particle_type == 2])
     
     print ('age=', age/year)
     #print (d/AU)
@@ -829,6 +829,7 @@ plt.scatter((time_coord/year), (dust_temps), alpha=0.2, c='grey', s = 10, edgeco
 plt.plot((utime/year), (dustt), c='maroon', alpha=0.5)
 plt.plot((utime/year), (dustt + 2 * dusts), c='maroon', alpha=0.25)
 plt.plot((utime/year), (dustt - 2 * dusts), c='maroon', alpha=0.25)
+
 '''
 '''
 VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
