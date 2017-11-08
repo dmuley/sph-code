@@ -699,6 +699,9 @@ for iq in range(400):
 			sizes = np.zeros(len(points))
 			sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
 			sizes[particle_type == 2] = d
+			Tnew = np.zeros(len(sizes));
+			Tnew[:len(T)] += T
+			T = Tnew
 
 			neighbor = neighbors(points, d)
             
@@ -830,6 +833,7 @@ for iq in range(400):
 '''utime = np.unique(time_coord)
 dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
 dusts = np.array([np.std(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
+starf = np.array([np.average(star_frac[time_coord == med]) for med in np.unique(time_coord)])
 plt.scatter(np.log10(time_coord/year), np.log10(dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
 plt.plot(np.log10(utime/year), np.log10(dustt), c='maroon', alpha=0.5)
 plt.plot(np.log10(utime/year), np.log10(dustt + 2 * dusts), c='maroon', alpha=0.25)
