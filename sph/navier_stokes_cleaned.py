@@ -109,7 +109,7 @@ def luminosity_relation(base_imf, imf, lifetime=0):
     
     luminosity_relation = coeff_luminosity * base_imf**exp_luminosity
     lifetime_relation = coeff_luminosity**(-1) * base_imf**(1 - exp_luminosity)
-    lifetime_relation[lifetime_relation < 3.6e-3] = 3.6e-3 
+    lifetime_relation[lifetime_relation < 3.6e-4] = 3.6e-4
     #per Murray (2011), http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta,
     #stars have a minimum lifespan of about 3.6 Myr
     if lifetime == 0:
@@ -662,7 +662,8 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 while (age < MAX_AGE):
     #timestep reset here
-    dyn_t = np.average(sizes[particle_type == 0])/max(relative_velocities(neighbor, velocities))
+    relv = relative_velocities(neighbor, velocities)
+    dyn_t = np.average(sizes[particle_type == 0])/np.average(relv[(particle_type == 0) & (relv > 0)])
     dt = min(dt_0, dyn_t)
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
@@ -857,6 +858,11 @@ while (age < MAX_AGE):
     print ('==================================')
     
 '''
+utime = np.unique(time_coord)
+dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
+dusts = np.array([np.std(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
+starf = np.array([np.average(star_frac[time_coord == med]) for med in np.unique(time_coord)])
+
 plt.scatter(np.log10(time_coord/year), np.log10(dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
 plt.plot(np.log10(utime/year), np.log10(dustt), c='maroon', alpha=0.5)
 plt.plot(np.log10(utime/year), np.log10(dustt + 2 * dusts), c='maroon', alpha=0.25)
@@ -886,7 +892,7 @@ PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
 #[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 #[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.colorbar()]
-[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.01)]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
 plt.xlabel('Position (astronomical units)')
