@@ -3,8 +3,6 @@ Created on Aug 21, 2017
 
 @author: umbut, dhruv
 '''
-"""VISCOSITY HASN'T BEEN VECTORIZED YET, SO WE SHOULD DO THAT"""
-"""MOST OTHER FUNCTIONS SEEM TO WORK AND OVERALL SPH SIMULATION IS MUCH FASTER THAN BEFORE"""
 import numpy as np
 import random
 from scipy import constants
@@ -32,8 +30,8 @@ t_cmb = 2.732
 t_solar = 5776
 supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
-dt_0 = 60. * 60. * 24. * 365 * 100000. # 100000 years
 year = 60. * 60. * 24. * 365.
+dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
 cross_sections = np.array([6.65e-29, 6.65e-29, 6.3e-28, 5e-26, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0.])
@@ -280,12 +278,12 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 			gw0 = grad_weight(points[neighbor[j]], points[j], mass[j], particle_type[neighbor[j]])
 			gw1 = grad_weight(points[neighbor[j]], points[j], mass[neighbor[j]], particle_type[neighbor[j]])
 			gw = (gw0 + gw1)/2.
-			accel_ij = -(mass[neighbor[j]] * PI_ij * gw.T).T
+			accel_ij = (mass[neighbor[j]] * PI_ij * gw.T).T
 			heat_ij = 0.5 * mass[neighbor[j]] * PI_ij * np.sum((velocities[neighbor[j]] - velocities[j]) * gw, axis=1)
 		
 			accel_i = np.sum(accel_ij[(particle_type[neighbor[j]] == 0)],axis=0)
 			heat_i = np.sum(heat_ij[particle_type[neighbor[j]] == 0])
-			visc_accel[j] = -accel_i
+			visc_accel[j] = accel_i
 			visc_heat[j] = heat_i
 	
 	return visc_accel, visc_heat
@@ -572,15 +570,14 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
 
-DIAMETER = 2e6 * AU
-N_PARTICLES = 3000
+DIAMETER = 0.5e6 * AU
+N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
-base_sfr = 0.02
 dt = dt_0
-DUST_FRAC = 0.0010000
+DUST_FRAC = 0.0050000
 DUST_MASS = 0.05
 N_RADIATIVE = 100
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
@@ -594,12 +591,12 @@ base_imf = np.logspace(-1,1.7, 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
-points = (np.random.rand(N_PARTICLES, 3) - 0.5) * DIAMETER
+points = np.random.normal(size=(N_PARTICLES, 3)) * DIAMETER
 points2 = copy.deepcopy(points)
 neighbor = neighbors(points, d)
 #print(nbrs)
 #print(points)
-velocities = (np.random.rand(N_PARTICLES, 3) - 0.5) * 0.0
+velocities = np.random.normal(size=(N_PARTICLES, 3)) * 10.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 mass = np.random.choice(base_imf, N_PARTICLES, p = imf) * solar_mass
 sizes = (mass/m_0)**(1./3.) * d
@@ -610,8 +607,8 @@ mu_array = np.zeros([N_PARTICLES])#array of all mu
 E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 #copy of generate_E_array
 #fills in E_internal array specified at the beginning
-T = 5 * np.ones([N_PARTICLES]) #5 kelvins
-T_FF = 3000000. #years
+T = 20 * np.ones([N_PARTICLES]) #5 kelvins
+
 #fills the f_u array
 dust_fracs = ((np.random.rand(N_PARTICLES) > DUST_FRAC))
 dust_fracs = dust_fracs.astype('bool')
@@ -621,6 +618,11 @@ fdust = np.array([dust_base[0]] * N_PARTICLES)
 f_un = (fgas.T * dust_fracs + fdust.T * (1 - dust_fracs)).T
 mass[particle_type == 2] = DUST_MASS * solar_mass
 sizes[particle_type == 2] = d
+
+#based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
+base_sfr = 0.0057 
+T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
+print T_FF
 
 #f_un = np.array([specie_fraction_array] * N_PARTICLES)
 mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -649,14 +651,15 @@ for iq in range(400):
         rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
         f_un0 = f_un
         N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
+        area = (4 * np.pi * sizes**2)
+        N_PART = mass/(m_h * mu_array)
+        W6_integral = 9./area #evaluating integral of W6 kernel
+        optd = 1. - np.exp(-optical_depth * W6_integral)
+        T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
+        E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
         for nrad in range(N_RADIATIVE):
-        	area = (4 * np.pi * sizes**2)
-        	W6_integral = 9./area #evaluating integral of W6 kernel
         	optd = 1. - np.exp(-optical_depth * W6_integral)
-        	N_PART = mass/(m_h * mu_array)
         	#dust particles function as if always in thermal equilibrium, F proportional to T^6. Last two variables are obtained from integration. http://www.astronomy.ohio-state.edu/~pogge/Ast871/Notes/Dust.pdf pg. 27
-        	T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
-        	E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
         	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optd * W6_integral**(-1) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
         	E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/N_RADIATIVE
         	E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
@@ -724,20 +727,26 @@ for iq in range(400):
     dust_densities = np.array([dust_density(j) for j in range(len(neighbor))])
     #viscous force causing dust to accelerate/decelerate along with gas
     dust_net_impulse = np.array([net_impulse(j)[0] for j in range(len(neighbor))])
+    #av = np.array([0., 0.])
+    #way too strong!
     av = artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T)
     
-    viscous_accel_dust = np.zeros((len(neighbor), 3))
+    drag_accel_dust = np.zeros((len(neighbor), 3))
     for j in range(len(neighbor)):
-    	viscous_accel_dust[neighbor[j]] += net_impulse(j)[1].T
+    	drag_accel_dust[neighbor[j]] += net_impulse(j)[1].T
     
     pressure_accel = -np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
     #very small factor, only seems to matter at the solar-system scale
-    viscous_accel_gas = np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
-    viscous_accel_dust = -np.nan_to_num(viscous_accel_dust)
+    drag_accel_gas = np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
+    drag_accel_dust = -np.nan_to_num(drag_accel_dust)
     
     #leapfrog integration
     old_accel = copy.deepcopy(total_accel)
-    total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust + av[0]
+    visc_accel = drag_accel_gas + drag_accel_dust + av[0]
+    #want perturbations of artificial viscosity to die out in time
+    visc_accel[np.sum(velocities**2, axis=1)**0.5 - np.sum(visc_accel**2, axis=1)**0.5 * dt < 0] = (-velocities/dt)[np.sum(velocities**2, axis=1)**0.5 - np.sum(visc_accel**2, axis=1)**0.5 * dt < 0]
+    
+    total_accel = grav_accel + pressure_accel + visc_accel
         
     points += ((total_accel * (dt)**2)/2.) + velocities * dt
     if np.shape(total_accel) == np.shape(old_accel):
@@ -746,16 +755,19 @@ for iq in range(400):
     	dv = total_accel * dt
     velocities += dv
     
-    T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
     E_internal = np.nan_to_num(E_internal) + np.nan_to_num(av[1] * dt)
+    T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
 
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
-    probability = base_sfr * (densities/critical_density)**(1.4) * ((dt/year)/T_FF)
+    probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
     diceroll = np.random.rand(len(probability))
     particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
     #this helps ensure that lone SPH particles don't form stars at late times in the simulation
     #ideally, there is an infinite number of SPH particles, each with infinitesimal density
     #that only has any real physical effects in conjunction with other particles
+    
+    #timestep reset here
+    dt = min(dt_0, max(dt_0/10., np.average(sizes[particle_type == 0])/min(85000, max(np.sum(velocities**2,axis=1)**0.5 + 1))))
     
     vel_condition = np.sum(velocities**2, axis=1)
     
@@ -820,7 +832,6 @@ for iq in range(400):
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     '''
-    
     time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
     dust_temps = np.append(dust_temps, (E_internal/optical_depth)[particle_type == 2])
     star_frac = np.append(star_frac, [float(np.sum(mass[particle_type == 1]))/np.sum(mass)] * len(T[particle_type == 2]))
@@ -830,7 +841,8 @@ for iq in range(400):
     print ('stars/total = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
     print ('==================================')
     
-'''utime = np.unique(time_coord)
+'''
+utime = np.unique(time_coord)
 dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
 dusts = np.array([np.std(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
 starf = np.array([np.average(star_frac[time_coord == med]) for med in np.unique(time_coord)])
@@ -844,8 +856,8 @@ plt.plot((utime/year), (dustt), c='maroon', alpha=0.5)
 plt.plot((utime/year), (dustt + 2 * dusts), c='maroon', alpha=0.25)
 plt.plot((utime/year), (dustt - 2 * dusts), c='maroon', alpha=0.25)
 
-'''
-'''
+
+
 VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
 TO REPRESENT THE FINAL STATE OF THE SIMULATION
 
