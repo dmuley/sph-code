@@ -42,7 +42,7 @@ mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,23
 sputtering_yields = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
-supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025]])
+supernova_base_release = np.array([[.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025]])
 W6_constant = (3 * np.pi/80)
 
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
@@ -79,28 +79,7 @@ def kroupa_imf(base_imf):
     imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.2 #fattened tail from 2.3!
     
     return (imf_final)
-
-def viscosity_2(i):
-    index = 1.4
-    accel = 0 #initial acceleration (force) due to viscosity
-    indices_nearest = neighbor[i]
-    for j in range(len(indices_nearest)):
-        if(density(i)==0):
-            continue
-        c1 = np.sqrt(index*k*T[i]/mass[i])
-        c2 = np.sqrt(index*k*T[j]/mass[j])
-        alpha = 1
-        rho_ij = (density(j)+density(i))/2
-        w_ij = np.dot((points[j]-points[i]),(velocities[j]-velocities[i]))/np.dot((points[j]-points[i]),(points[j]-points[i]))
-        v_ij = c1+c2-3*w_ij
-        if (w_ij < 0):
-            factor = -alpha*v_ij*w_ij/(2*rho_ij)
-        else:
-            factor = 0
-        accel += -mass[j]*factor*grad_weight(points[i], points[j], mass[i],particle_type[i])
-    return(accel)
-        
-	
+    	
 def mu_j(j): #mean molecular weight of the SPH particle
     #species = 13
     mu = 0
@@ -154,38 +133,6 @@ def Laplacian_Weight(x):#laplacian of the weight for the viscosity function
     lap_W = const*(d*d-x_norm)*(3*d*d-7*x_norm)
     return(lap_W)
 
-def artificial_viscosity(j): #artificial viscosity introduced to make the simulation more stable
-    eta = 0.1*d#idk the actual eta
-    beta = 2
-    x = points[j]
-    v = velocities[j]
-    momentum_change = 0 #dv/dt, which is technically speed change
-    indices_nearest = neighbor[j]
-    for i in range(len(indices_nearest)):
-        if(density(i)==0):
-            continue
-        v_diff = v-velocities[indices_nearest[i]] #velocity differences
-        r_diff = x - points[indices_nearest[i]] #position differences
-        mu = d*np.inner(v_diff,r_diff)/(np.inner(r_diff,r_diff)+eta*eta)
-        rho_avg = (density(j)+density(i))/2
-        pi = beta*mu*mu/rho_avg
-        momentum_change += mass[i]*(pressure(i)/density(i)**2+pressure(i)/density(i)**2+pi)*grad_weight(x, points[i], m[j], particle_type[j]) 
-    return(momentum_change*-1) #returns dv/dt for each particle j
-
-def viscosity(j): #viscosity introduced to make the simulation more stable
-    visc_coeff = 0.5 #vicsosity coefficient
-    f_visc = 0
-    x = points[j]
-    v = velocities[j]
-    indices_nearest = neighbor[j]
-    for i in range(len(indices_nearest)):
-        if(density(i)==0):
-            continue
-        f_visc = f_visc + (velocities[indices_nearest[i]]-v)*mass[indices_nearest[i]]*Laplacian_Weight(x-points[indices_nearest[i]])/density(i)
-        #print(density(i))
-    f_visc = f_visc/visc_coeff
-    return(f_visc)
-    
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]
     positional_masses = np.array([masses[np.argsort(positions.T[b])] for b in range(len(subdivisions))])
@@ -295,6 +242,7 @@ def grad_weight(x, x_0, m, type_particle):
     
     W = -315 * 6 * (m_0/m)**3 / (64*np.pi*d**9) * ((m/m_0)**(2./3.)*d**2-norms_sq)**2 * (type_particle == 0) * vec.T
     
+    #checks if SPH particles intersect or not
     return((np.nan_to_num(W.astype('float') * ((m/m_0)**(2./3.)*d**2-norms_sq > 0))).T)
 
 def del_pressure(i): #gradient of the pressure
@@ -306,11 +254,41 @@ def del_pressure(i): #gradient of the pressure
         m = np.append(mass[i], mass[np.array(neighbor[i])])
         pt = np.append(particle_type[i], particle_type[neighbor[i]])
         
-        gw = grad_weight(x, x_0, m, pt)
+        #symmetrizing pressure gradient
+        gw = (grad_weight(x, x_0, m, pt) + grad_weight(x, x_0, m[0], pt))/2.
         
         del_pres = np.sum((gw.T * E_internal[np.append(i, neighbor[i])]/gamma_array[np.append(i, neighbor[i])]).T, axis=0)
         
         return del_pres
+
+def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T):
+	css_base = (gamma_array * k * T/(mu_array * amu))**0.5
+	visc_accel = np.zeros((len(points),3))
+	visc_heat = np.zeros(len(points))
+	for j in np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]:
+		if (np.sum(particle_type[neighbor[j]] == 0) > 0):
+			w_ij = np.sum((velocities[neighbor[j]] - velocities[j]) * (points[neighbor[j]] - points[j]), axis=1)/np.sum((points[neighbor[j]] - points[j])**2, axis=1)**0.5
+			w_ij[w_ij > 0] = 0
+			w_ij = np.nan_to_num(w_ij)
+			c_sound_sum = css_base[neighbor[j]] + css_base[j]
+			vsig_ij = c_sound_sum - 3 * w_ij
+		
+			rho_ij = (densities[neighbor[j]] + densities[j])/2.
+		
+			PI_ij = -1./2. * vsig_ij * w_ij/rho_ij
+			#symmetrizing pressure
+			gw0 = grad_weight(points[neighbor[j]], points[j], mass[j], particle_type[neighbor[j]])
+			gw1 = grad_weight(points[neighbor[j]], points[j], mass[neighbor[j]], particle_type[neighbor[j]])
+			gw = (gw0 + gw1)/2.
+			accel_ij = -(mass[neighbor[j]] * PI_ij * gw.T).T
+			heat_ij = 0.5 * mass[neighbor[j]] * PI_ij * np.sum((velocities[neighbor[j]] - velocities[j]) * gw, axis=1)
+		
+			accel_i = np.sum(accel_ij[(particle_type[neighbor[j]] == 0)],axis=0)
+			heat_i = np.sum(heat_ij[particle_type[neighbor[j]] == 0])
+			visc_accel[j] = -accel_i
+			visc_heat[j] = heat_i
+	
+	return visc_accel, visc_heat
 
 def neighbors(points, dist):
     kdt = spatial.cKDTree(points)  
@@ -595,14 +573,14 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     return lf2, new_fun.T, momentum
 
 DIAMETER = 2e6 * AU
-N_PARTICLES = 2000
+N_PARTICLES = 3000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 base_sfr = 0.02
 dt = dt_0
-DUST_FRAC = 0.030000
+DUST_FRAC = 0.0010000
 DUST_MASS = 0.05
 N_RADIATIVE = 100
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
@@ -664,6 +642,7 @@ age = 0
 plt.ion()
 time_coord = np.array([])
 dust_temps = np.array([])
+star_frac = np.array([])
 for iq in range(400):
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
@@ -742,6 +721,7 @@ for iq in range(400):
     dust_densities = np.array([dust_density(j) for j in range(len(neighbor))])
     #viscous force causing dust to accelerate/decelerate along with gas
     dust_net_impulse = np.array([net_impulse(j)[0] for j in range(len(neighbor))])
+    av = artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T)
     
     viscous_accel_dust = np.zeros((len(neighbor), 3))
     for j in range(len(neighbor)):
@@ -754,7 +734,7 @@ for iq in range(400):
     
     #leapfrog integration
     old_accel = copy.deepcopy(total_accel)
-    total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust
+    total_accel = grav_accel + pressure_accel + viscous_accel_gas + viscous_accel_dust + av[0]
         
     points += ((total_accel * (dt)**2)/2.) + velocities * dt
     if np.shape(total_accel) == np.shape(old_accel):
@@ -764,7 +744,7 @@ for iq in range(400):
     velocities += dv
     
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
-    E_internal = np.nan_to_num(E_internal)
+    E_internal = np.nan_to_num(E_internal) + np.nan_to_num(av[1] * dt)
 
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     probability = base_sfr * (densities/critical_density)**(1.4) * ((dt/year)/T_FF)
@@ -840,6 +820,7 @@ for iq in range(400):
     
     time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
     dust_temps = np.append(dust_temps, (E_internal/optical_depth)[particle_type == 2])
+    star_frac = np.append(star_frac, [float(np.sum(mass[particle_type == 1]))/np.sum(mass)] * len(T[particle_type == 2]))
     
     print ('age=', age/year)
     #print (d/AU)
