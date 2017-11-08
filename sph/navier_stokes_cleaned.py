@@ -74,7 +74,7 @@ def kroupa_imf(base_imf):
     coeff_1 = 2.133403503
     imf_final[(base_imf >= 0.08) & (base_imf < 0.5)] = coeff_1 * (base_imf/0.08)[(base_imf >= 0.08) & (base_imf < 0.5)]**-1.3
     coeff_2 = 0.09233279398
-    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.2 #fattened tail from 2.3!
+    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.3 #fattened tail from 2.3!
     
     return (imf_final)
     	
@@ -109,6 +109,9 @@ def luminosity_relation(base_imf, imf, lifetime=0):
     
     luminosity_relation = coeff_luminosity * base_imf**exp_luminosity
     lifetime_relation = coeff_luminosity**(-1) * base_imf**(1 - exp_luminosity)
+    lifetime_relation[lifetime_relation < 3.6e-3] = 3.6e-3 
+    #per Murray (2011), http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta,
+    #stars have a minimum lifespan of about 3.6 Myr
     if lifetime == 0:
         return luminosity_relation
     if lifetime == 1:
@@ -130,6 +133,12 @@ def Laplacian_Weight(x):#laplacian of the weight for the viscosity function
     const = -945/(32*np.pi*d**9)#d^9replaced by iterations of *d for computational efficiency
     lap_W = const*(d*d-x_norm)*(3*d*d-7*x_norm)
     return(lap_W)
+
+def neighbors(points, dist):
+    kdt = spatial.cKDTree(points)  
+    qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
+    
+    return qbp
 
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]
@@ -259,6 +268,14 @@ def del_pressure(i): #gradient of the pressure
         
         return del_pres
 
+def relative_velocities(neighbor, velocities):
+	max_relvel = np.zeros(len(neighbor))
+	neighbor_lengths = np.array([len(a) for a in neighbor])
+	j_range = np.arange(len(neighbor))
+	max_relvel[neighbor_lengths > 0] = np.array([np.max(np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1))**0.5 for j in j_range[neighbor_lengths]])
+	
+	return max_relvel
+
 def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T):
 	css_base = (gamma_array * k * T/(mu_array * amu))**0.5
 	visc_accel = np.zeros((len(points),3))
@@ -287,12 +304,6 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 			visc_heat[j] = heat_i
 	
 	return visc_accel, visc_heat
-
-def neighbors(points, dist):
-    kdt = spatial.cKDTree(points)  
-    qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
-    
-    return qbp
     
 def neighbors_arb(points, arb_points):
     kdt = spatial.cKDTree(points)  
@@ -580,6 +591,7 @@ dt = dt_0
 DUST_FRAC = 0.0050000
 DUST_MASS = 0.05
 N_RADIATIVE = 100
+MAX_AGE = 4e7 * year
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
@@ -587,7 +599,7 @@ dust_base_frac = (specie_fraction_array - supernova_base_release)
 dust_base = dust_base_frac/np.sum(dust_base_frac)
 cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
 
-base_imf = np.logspace(-1,1.7, 200)
+base_imf = np.logspace(-1,2., 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
@@ -622,7 +634,6 @@ sizes[particle_type == 2] = d
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
 base_sfr = 0.0057 
 T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
-print T_FF
 
 #f_un = np.array([specie_fraction_array] * N_PARTICLES)
 mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -638,14 +649,21 @@ critical_density = 1000*amu*10**6 #critical density of star formation
 densities = np.array([density(j) for j in range(len(neighbor))])
 delp = np.array([del_pressure(j) for j in range(len(neighbor))])
 num_densities = np.array([num_dens(j) for j in range(len(neighbor))])
-print("Begin SPH")
+
 star_ages = np.ones(len(points)) * -1.
 age = 0
-plt.ion()
+
 time_coord = np.array([])
 dust_temps = np.array([])
 star_frac = np.array([])
-for iq in range(400):
+
+print("Simulation time: " + str(MAX_AGE/year) + " y")
+print("Estimated free fall time: " + str(T_FF) + " y")
+plt.ion()
+while (age < MAX_AGE):
+    #timestep reset here
+    dyn_t = np.average(sizes[particle_type == 0])/max(relative_velocities(neighbor, velocities))
+    dt = min(dt_0, dyn_t)
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
@@ -765,10 +783,7 @@ for iq in range(400):
     #this helps ensure that lone SPH particles don't form stars at late times in the simulation
     #ideally, there is an infinite number of SPH particles, each with infinitesimal density
     #that only has any real physical effects in conjunction with other particles
-    
-    #timestep reset here
-    dt = min(dt_0, max(dt_0/10., np.average(sizes[particle_type == 0])/min(85000, max(np.sum(velocities**2,axis=1)**0.5 + 1))))
-    
+        
     vel_condition = np.sum(velocities**2, axis=1)
     
     xmin = np.percentile(points.T[0][vel_condition < 80000**2], 10)/AU
@@ -842,10 +857,6 @@ for iq in range(400):
     print ('==================================')
     
 '''
-utime = np.unique(time_coord)
-dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
-dusts = np.array([np.std(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
-starf = np.array([np.average(star_frac[time_coord == med]) for med in np.unique(time_coord)])
 plt.scatter(np.log10(time_coord/year), np.log10(dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
 plt.plot(np.log10(utime/year), np.log10(dustt), c='maroon', alpha=0.5)
 plt.plot(np.log10(utime/year), np.log10(dustt + 2 * dusts), c='maroon', alpha=0.25)
@@ -855,7 +866,6 @@ plt.scatter((time_coord/year), (dust_temps), alpha=0.2, c='grey', s = 10, edgeco
 plt.plot((utime/year), (dustt), c='maroon', alpha=0.5)
 plt.plot((utime/year), (dustt + 2 * dusts), c='maroon', alpha=0.25)
 plt.plot((utime/year), (dustt - 2 * dusts), c='maroon', alpha=0.25)
-
 
 
 VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
