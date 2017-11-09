@@ -268,13 +268,14 @@ def del_pressure(i): #gradient of the pressure
         
         return del_pres
 
-def relative_velocities(neighbor, velocities):
+def crossing_time(neighbor, velocities, sizes, particle_type):
 	max_relvel = np.zeros(len(neighbor))
 	neighbor_lengths = np.array([len(a) for a in neighbor])
 	j_range = np.arange(len(neighbor))
 	max_relvel[neighbor_lengths > 0] = np.array([np.max(np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1))**0.5 for j in j_range[neighbor_lengths]])
 	
-	return max_relvel
+	crossing_time = np.nan_to_num(sizes/max_relvel) * (particle_type == 0)
+	return min(crossing_time[crossing_time != 0])
 
 def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T):
 	css_base = (gamma_array * k * T/(mu_array * amu))**0.5
@@ -581,7 +582,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     #energy, composition change, impulse
     return lf2, new_fun.T, momentum
 
-DIAMETER = 0.5e6 * AU
+DIAMETER = 0.75e6 * AU
 N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
@@ -662,9 +663,8 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 while (age < MAX_AGE):
     #timestep reset here
-    relv = relative_velocities(neighbor, velocities)
-    dyn_t = np.average(sizes[particle_type == 0])/np.average(relv[(particle_type == 0) & (relv > 0)])
-    dt = min(dt_0, dyn_t)
+    ct = crossing_time(neighbor, velocities, sizes, particle_type)
+    dt = min(dt_0, ct)
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
@@ -903,7 +903,7 @@ plt.title('Temperature in H II region')
 #[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 #[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.colorbar()]
-[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.02)]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
 plt.xlabel('Position (astronomical units)')
