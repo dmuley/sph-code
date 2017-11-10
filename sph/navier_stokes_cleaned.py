@@ -67,6 +67,27 @@ def grain_mass(mineral_densities, mrn_constants):
 	
 	return meff
 
+
+def supernova_destruction(j): #where j is the index of the star particle that undergoes supernova
+    E51 = 10**51 #ergs
+    f_w = 0.3
+    f_h = 0.7
+    f_c = 0.02
+    indices = neighbor[j]
+    for ii in range(len(indices)):
+        if particle_type[ii] != 1: #if it is not a dust particle
+            continue
+        else:
+	    #destruction efficiency = efficiency*W6(xmutual)
+	    factor = weigh2(point[j],point[ii],mass[j])
+    	    M_si = 6800*0.295*specie_fraction_array[0]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon
+   	    M_C = 6800*0.137*specie_fraction_array[1]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for carbon
+    	    M_SiC = 6800*0.137*specie_fraction_array[2]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon carbide
+            M_Fe = 6800*0.137*specie_fraction_array[3]*factor*E51*(f_c+f_w)/f_h
+	    
+     return(0)
+
+
 def kroupa_imf(base_imf):
     coeff_0 = 1
     imf_final = np.zeros(len(base_imf))
