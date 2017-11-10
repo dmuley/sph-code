@@ -69,23 +69,46 @@ def grain_mass(mineral_densities, mrn_constants):
 
 
 def supernova_destruction(j): #where j is the index of the star particle that undergoes supernova
+    #mass
     E51 = 10**51 #ergs
     f_w = 0.3
     f_h = 0.7
     f_c = 0.02
     indices = neighbor[j]
     for ii in range(len(indices)):
-        if particle_type[ii] != 1: #if it is not a dust particle
+	index = indices[ii]
+        if particle_type[index] != 1: #if it is not a dust particle
             continue
         else:
-	    #destruction efficiency = efficiency*W6(xmutual)
-	    factor = weigh2(point[j],point[ii],mass[j])
-    	    M_si = 6800*0.295*specie_fraction_array[0]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon
-   	    M_C = 6800*0.137*specie_fraction_array[1]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for carbon
-    	    M_SiC = 6800*0.137*specie_fraction_array[2]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon carbide
-            M_Fe = 6800*0.137*specie_fraction_array[3]*factor*E51*(f_c+f_w)/f_h
-	    
-     return(0)
+        #destruction efficiency = efficiency*W6(xmutual)
+        factor = weigh2(points[j],points[index][9],mass[j])
+        M_si_dest = 6800*0.295*f_un[index][9]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon
+        M_si_present = mass[index]*f_un[index][9]
+	if (M_si_dest > M_si_present):
+		M_si_dest = M_si_present
+            
+        M_C_dest = 6800*0.137*f_un[index][8]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for carbon
+	M_C_present = mass[index]*f_un[index][8]
+	if (M_C_dest > M_C_present):
+		M_C_dest = M_C_present
+	
+        M_SiC_dest = 6800*0.137*f_un[index][7]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon carbide
+	M_SiC_present = mass[index]*f_un[index][7]
+	if (M_SiC_dest > M_SiC_present):
+		M_SiC_dest = M_SiC_present
+	
+        M_Fe_dest = 6800*0.137*f_un[index][10]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for iron
+	M_Fe_present = mass[index]*f_un[index][10]
+	if (M_Fe_dest > M_Fe_present):
+		M_Fe_dest = M_Fe_present
+	
+	mass[index] = mass[index] - (M_si_dest+M_C_dest+M_SiC_dest+M-Fe_dest) #mass of dust is destroyed to be later added to nearest gas particle
+	f_un[index][9] = (M_si_present-M_si_dest)/mass[index]
+	f_un[index][8] = (M_C_present-M_C_dest)/mass[index]
+	f_un[index][7] = (M_SiC_present-M_SiC_dest)/mass[index]
+	f_un[index][10] = (M_Fe_present-M_Fe_dest)/mass[index]
+	
+  return(0)
 
 
 def kroupa_imf(base_imf):
