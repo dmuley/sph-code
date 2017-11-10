@@ -600,7 +600,7 @@ dust_base_frac = (specie_fraction_array - supernova_base_release)
 dust_base = dust_base_frac/np.sum(dust_base_frac)
 cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
 
-base_imf = np.logspace(-1,2., 200)
+base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
@@ -746,8 +746,7 @@ while (age < MAX_AGE):
     dust_densities = np.array([dust_density(j) for j in range(len(neighbor))])
     #viscous force causing dust to accelerate/decelerate along with gas
     dust_net_impulse = np.array([net_impulse(j)[0] for j in range(len(neighbor))])
-    #av = np.array([0., 0.])
-    #way too strong!
+    #artificial viscosity to ensure proper blast wave
     av = artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T)
     
     drag_accel_dust = np.zeros((len(neighbor), 3))
@@ -755,7 +754,7 @@ while (age < MAX_AGE):
     	drag_accel_dust[neighbor[j]] += net_impulse(j)[1].T
     
     pressure_accel = -np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
-    #very small factor, only seems to matter at the solar-system scale
+    #drag is a very small factor, only seems to matter at the solar-system scale
     drag_accel_gas = np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
     drag_accel_dust = -np.nan_to_num(drag_accel_dust)
     
