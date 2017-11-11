@@ -68,6 +68,32 @@ def grain_mass(mineral_densities, mrn_constants):
 	return meff
 
 
+def e_interpolate(v): #interpolation of carbon and silicon destruction efficiency, returns the calculated e_c and e_s
+    v_s = np.array([50,75,100,125,150,175,200])
+    e_c = np.array([0.01,0.04,0.10,0.18,0.17,0.18,0.23])
+    e_si = np.array([0.02,0.09,0.23,0.41,0.40,0.42,0.40])
+    a_c,b_c,c_c = np.polyfit(v_s, e_c, 2) #coefficients of 2nd order polynomial fit
+    a_si,b_si,c_si = np.polyfit(v_s, e_si, 2) #coefficients of 2nd order polynomial fit
+
+    e_c_int = a_c*v**2+b_c*v+c_c
+    e_si_int = a_si*v**2+b_si*v+c_si
+
+    return(e_c_int, e_si_int)
+	
+def supernova_sputtering(i,u): #for a dust particle i, specie u. Returns F_sup
+	rho_crit = 10**3*m_h
+	indices = neighbor(i)
+	F_sup = 0
+	for j in range(len(indices)):
+		index = indices[j]
+		e_c, e_si = e_interpolate(np.abs(velocity[index]-velocity[i]))
+		if (u==9): #if the element is silicon
+			e = e_si
+		else:
+			e = e_c
+		F_sup += density(index)/rho_crit*e*weigh2(points[index],points[i],mass[index])/weigh2(0,mass[index]
+	retur(F_sup)	
+	
 def supernova_destruction(j): #where j is the index of the star particle that undergoes supernova
     #mass
     E51 = 10**51 #ergs
