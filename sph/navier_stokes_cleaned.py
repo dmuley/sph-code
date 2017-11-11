@@ -92,33 +92,69 @@ def chemical_sputtering(i,u,dt): #for a particle i
 	
 	
 	
-def supernova_sputtering_yield(i,u): #for a dust particle i, specie u. Returns F_sup
+def supernova_sputtering_yield(i,u): #for a dust particle i, specie u. Returns F_sup and the indices of intersecting gas particles
 	rho_crit = 10**3*m_h
-
+	array_gas_particles = np.array([]) #array of indicies of intersecting gas particles
 	indices = neighbor[i]
 	F_sup = 0
-	for j in range(len(indices)):
+	for j in range(len(indices)):								 
 		index = indices[j]
-		e_c, e_si = e_interpolate(np.abs(velocity[index]-velocity[i]))
-		if (u==9): #if the element is silicon
-			e = e_si
-		else:
-			e = e_c
-		F_sup += density(index)/rho_crit*e*weigh2(points[index],points[i],mass[index])/weigh2(0,mass[index]
-	return(F_sup)	
+		if(particle_type[index] != 0): #if the neighboring particle is not a gas particle, continue
+			continue:
+		else:								 
+			array_gas_particles = np.append(array_gas_particles,[index])
+			e_c, e_si = e_interpolate(np.abs(velocity[index]-velocity[i]))
+			if (u==9): #if the element is silicon
+				e = e_si
+			else:
+				e = e_c
+			F_sup += density(index)/rho_crit*e*weigh2(points[index],points[i],mass[index])/weigh2(points[i],points[i],mass[index])
+	return(F_sup,array_gas_particles)	
 												    
-def supernova_sputtering(k,u): #particle k undergoes supernova
-	indices = neighbor[k]
-	for j in range(len(indices)):
+def supernova_sputtering(x,u): #evaluated at point x
+	total_diff_mass_u = 0 #total difference in mass for each dust particle i									 
+	indices = neighbors(x,d)
+	normalization = 0 #normalization factor for dust particles
+	normalization_gas = 0 #normalization factor for gas particles									 
+	all_intersecting_gas = np.array([]) #the array of all the gas particles that intersect the dust particles									 
+	for k in range(len(indices)):
+		jj = indices[k]
+		if(particle_type[jj] !=1): #if it is not dust
+			continue:
+		else:
+			total_N = mass[jj]/np.dot(f_un[jj],mu_specie)
+			mass_u = total_N*f_un[jj][u]*mu_specie[u]									      
+			normalization += mass_u*weigh2(x,points[jj],mass[jj])										      
+	for j in range(len(indices)): #this is where I consider the destruction of dust of specie u in a dust particle
 		i = indices[j]
+		total_diff_mass_u								 
 		if(particle_type[i] !=1): #if it is not dust
 			continue:										      
- 	else:
-		total_N = mass[i]/np.dot(f_un[i],mu_specie)
-		mass_u = total_N*f_un[i][u]*mu_specie[u]
-		F_u = supernova_sputtering_yield(i,u)										      
-		diff_mass_u = (F_u-1)*mass_u**2										      
-												      
+ 		else:
+			total_N = mass[i]/np.dot(f_un[i],mu_specie)
+			mass_u = total_N*f_un[i][u]*mu_specie[u] #mass of specie u contained in the dust
+			F_u, gas_particle_array = supernova_sputtering_yield(i,u) #returns the intersecting gas particle indices, for each dust particle i										      
+			all_intersecting_gas = np.append(all_intersecting_gas,gas_particle_array)
+			diff_mass_u = np.abs((F_u-1)*mass_u**2*weigh2(x,points[i],mass[i])/normalization) #mass change in the dust particle (dust is destroyed)	
+			total_diff_mass_u += diff_mass_u 
+			mass[i] = mass[i]-diff_mass_u							 
+			num_u_molecules = diff_mass_u/mu_specie[u] #number of dust molecules of specie u that get destroyed
+			total_N = total_N - num_u_molecules							 
+			f_un[i][u] = (mass_u-diff_mass_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)						 
+	#this is where I consider the addition of destroyed dust to gas particles
+	for ii in range(len(all_intersecting_gas)):
+		index = all_intersecting_gas[ii]
+		normalization_2 += mass[index]*weigh2(x,points[index],mass[index])								 
+	for zz in range(len(all_intersecting_gas)):
+		index = all_intersecting_gas[zz]								 
+		total_N = mass[index]/np.dot(f_un[index],mu_specie)
+		mass_u = total_N*f_un[index][u]*mu_specie[u] #mass of specie u contained in the gas								 
+		diff_mass_gas_u = mass[index]*weigh2(x,points[index],mass[index])/normalization_2*total_diff_mass_u #addition to gas
+		mass[index] = mass[index]+diff_mass_u	#new mass						 
+		num_u_molecules = diff_mass_gas_u/mu_specie[u] #number of gas molecules of specie u that get added
+		total_N = total_N + num_u_molecules							 
+		f_un[index][u] = (mass_u+diff_mass_gas_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)								 
+	return(1)
 ''' 
 def supernova_destruction(j): #where j is the index of the star particle that undergoes supernova
     #mass
