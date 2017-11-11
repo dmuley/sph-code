@@ -86,6 +86,8 @@ def chemical_sputtering(i,u,dt): #for a particle i
 	factor = mu_specie[u]*num_dens_ref+mineral_densities[u]-num_dens_H*sputtering_yields[u]*mu_specie[u]
 	K_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
 	F_sput_u = K_u*np.exp(K_u*dt)/(mu_specie[u]*num_dens_ref-num_dens_H*mu_specie[u]*sputtering_yields[u]+mineral_densities[u]*np.exp(K_u*dt))
+	gas_dM =  #gas mass change
+										 
 	return(F_sput_u)									 
 	
 	
@@ -103,7 +105,8 @@ def supernova_sputtering(i,u): #for a dust particle i, specie u. Returns F_sup
 			e = e_c
 		F_sup += density(index)/rho_crit*e*weigh2(points[index],points[i],mass[index])/weigh2(0,mass[index]
 	retur(F_sup)	
-	
+
+ '''												  
 def supernova_destruction(j): #where j is the index of the star particle that undergoes supernova
     #mass
     E51 = 10**51 #ergs
@@ -145,7 +148,7 @@ def supernova_destruction(j): #where j is the index of the star particle that un
 	f_un[index][10] = (M_Fe_present-M_Fe_dest)/mass[index]
 	
   return(0)
-
+ '''
 
 def kroupa_imf(base_imf):
     coeff_0 = 1
