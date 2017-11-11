@@ -79,6 +79,16 @@ def e_interpolate(v): #interpolation of carbon and silicon destruction efficienc
     e_si_int = a_si*v**2+b_si*v+c_si
 
     return(e_c_int, e_si_int)
+
+def chemical_sputtering(i,u,dt): #for a particle i
+	a_min = mrn_constants[0]
+	a_max = mrn_constants[1]
+	factor = mu_specie[u]*num_dens_ref+mineral_densities[u]-num_dens_H*sputtering_yields[u]*mu_specie[u]
+	K_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
+	F_sput_u = K_u*np.exp(K_u*dt)/(mu_specie[u]*num_dens_ref-num_dens_H*mu_specie[u]*sputtering_yields[u]+mineral_densities[u]*np.exp(K_u*dt))
+	return(F_sput_u)									 
+	
+	
 	
 def supernova_sputtering(i,u): #for a dust particle i, specie u. Returns F_sup
 	rho_crit = 10**3*m_h
