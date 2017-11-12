@@ -84,7 +84,13 @@ def interpolation_functions(): #interpolation of carbon and silicon destruction 
     carb_interpolation = interp1d(v_s, e_c, bounds_error=False, fill_value = 0.)
     silicon_interpolation = interp1d(v_s, e_si, bounds_error=False, fill_value = 0.)
     
-    return (carb_interpolation, silicon_interpolation)
+    def zero_function(v):
+    	return np.zeros(len(v));
+    
+    #list of interpolation functions for each species
+    return (zero_function, zero_function, zero_function, zero_function, zero_function, zero_function, carb_interpolation, silicon_interpolation, carb_interpolation, silicon_interpolation, carb_interpolation, carb_interpolation, carb_interpolation)
+
+intf = interpolation_functions(); #calling this beforehand just so it's clear that it's set
 
 def kroupa_imf(base_imf):
     coeff_0 = 1
@@ -241,10 +247,6 @@ def Weigh2_dust(x, x_0, m, dustsize):
     norms_sq = np.sum((x - x_0)**2, axis=1)
     W = m * 315*(dustsize**2-norms_sq)**3/(64*np.pi*dustsize**9)
     return(W)
-
-def laplacian_weight(x, x_0, m):
-    sq_norms = np.sum((x - x_0)**2, axis=1)
-    const = -945/(32*np.pi*d**9)
     
 def grad_weight(x, x_0, m, type_particle):
     vec = (x - x_0)
@@ -643,114 +645,36 @@ def chemical_sputtering(i,u,dt):
 		total_N = total_N + num_u_molecules							 
 		f_un[index][u] = (mass_u+diff_mass_gas_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)								 
 	return(1)										 
-	
-def supernova_sputtering_yield(i,u): #for a dust particle i, specie u. Returns F_sup and the indices of intersecting gas particles
-	rho_crit = 10**3*m_h
-	array_gas_particles = np.array([]) #array of indicies of intersecting gas particles
-	indices = neighbor[i]
-	F_sup = 0
-	for j in range(len(indices)):								 
-		index = indices[j]
-		if(particle_type[index] != 0): #if the neighboring particle is not a gas particle, continue
-			continue:
-		else:								 
-			array_gas_particles = np.append(array_gas_particles,[index])
-			e_c, e_si = e_interpolate(np.abs(velocity[index]-velocity[i]))
-			if (u==9): #if the element is silicon
-				e = e_si
-			else:
-				e = e_c
-			F_sup += density(index)/rho_crit*e*weigh2(points[index],points[i],mass[index])/weigh2(points[i],points[i],mass[index])
-	return(F_sup,array_gas_particles)	
-												    
-def supernova_sputtering(x,u): #evaluated at point x
-	total_diff_mass_u = 0 #total difference in mass for each dust particle i									 
-	indices = neighbors(x,d)
-	normalization = 0 #normalization factor for dust particles
-	normalization_gas = 0 #normalization factor for gas particles									 
-	all_intersecting_gas = np.array([]) #the array of all the gas particles that intersect the dust particles									 
-	for k in range(len(indices)):
-		jj = indices[k]
-		if(particle_type[jj] !=1): #if it is not dust
-			continue:
-		else:
-			total_N = mass[jj]/np.dot(f_un[jj],mu_specie)
-			mass_u = total_N*f_un[jj][u]*mu_specie[u]									      
-			normalization += mass_u*weigh2(x,points[jj],mass[jj])										      
-	for j in range(len(indices)): #this is where I consider the destruction of dust of specie u in a dust particle
-		i = indices[j]
-		total_diff_mass_u								 
-		if(particle_type[i] !=1): #if it is not dust
-			continue:										      
- 		else:
-			total_N = mass[i]/np.dot(f_un[i],mu_specie)
-			mass_u = total_N*f_un[i][u]*mu_specie[u] #mass of specie u contained in the dust
-			F_u, gas_particle_array = supernova_sputtering_yield(i,u) #returns the intersecting gas particle indices, for each dust particle i										      
-			all_intersecting_gas = np.append(all_intersecting_gas,gas_particle_array)
-			diff_mass_u = np.abs((F_u-1)*mass_u**2*weigh2(x,points[i],mass[i])/normalization) #mass change in the dust particle (dust is destroyed)	
-			total_diff_mass_u += diff_mass_u 
-			mass[i] = mass[i]-diff_mass_u							 
-			num_u_molecules = diff_mass_u/mu_specie[u] #number of dust molecules of specie u that get destroyed
-			total_N = total_N - num_u_molecules							 
-			f_un[i][u] = (mass_u-diff_mass_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)						 
-	#this is where I consider the addition of destroyed dust to gas particles
-	for ii in range(len(all_intersecting_gas)):
-		index = all_intersecting_gas[ii]
-		normalization_2 += mass[index]*weigh2(x,points[index],mass[index])								 
-	for zz in range(len(all_intersecting_gas)):
-		index = all_intersecting_gas[zz]								 
-		total_N = mass[index]/np.dot(f_un[index],mu_specie)
-		mass_u = total_N*f_un[index][u]*mu_specie[u] #mass of specie u contained in the gas								 
-		diff_mass_gas_u = mass[index]*weigh2(x,points[index],mass[index])/normalization_2*total_diff_mass_u #addition to gas
-		mass[index] = mass[index]+diff_mass_u	#new mass						 
-		num_u_molecules = diff_mass_gas_u/mu_specie[u] #number of gas molecules of specie u that get added
-		total_N = total_N + num_u_molecules							 
-		f_un[index][u] = (mass_u+diff_mass_gas_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)								 
-	return(1)
-''' 
-def supernova_destruction(j): #where j is the index of the star particle that undergoes supernova
-    #mass
-    E51 = 10**51 #ergs
-    f_w = 0.3
-    f_h = 0.7
-    f_c = 0.02
-    indices = neighbor[j]
-    for ii in range(len(indices)):
-	index = indices[ii]
-        if particle_type[index] != 1: #if it is not a dust particle
-            continue
-        else:
-        #destruction efficiency = efficiency*W6(xmutual)
-        factor = weigh2(points[j],points[index][9],mass[j])
-        M_si_dest = 6800*0.295*f_un[index][9]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon
-        M_si_present = mass[index]*f_un[index][9]
-	if (M_si_dest > M_si_present):
-		M_si_dest = M_si_present
-            
-        M_C_dest = 6800*0.137*f_un[index][8]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for carbon
-	M_C_present = mass[index]*f_un[index][8]
-	if (M_C_dest > M_C_present):
-		M_C_dest = M_C_present
-	
-        M_SiC_dest = 6800*0.137*f_un[index][7]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for silicon carbide
-	M_SiC_present = mass[index]*f_un[index][7]
-	if (M_SiC_dest > M_SiC_present):
-		M_SiC_dest = M_SiC_present
-	
-        M_Fe_dest = 6800*0.137*f_un[index][10]*factor*E51*(f_c+f_w)/f_h #dust mass destroyed for iron
-	M_Fe_present = mass[index]*f_un[index][10]
-	if (M_Fe_dest > M_Fe_present):
-		M_Fe_dest = M_Fe_present
-	
-	mass[index] = mass[index] - (M_si_dest+M_C_dest+M_SiC_dest+M-Fe_dest) #mass of dust is destroyed to be later added to nearest gas particle
-	f_un[index][9] = (M_si_present-M_si_dest)/mass[index]
-	f_un[index][8] = (M_C_present-M_C_dest)/mass[index]
-	f_un[index][7] = (M_SiC_present-M_SiC_dest)/mass[index]
-	f_un[index][10] = (M_Fe_present-M_Fe_dest)/mass[index]
-	
-  return(0)
- '''
 
+def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_type):
+	frac_destruction = copy.deepcopy(f_un * 0.)
+	frac_reuptake = copy.deepcopy(f_un * 0.)
+	for j in np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 2]:
+		if (np.sum(particle_type[neighbor[j]] == 0) > 0):
+			x = points[np.array(neighbor[j])]
+			m = mass[np.array(neighbor[j])]
+			x_0 = points[j]
+			comps = f_un[j]
+			
+			w2 = Weigh2(x, x_0, m)
+			w2 *= (w2 >= 0)
+			
+			rho = w2 * (particle_type[np.append(j, np.array(neighbor[j]))] == 0)
+			vels = velocities[neighbor[j]] * (particle_type[neighbor[j]] == 0)
+			vels = np.sum(vels**2, axis=1)**0.5
+			dest_fracs = np.array([u(vels) for u in intf]).T
+			
+			reuptake_relative = rho/np.sum(rho)
+			
+			final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0)
+			final_fracs[final_fracs >= 1.] = 1.
+			frac_destruction[j] = final_fracs * f_un[j]
+			frac_reuptake[neighbors[j]] = (np.vstack([final_fracs] * len(rho)).T * rho).T
+			#Still need to make sure shapes are correct!!!!
+			#Also, need to fix normalization here still!! Do not use yet!
+			
+	return frac_destruction, frac_reuptake #in the same shape as f_un
+													    
 #INTERPOLATION OF GRAPH AT ARBITRARY POINTS--- WE CAN USE THESE 
 #TO MAKE HIGH-QUALITY GRAPHS FOR THE FINAL PAPER. SPH PARTICLES
 #ARE TOO LARGE TO LOOK GOOD. THESE TAKE A LOT OF TIME TO RUN---
