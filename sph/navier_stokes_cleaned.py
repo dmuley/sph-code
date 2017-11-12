@@ -80,17 +80,81 @@ def e_interpolate(v): #interpolation of carbon and silicon destruction efficienc
 
     return(e_c_int, e_si_int)
 
-def chemical_sputtering(i,u,dt): #for a particle i
+def num_dens_array(x)
+	num_dens_ref = np.array([])
+	indices = neighbors(x,d)
+	for j in range(len(indices)):
+		i = indices[j]
+		factor = f_un[i].T*(mass[i]/(mu_species*amu))
+		num_dens_ref += factor*weigh2(x,points[i],mass[i])
+	return(num_dens_ref) #retuns n_u_0 for chemisputtering, not sure if it is correct
+		
+	
+def chemical_sputtering_yield(i,u,x,dt): #for a particle i, returns F_sput_u
+	num_dens_ref = num_dens_array(x)
 	a_min = mrn_constants[0]
 	a_max = mrn_constants[1]
-	K_u = mu_specie[u]*num_dens_ref+mineral_densities[u]-num_dens_H*sputtering_yields[u]*mu_specie[u]-num_dens_He*sputtering_yields_He[u]*mu_specie[u]
+	K_u = mu_specie[u]*num_dens_ref[u]+mineral_densities[u]-num_dens_ref[3]*y_H*mu_specie[u]-num_dens_ref[4]*y_He[u]*mu_specie[u]
 	J_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
-	F_sput_u = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref-num_dens_H*mu_specie[u]*sputtering_yields[u]+mineral_densities[u]*np.exp(K_u*dt)-num_dens_He*mu_specie[u]*sputtering_yields[u]+mineral_densities[u])
-	gas_dM =  #gas mass change
-										 
+	F_sput_u = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref[u]-num_dens_ref[3]*mu_specie[u]*y_h+mineral_densities[u]*np.exp(K_u*dt)-num_dens_ref[4]*mu_specie[u]*y_He)
 	return(F_sput_u)									 
-	
-	
+
+def nearest_gas(i): #returns the nearest gas particles for a particle i
+	gas_particle_array = np.array([])									 
+	indices = neighbor[i]
+	for j in range(len(indices)):
+		if (particle_type[indices[j]] == 0):
+			gas_particle_array = np.append(gas_particle_array,indices[j])
+	return(gas_particle_array)
+										 
+def chemical_sputtering(i,u,dt):
+	total_diff_mass_u = 0 #total difference in mass for each dust particle i									 
+	indices = neighbors(x,d)
+	normalization = 0 #normalization factor for dust particles
+	normalization_gas = 0 #normalization factor for gas particles									 
+	all_intersecting_gas = np.array([]) #the array of all the gas particles that intersect the dust particles									 
+	for k in range(len(indices)):
+		jj = indices[k]
+		if(particle_type[jj] !=1): #if it is not dust
+			continue:
+		else:
+			total_N = mass[jj]/np.dot(f_un[jj],mu_specie)
+			mass_u = total_N*f_un[jj][u]*mu_specie[u]									      
+			normalization += mass_u*weigh2(x,points[jj],mass[jj])										      
+	for j in range(len(indices)): #this is where I consider the destruction of dust of specie u in a dust particle
+		i = indices[j]
+		total_diff_mass_u								 
+		if(particle_type[i] !=1): #if it is not dust
+			continue:										      
+ 		else:   #accretion/sputtering 
+			total_N = mass[i]/np.dot(f_un[i],mu_specie)
+			mass_u = total_N*f_un[i][u]*mu_specie[u] #mass of specie u contained in the dust
+			F_u = chemical_sputtering_yield(i,u,x,dt) #returns the intersecting gas particle indices, for each dust particle i										      
+			gas_particle_arrray = nearest_gas(i)
+			all_intersecting_gas = np.append(all_intersecting_gas,gas_particle_array)
+			diff_mass_u = (F_u-1)*mass_u**2*weigh2(x,points[i],mass[i])/normalization #mass change in the dust particle
+			total_diff_mass_u += diff_mass_u 
+			mass[i] = mass[i]+diff_mass_u							 
+			num_u_molecules = diff_mass_u/mu_specie[u] #number of gas particles precipitating into dust
+			total_N = total_N + num_u_molecules							 
+			f_un[i][u] = (mass_u+diff_mass_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)									 
+	#this is where I consider the addition of dust to gas particles
+	for ii in range(len(all_intersecting_gas)):
+		index = all_intersecting_gas[ii]
+		total_N = mass[index]/np.dot(f_un[index],mu_specie)
+		new_mass = mu_specie[u]*total_N*f_un[index][u]-total_N*f_un[index][3]*mu_specie[u]*y_h_u - y_he_u*total_N*f_un[index][4]*mu_specie[u] #this is m_u_j'								 
+		normalization_2 += new_mass*weigh2(x,points[index],new_mass)	#normalization factor for gas particles							 
+	for zz in range(len(all_intersecting_gas)):
+		index = all_intersecting_gas[zz]								 
+		total_N = mass[index]/np.dot(f_un[index],mu_specie)
+		mass_u = total_N*f_un[index][u]*mu_specie[u] #mass of specie u contained in the gas
+		new_mass = mu_specie[u]*total_N*f_un[index][u]-total_N*f_un[index][3]*mu_specie[u]*y_h_u - y_he_u*total_N*f_un[index][4]*mu_specie[u]							 
+		diff_mass_gas_u = -1*new_mass*weigh2(x,points[index],new_mass)/normalization_2*total_diff_mass_u #corresponding change in gas
+		mass[index] = mass[index]+diff_mass_u	#new mass						 
+		num_u_molecules = diff_mass_gas_u/mu_specie[u] #number of gas molecules of specie u that get added
+		total_N = total_N + num_u_molecules							 
+		f_un[index][u] = (mass_u+diff_mass_gas_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)								 
+	return(1)										 
 	
 def supernova_sputtering_yield(i,u): #for a dust particle i, specie u. Returns F_sup and the indices of intersecting gas particles
 	rho_crit = 10**3*m_h
