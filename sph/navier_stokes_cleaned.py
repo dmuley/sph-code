@@ -666,12 +666,14 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_typ
 			rho = w2 * (particle_type[np.array(neighbor[j]))] == 0)
 			vels = velocities[neighbor[j]] * (particle_type[np.array(neighbor[j]))] == 0)
 			vels = np.sum(vels**2, axis=1)**0.5
-			dest_fracs = np.array([u(vels) for u in intf]).T
+			dest_fracs = np.array([u(vels/1000) for u in intf]).T
 			
 			reuptake_relative = rho/np.sum(rho)
 			
-			final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0)
+			final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0) #fraction destroyed					     
 			final_fracs[final_fracs >= 1.] = 1.
+			N_total = np.sum(mass[j]/mu_specie)					     
+			num_molecules_destroyed = final_fracs*N_total #number of molecules destroyed					     
 			frac_destruction[j] = final_fracs * f_un[j]
 			frac_reuptake[neighbors[j]] = (np.vstack([final_fracs] * len(rho)).T * rho).T
 			#Still need to make sure shapes are correct!!!!
