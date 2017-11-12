@@ -91,12 +91,17 @@ def num_dens_array(x)
 		
 	
 def chemical_sputtering_yield(i,u,x,dt): #for a particle i, returns F_sput_u
+	y_H = min[max[10**(-7),0.5*np.exp(-4600*k/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
+	y_He = min[max[10**(-6),0.5*np.exp(-4600*k/T[i])],10**(-2)]*(k*T[i]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.								   
+	if (u == 9): #if the element is a silicon
+		y_H = y_H/0.464
+		y_He = y_He/0.464						     
 	num_dens_ref = num_dens_array(x)
 	a_min = mrn_constants[0]
 	a_max = mrn_constants[1]
 	K_u = mu_specie[u]*num_dens_ref[u]+mineral_densities[u]-num_dens_ref[3]*y_H*mu_specie[u]-num_dens_ref[4]*y_He[u]*mu_specie[u]
 	J_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
-	F_sput_u = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref[u]-num_dens_ref[3]*mu_specie[u]*y_h+mineral_densities[u]*np.exp(K_u*dt)-num_dens_ref[4]*mu_specie[u]*y_He)
+	F_sput_u = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref[u]-num_dens_ref[3]*mu_specie[u]*y_H+mineral_densities[u]*np.exp(K_u*dt)-num_dens_ref[4]*mu_specie[u]*y_He)
 	return(F_sput_u)									 
 
 def nearest_gas(i): #returns the nearest gas particles for a particle i
@@ -108,6 +113,11 @@ def nearest_gas(i): #returns the nearest gas particles for a particle i
 	return(gas_particle_array)
 										 
 def chemical_sputtering(i,u,dt):
+	y_H = min[max[10**(-7),0.5*np.exp(-4600*k/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
+	y_He = min[max[10**(-6),0.5*np.exp(-4600*k/T[i])],10**(-2)]*(k*T[i]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.								   
+	if (u == 9): #if the element is a silicon
+		y_H = y_H/0.464
+		y_He = y_He/0.464
 	total_diff_mass_u = 0 #total difference in mass for each dust particle i									 
 	indices = neighbors(x,d)
 	normalization = 0 #normalization factor for dust particles
@@ -142,7 +152,7 @@ def chemical_sputtering(i,u,dt):
 	for ii in range(len(all_intersecting_gas)):
 		index = all_intersecting_gas[ii]
 		total_N = mass[index]/np.dot(f_un[index],mu_specie)
-		new_mass = mu_specie[u]*total_N*f_un[index][u]-total_N*f_un[index][3]*mu_specie[u]*y_h_u - y_he_u*total_N*f_un[index][4]*mu_specie[u] #this is m_u_j'								 
+		new_mass = mu_specie[u]*total_N*f_un[index][u]-total_N*f_un[index][3]*mu_specie[u]*y_H - y_He*total_N*f_un[index][4]*mu_specie[u] #this is m_u_j'								 
 		normalization_2 += new_mass*weigh2(x,points[index],new_mass)	#normalization factor for gas particles							 
 	for zz in range(len(all_intersecting_gas)):
 		index = all_intersecting_gas[zz]								 
