@@ -650,7 +650,7 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_typ
 	frac_destruction = copy.deepcopy(f_un * 0.)
 	frac_reuptake = copy.deepcopy(f_un * 0.)
 	for j in np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 2]:
-		if (np.sum(particle_type[neighbor[j]] == 0) > 0):
+		if (np.sum(particle_type[np.array(neighbor[j]))] == 0) > 0):
 			x = points[np.array(neighbor[j])]
 			m = mass[np.array(neighbor[j])]
 			x_0 = points[j]
@@ -659,8 +659,12 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_typ
 			w2 = Weigh2(x, x_0, m)
 			w2 *= (w2 >= 0)
 			
-			rho = w2 * (particle_type[np.append(j, np.array(neighbor[j]))] == 0)
-			vels = velocities[neighbor[j]] * (particle_type[neighbor[j]] == 0)
+			#maybe throw in an optimization here to eliminate those elements where weight = 0
+			#since in general most "neighbors" do not intersect (due to smaller sizes)
+			#this should give a considerable boost to performance
+			#both here and in artificial viscosity
+			rho = w2 * (particle_type[np.array(neighbor[j]))] == 0)
+			vels = velocities[neighbor[j]] * (particle_type[np.array(neighbor[j]))] == 0)
 			vels = np.sum(vels**2, axis=1)**0.5
 			dest_fracs = np.array([u(vels) for u in intf]).T
 			
