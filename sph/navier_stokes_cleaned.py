@@ -270,10 +270,10 @@ def mu_j(j): #mean molecular weight of the SPH particle
 
 def density(j):
     x_0 = points[j]
-    x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
-    m = np.append(mass[j], mass[np.array(neighbor[j])])
+    x = np.append(points[np.array(neighbor[j])],axis=0)
+    m = np.append(mass[np.array(neighbor[j])])
     
-    rho = Weigh2(x, x_0, m) * (particle_type[np.append(j, np.array(neighbor[j]))] == 0)
+    rho = Weigh2(x, x_0, m) * (particle_type[np.array(neighbor[j])] == 0)
     return np.sum(rho[rho > 0])
     
 def dust_density(j):
@@ -318,14 +318,14 @@ def del_pressure(i): #gradient of the pressure
         return(np.zeros(3))
     else:
         x_0 = points[i]
-        x = np.append([x_0], points[np.array(neighbor[i])],axis=0)
-        m = np.append(mass[i], mass[np.array(neighbor[i])])
-        pt = np.append(particle_type[i], particle_type[neighbor[i]])
+        x = np.append(points[np.array(neighbor[i])],axis=0)
+        m = np.append(mass[np.array(neighbor[i])])
+        pt = np.append(particle_type[neighbor[i]])
         
         #symmetrizing pressure gradient
         gw = (grad_weight(x, x_0, m, pt) + grad_weight(x, x_0, m[0], pt))/2.
         
-        del_pres = np.sum((gw.T * E_internal[np.append(i, neighbor[i])]/gamma_array[np.append(i, neighbor[i])]).T, axis=0)
+        del_pres = np.sum((gw.T * E_internal[neighbor[i]]/gamma_array[neighbor[i]]).T, axis=0)
         
         return del_pres
 
@@ -549,7 +549,7 @@ def supernova_impulse(points, masses, supernova_pos, ptypes):
 
 #### PHYSICS OF DUST ####
 # VERY SIMILAR IN PURPOSE TO THE SPH SECTION, BUT WITH A SPECIAL EMPHASIS ON DUST.
-def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timestep, and Temperature. Returns accreated dust mass
+'''def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timestep, and Temperature. Returns accreated dust mass
     #Still need to add n_h, sputtering yield, mineral density, initial number density, etc.
     n_H = 1;
     num_dens_ref = dust_comps[j]*mass[j]/m_ref_species[u] #initial number density of species, n_u_0
@@ -561,7 +561,7 @@ def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timest
     n_u = num_dens_ref-(rho-mineral_density[u])/mol_weights[u]                                              
     return(rho,n_u)
         
-def num_dens_array(x)
+def num_dens_array(x):
 	num_dens_ref = np.array([])
 	indices = neighbors(x,d)
 	for j in range(len(indices)):
@@ -644,13 +644,58 @@ def chemical_sputtering(i,u,dt):
 		num_u_molecules = diff_mass_gas_u/mu_specie[u] #number of gas molecules of specie u that get added
 		total_N = total_N + num_u_molecules							 
 		f_un[index][u] = (mass_u+diff_mass_gas_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)								 
-	return(1)										 
+	return(1)		'''								 
 
-def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_type):
+def supernova_destruction_2(points, velocities, neighbor, mass, f_un, particle_type, sizes):
 	frac_destruction = copy.deepcopy(f_un * 0.)
 	frac_reuptake = copy.deepcopy(f_un * 0.)
-	for j in np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 2]:
-		if (np.sum(particle_type[np.array(neighbor[j]))] == 0) > 0):
+	jarr = np.arange(len(neighbor))
+	jarr = jarr[particle_type[jarr] == 0]
+	for j in jarr:
+		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0):
+			x = points[neighbor[j]]
+			m = mass[neighbor[j]]
+			x_0 = points[j]
+			ds = sizes[neighbor[j]]
+			comps = f_un[j]
+			
+			w2 = Weigh2(x, x_0, m)
+			w2_dust = Weigh2_dust(x, x_0, m, ds)
+			w2 *= (w2 >= 0)
+			w2_dust *= (w2_dust >= 0)
+			
+			w2_0 = Weigh2(x, x, m)
+			w2_dust_0 = Weigh2_dust(x, x, m, ds)
+			
+			dest_ratio_dust = (w2_dust/w2_dust_0) * (particle_type[np.array(neighbor[j])] == 2).astype('longdouble')
+			
+			
+			rho_gas = w2 * (particle_type[np.array(neighbor[j])] == 0).astype('longdouble')
+			rho_dust = w2_dust * (particle_type[np.array(neighbor[j])] == 2).astype('longdouble')
+			
+			total_dens = np.sum(rho_gas)
+			
+			if np.sum(rho_dust) > 0: #rho_gas guaranteed to be greater than zero
+				pos_cartesian = np.array([q for q in itertools.product(np.array(neighbor[j])[rho_gas > 0], np.array(neighbor[j])[rho_dust > 0])])
+				gas_indices = np.array([q[0] for q in pos_cartesian])
+				dust_indices = np.array([q[1] for q in pos_cartesian])
+				destruction_weighting = np.array([dest_ratio_dust[kl[1]] * rho_gas[kl[0]]/rho_crit for kl in pos_cartesian])
+				relative_vels = np.array([np.sum((velocities[kl[1]] - velocities[kl[0]])**2)**0.5 for kl in pos_cartesian])
+				
+				destruction_fracs = (np.array([u(relative_vels/1000.) for u in intf]) * destruction_weighting).T
+				#frac reuptake
+				frac_destruction[gas_indices] = destruction_fracs
+				frac_reuptake[dust_indices] = destruction_fracs * masses[gas_indices]/masses[dust_indices]
+				
+	return frac_destruction, frac_reuptake
+
+def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_type, sizes):			
+	frac_destruction = copy.deepcopy(f_un * 0.)
+	frac_reuptake = copy.deepcopy(f_un * 0.)
+	jarr = np.arange(len(neighbor))	
+	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 2]
+	for j in jarr:
+		if (np.sum(particle_type[np.array(neighbor[j])] == 0) > 0):
 			x = points[np.array(neighbor[j])]
 			m = mass[np.array(neighbor[j])]
 			x_0 = points[j]
@@ -663,19 +708,20 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_typ
 			#since in general most "neighbors" do not intersect (due to smaller sizes)
 			#this should give a considerable boost to performance
 			#both here and in artificial viscosity
-			rho = w2 * (particle_type[np.array(neighbor[j]))] == 0)
-			vels = velocities[neighbor[j]] * (particle_type[np.array(neighbor[j]))] == 0)
-			vels = np.sum(vels**2, axis=1)**0.5
-			dest_fracs = np.array([u(vels) for u in intf]).T
+			rho = w2 * (particle_type[np.array(neighbor[j])] == 0).astype('longdouble')
+			if np.sum(rho) > 0:
+				vels = (velocities[neighbor[j]].T * (particle_type[np.array(neighbor[j])] == 0)).T
+				vels = np.sum(vels**2, axis=1)**0.5
+				dest_fracs = np.array([u(vels/1000.) for u in intf]).T
 			
-			reuptake_relative = rho/np.sum(rho)
+				reuptake_relative = rho/np.sum(rho)
 			
-			final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0)
-			final_fracs[final_fracs >= 1.] = 1.
-			frac_destruction[j] = final_fracs * f_un[j]
-			frac_reuptake[neighbors[j]] = (np.vstack([final_fracs] * len(rho)).T * rho).T
-			#Still need to make sure shapes are correct!!!!
-			#Also, need to fix normalization here still!! Do not use yet!
+				final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0)
+				final_fracs[final_fracs >= 1.] = 1.
+				frac_destruction[j] = final_fracs * f_un[j]
+				frac_reuptake[np.array(neighbor[j])] = (np.vstack([final_fracs] * len(rho)).T * rho).T
+				#Still need to make sure shapes are correct!!!!
+				#Also, need to fix normalization here still!! Do not use yet!
 			
 	return frac_destruction, frac_reuptake #in the same shape as f_un
 													    
@@ -743,7 +789,7 @@ V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_sq = d**2
 dt = dt_0
-DUST_FRAC = 0.0050000
+DUST_FRAC = 0.050000
 DUST_MASS = 0.05
 N_RADIATIVE = 100
 MAX_AGE = 4e7 * year
