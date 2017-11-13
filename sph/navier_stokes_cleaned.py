@@ -671,9 +671,10 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_typ
 			reuptake_relative = rho/np.sum(rho)
 			
 			final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0) #fraction destroyed					     
-			final_fracs[final_fracs >= 1.] = 1.
-			N_total = np.sum(mass[j]/mu_specie)					     
-			num_molecules_destroyed = final_fracs*N_total #number of molecules destroyed					     
+			#final_fracs[final_fracs >= 1.] = 1.
+			#N_total = np.sum(mass[j]/mu_specie)					     
+			num_molecules_destroyed = final_fracs*N_total #number of molecules destroyed
+			relative_n = mass[neighbor[j]]/np.dot(mu_array[neighbor[j]].T,f_un[neighbor[j]]) *  f_un[neighbor[j]]/(mass[j]/np.dot(mu_array[j]*f_un[j])*f_un[j])					     
 			frac_destruction[j] = final_fracs * f_un[j]
 			frac_reuptake[neighbors[j]] = (np.vstack([final_fracs] * len(rho)).T * rho).T
 			#Still need to make sure shapes are correct!!!!
