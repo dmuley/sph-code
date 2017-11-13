@@ -270,8 +270,8 @@ def mu_j(j): #mean molecular weight of the SPH particle
 
 def density(j):
     x_0 = points[j]
-    x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
-    m = np.append(mass[j], mass[np.array(neighbor[j])])
+    x = np.append(points[np.array(neighbor[j])],axis=0)
+    m = np.append(mass[np.array(neighbor[j])])
     
     rho = Weigh2(x, x_0, m) * (particle_type[np.append(j, np.array(neighbor[j]))] == 0)
     return np.sum(rho[rho > 0])
@@ -307,10 +307,10 @@ def net_impulse(j):
     
 def num_dens(j):
     x_0 = points[j]
-    x = np.append([x_0], points[np.array(neighbor[j])],axis=0)
-    m = np.append(mass[j], mass[np.array(neighbor[j])])
+    x = np.append(points[np.array(neighbor[j])],axis=0)
+    m = np.append(mass[np.array(neighbor[j])])
     
-    n_dens = Weigh2(x, x_0, m)/(mu_array[np.append(j, neighbor[j])] * m_h)
+    n_dens = Weigh2(x, x_0, m)/(mu_array[np.arrays(neighbor[j])] * m_h)
     return np.sum(n_dens[n_dens > 0])
     
 def del_pressure(i): #gradient of the pressure
@@ -561,7 +561,7 @@ def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timest
     n_u = num_dens_ref-(rho-mineral_density[u])/mol_weights[u]                                              
     return(rho,n_u)
         
-def num_dens_array(x)
+'''def num_dens_array(x)
 	num_dens_ref = np.array([])
 	indices = neighbors(x,d)
 	for j in range(len(indices)):
@@ -644,7 +644,7 @@ def chemical_sputtering(i,u,dt):
 		num_u_molecules = diff_mass_gas_u/mu_specie[u] #number of gas molecules of specie u that get added
 		total_N = total_N + num_u_molecules							 
 		f_un[index][u] = (mass_u+diff_mass_gas_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)								 
-	return(1)										 
+	return(1)	'''									 
 
 def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_type):
 	frac_destruction = copy.deepcopy(f_un * 0.)
@@ -664,21 +664,20 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, particle_typ
 			#this should give a considerable boost to performance
 			#both here and in artificial viscosity
 			rho = w2 * (particle_type[np.array(neighbor[j]))] == 0)
-			vels = velocities[neighbor[j]] * (particle_type[np.array(neighbor[j]))] == 0)
-			vels = np.sum(vels**2, axis=1)**0.5
-			dest_fracs = np.array([u(vels/1000) for u in intf]).T
+			if np.sum(rho) > 0:
+				vels = velocities[neighbor[j]] * (particle_type[np.array(neighbor[j]))] == 0)
+				vels = np.sum(vels**2, axis=1)**0.5
+				dest_fracs = np.array([u(vels/1000) for u in intf]).T
 			
-			reuptake_relative = rho/np.sum(rho)
+				reuptake_relative = rho/np.sum(rho)
 			
-			final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0) #fraction destroyed					     
-			#final_fracs[final_fracs >= 1.] = 1.
-			#N_total = np.sum(mass[j]/mu_specie)					     
-			num_molecules_destroyed = final_fracs*N_total #number of molecules destroyed
-			relative_n = mass[neighbor[j]]/np.dot(mu_array[neighbor[j]].T,f_un[neighbor[j]]) *  f_un[neighbor[j]]/(mass[j]/np.dot(mu_array[j]*f_un[j])*f_un[j])					     
-			frac_destruction[j] = final_fracs * f_un[j]
-			frac_reuptake[neighbors[j]] = (np.vstack([final_fracs] * len(rho)).T * rho).T
-			#Still need to make sure shapes are correct!!!!
-			#Also, need to fix normalization here still!! Do not use yet!
+				final_fracs = np.sum((rho/rho_crit * dest_fracs.T).T,axis=0) #fraction destroyed					     
+				#final_fracs[final_fracs >= 1.] = 1.
+				#N_total = np.sum(mass[j]/mu_specie)					     
+				num_molecules_destroyed = final_fracs*N_total #number of molecules destroyed
+				relative_n = mass[neighbor[j]]/np.dot(mu_array[neighbor[j]].T,f_un[neighbor[j]]) *  f_un[neighbor[j]]/(mass[j]/np.dot(mu_array[j]*f_un[j])*f_un[j])					     
+				frac_destruction[j] = final_fracs * f_un[j]
+				frac_reuptake[neighbors[j]] = (np.vstack([final_fracs] * len(rho)).T * rho * mass[j]/mass[neighbors[j]]).T
 			
 	return frac_destruction, frac_reuptake #in the same shape as f_un
 													    
