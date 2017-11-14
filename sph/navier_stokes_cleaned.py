@@ -648,12 +648,14 @@ def chemical_sputtering(i,u,dt):
 
 def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
 	#Indexes over all gas particles and sees if they intersect a dust,
-	#rather than the other way around as previously
+	#rather than the other way around as previously, because gas particles
+	#are much smaller than dust particles, by design
 	frac_destruction = copy.deepcopy(f_un * 0.)
 	frac_reuptake = copy.deepcopy(f_un * 0.)
-	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
+	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0] #setting up array where all particles are gas
 	for j in jarr:
-		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0):
+		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0): #making sure that this gas particle has dusty neighbors!
+			#no need to append j to this, because j is included as its own neighbor since it has a distance of 0 from itself
 			x = points[neighbor[j]]
 			m = mass[neighbor[j]]
 			x_0 = points[j]
@@ -661,13 +663,19 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 			dustsize = sizes[neighbor[j]]
 			dens = densities[j]
 			
+			#Density of dust at the center of the gas particle
 			w2d = Weigh2_dust(x, x_0, m, dustsize)
+			#density of dust at the center of the dust particles
 			w2_max = Weigh2_dust(x, x, m, dustsize)
+			
+			#density of dust at the selected gas particle
 			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2);
 			rho_base = w2_max
 			if np.sum(rho) > 0:
+				#Obtaining relative velocities between gas/dust, and destruction efficiency
 				vels = np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1)**0.5 * (particle_type[np.array(neighbor[j])] == 2)
 				dest_fracs = (np.array([u(vels/1000.) for u in intf]) * np.nan_to_num(rho/rho_base)).T
+				#Distributing dust destruction over all intersecting dust particles
 				loss_relative = rho/np.sum(rho)
 				final_fracs = dens/critical_density * dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 1.] = 1.
@@ -675,22 +683,17 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 				N_dust = mass[neighbor[j]]/mu_array[neighbor[j]]
 				N_self = mass[j]/mu_array[j]
 				
+				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
 				refractory_fracs = np.sum((final_fracs * N_dust/N_self).T * f_un[neighbor[j]], axis=0).astype('float64')
+				#Conversely, how much dust is fractionally lost from each intersecting gas particle?
 				dust_lost = final_fracs.T * f_un[neighbor[j]]
 				
-				#print refractory_fracs/dust_lost
-				
+				#Dust lost in each dust particle, which is taken up as refractory gas by the gas particle
 				frac_destruction[neighbor[j]] += dust_lost
 				frac_reuptake[j] += refractory_fracs
 				#print refractory_fracs
 				
 	return frac_destruction, frac_reuptake													    
-#INTERPOLATION OF GRAPH AT ARBITRARY POINTS--- WE CAN USE THESE 
-#TO MAKE HIGH-QUALITY GRAPHS FOR THE FINAL PAPER. SPH PARTICLES
-#ARE TOO LARGE TO LOOK GOOD. THESE TAKE A LOT OF TIME TO RUN---
-#SO USE SPARINGLY!!!!
-
-
 
 def chemisputtering_2(points,  neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
 	#Indexes over all gas particles and sees if they intersect a dust, like supernovae
@@ -729,6 +732,11 @@ def chemisputtering_2(points,  neighbor, mass, f_un, mu_array, sizes, densities,
 				#print refractory_fracs
 				
 	return frac_destruction, frac_reuptake		
+
+#INTERPOLATION OF GRAPH AT ARBITRARY POINTS--- WE CAN USE THESE 
+#TO MAKE HIGH-QUALITY GRAPHS FOR THE FINAL PAPER. SPH PARTICLES
+#ARE TOO LARGE TO LOOK GOOD. THESE TAKE A LOT OF TIME TO RUN---
+#SO USE SPARINGLY!!!!
 										 
 def neighbors_arb(points, arb_points):
     kdt = spatial.cKDTree(points)  
