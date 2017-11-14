@@ -724,20 +724,15 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, 
 			if np.sum(rho) > 0:
 				#Obtaining relative velocities between gas/dust, and destruction efficiency
 
-				dest_fracs = np.array(chemical_sputtering_yield(x,j,dt_0)) * np.nan_to_num(rho/rho_base)).T #fraction destroyed
+				dest_fracs = np.array(chemical_sputtering_yield(x,j,dt)) * np.nan_to_num(rho/rho_base)).T #fraction destroyed
 				#Distributing dust destruction over all intersecting dust particles
 				loss_relative = rho/np.sum(rho)
 				final_fracs = dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 1.] = 1.
 				
 				N_dust = mass[neighbor[j]]/mu_array[neighbor[j]]
+				N_self = mass[j]/mu_array[j]
 				
-				y_H = min[max[10**(-7),0.5*np.exp(-4600/T[j])],10**(-3)]*(k*T[j]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
-				y_He = min[max[10**(-6),0.5*np.exp(-4600/T[j])],10**(-2)]*(k*T[j]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.						   
-				
-				N_self_old = mass[j]/mu_array[j]
-				mass_new = N_self_old * f_un[j] * mu_specie - N_self_old*f_un[j]*mu_specie*y_H - y_He*total_N*f_un[j]*mu_specie #M_u_j, probably not correct
-				N_self = mass_new/mu_array[j]							   
 				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
 				refractory_fracs = np.sum((final_fracs * N_dust/N_self).T * f_un[neighbor[j]], axis=0).astype('float64')
 				#Conversely, how much dust is fractionally lost from each intersecting gas particle?
