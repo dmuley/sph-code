@@ -685,8 +685,7 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 				frac_reuptake[j] += refractory_fracs
 				#print refractory_fracs
 				
-	return frac_destruction, frac_reuptake
-														    
+	return frac_destruction, frac_reuptake													    
 #INTERPOLATION OF GRAPH AT ARBITRARY POINTS--- WE CAN USE THESE 
 #TO MAKE HIGH-QUALITY GRAPHS FOR THE FINAL PAPER. SPH PARTICLES
 #ARE TOO LARGE TO LOOK GOOD. THESE TAKE A LOT OF TIME TO RUN---
