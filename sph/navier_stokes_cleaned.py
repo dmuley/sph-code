@@ -570,19 +570,21 @@ def num_dens_array(x)
 		num_dens_ref += factor*weigh2(x,points[i],mass[i])
 	return(num_dens_ref) #retuns n_u_0 for chemisputtering, not sure if it is correct
 		
-def chemical_sputtering_yield(i,u,x,dt): #for a particle i, returns F_sput_u
-	y_H = min[max[10**(-7),0.5*np.exp(-4600*k/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
-	y_He = min[max[10**(-6),0.5*np.exp(-4600*k/T[i])],10**(-2)]*(k*T[i]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.								   
-	if (u == 9): #if the element is a silicon
-		y_H = y_H/0.464
-		y_He = y_He/0.464						     
-	num_dens_ref = num_dens_array(x)
-	a_min = mrn_constants[0]
-	a_max = mrn_constants[1]
-	K_u = mu_specie[u]*num_dens_ref[u]+mineral_densities[u]-num_dens_ref[3]*y_H*mu_specie[u]-num_dens_ref[4]*y_He[u]*mu_specie[u]
-	J_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
-	F_sput_u = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref[u]-num_dens_ref[3]*mu_specie[u]*y_H+mineral_densities[u]*np.exp(K_u*dt)-num_dens_ref[4]*mu_specie[u]*y_He)
-	return(F_sput_u)									 
+def chemical_sputtering_yield(i,x,dt): #for a particle i, returns F_sput array for all species
+	F_sput = np.zeros(13) #for all the 13 species
+	for u in range(len(F_sput)):
+		y_H = min[max[10**(-7),0.5*np.exp(-4600/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
+		y_He = min[max[10**(-6),0.5*np.exp(-4600/T[i])],10**(-2)]*(k*T[i]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.								   
+		if (u == 9): #if the element is a silicon
+			y_H = y_H/0.464
+			y_He = y_He/0.464						     
+		num_dens_ref = num_dens_array(x)
+		a_min = mrn_constants[0]
+		a_max = mrn_constants[1]
+		K_u = mu_specie[u]*num_dens_ref[u]+mineral_densities[u]-num_dens_ref[3]*y_H*mu_specie[u]-num_dens_ref[4]*y_He[u]*mu_specie[u]
+		J_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
+		F_sput[u] = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref[u]-num_dens_ref[3]*mu_specie[u]*y_H+mineral_densities[u]*np.exp(K_u*dt)-num_dens_ref[4]*mu_specie[u]*y_He)
+	return(F_sput)									 
 ''''
 def nearest_gas(i): #returns the nearest gas particles for a particle i
 	gas_particle_array = np.array([])									 
@@ -695,48 +697,53 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 				
 	return frac_destruction, frac_reuptake													    
 
-def chemisputtering_2(points,  neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
-	#Indexes over all gas particles and sees if they intersect a dust, like supernovae
+def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
+	#Indexes over all gas particles and sees if they intersect a dust, like supernova
 	frac_destruction = copy.deepcopy(f_un * 0.)
 	frac_reuptake = copy.deepcopy(f_un * 0.)
-	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
+	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0] #setting up array where all particles are gas
 	for j in jarr:
-		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0):
+		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0): #making sure that this gas particle has dusty neighbors!
+			#no need to append j to this, because j is included as its own neighbor since it has a distance of 0 from itself
 			x = points[neighbor[j]]
-			m = mass[neighbor[j]]
+			N_total = mass[neighbor[j]]/np.dot(mu_array[neighborhood[j]],f_un[neigbhorhood[j]]) #the total number of molecules in each particle								 
+			m = N_total*f_un[neighbor[j]]*mu_array[neighbor[j]] #mass of each specie u						 
 			x_0 = points[j]
 			comps = f_un[j]
 			dustsize = sizes[neighbor[j]]
 			dens = densities[j]
 			
+			#Density of dust at the center of the gas particle
 			w2d = Weigh2_dust(x, x_0, m, dustsize)
+			#density of dust at the center of the dust particles
 			w2_max = Weigh2_dust(x, x, m, dustsize)
+			
+			#density of dust at the selected gas particle
 			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2);
 			rho_base = w2_max
 			if np.sum(rho) > 0:
-				dest_fracs = np.nan_to_num(rho/rho_base)).T
+				#Obtaining relative velocities between gas/dust, and destruction efficiency
+
+				dest_fracs = np.array(chemical_sputtering_yield(x,j,dt)) * np.nan_to_num(rho/rho_base)).T #fraction destroyed
+				#Distributing dust destruction over all intersecting dust particles
 				loss_relative = rho/np.sum(rho)
-				final_fracs = chemical_sputtering_yield() * dest_fracs.T #fraction destroyed
+				final_fracs = dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 1.] = 1.
 				
 				N_dust = mass[neighbor[j]]/mu_array[neighbor[j]]
 				N_self = mass[j]/mu_array[j]
 				
+				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
 				refractory_fracs = np.sum((final_fracs * N_dust/N_self).T * f_un[neighbor[j]], axis=0).astype('float64')
+				#Conversely, how much dust is fractionally lost from each intersecting gas particle?
 				dust_lost = final_fracs.T * f_un[neighbor[j]]
 				
-				#print refractory_fracs/dust_lost
-				
+				#Dust lost in each dust particle, which is taken up as refractory gas by the gas particle
 				frac_destruction[neighbor[j]] += dust_lost
 				frac_reuptake[j] += refractory_fracs
 				#print refractory_fracs
 				
-	return frac_destruction, frac_reuptake		
-
-#INTERPOLATION OF GRAPH AT ARBITRARY POINTS--- WE CAN USE THESE 
-#TO MAKE HIGH-QUALITY GRAPHS FOR THE FINAL PAPER. SPH PARTICLES
-#ARE TOO LARGE TO LOOK GOOD. THESE TAKE A LOT OF TIME TO RUN---
-#SO USE SPARINGLY!!!!
+	return frac_destruction, frac_reuptake	
 										 
 def neighbors_arb(points, arb_points):
     kdt = spatial.cKDTree(points)  
