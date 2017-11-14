@@ -561,7 +561,7 @@ def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timest
     n_u = num_dens_ref-(rho-mineral_density[u])/mol_weights[u]                                              
     return(rho,n_u)
         
-'''def num_dens_array(x)
+def num_dens_array(x)
 	num_dens_ref = np.array([])
 	indices = neighbors(x,d)
 	for j in range(len(indices)):
@@ -583,7 +583,7 @@ def chemical_sputtering_yield(i,u,x,dt): #for a particle i, returns F_sput_u
 	J_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
 	F_sput_u = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref[u]-num_dens_ref[3]*mu_specie[u]*y_H+mineral_densities[u]*np.exp(K_u*dt)-num_dens_ref[4]*mu_specie[u]*y_He)
 	return(F_sput_u)									 
-
+''''
 def nearest_gas(i): #returns the nearest gas particles for a particle i
 	gas_particle_array = np.array([])									 
 	indices = neighbor[i]
@@ -668,7 +668,6 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 			if np.sum(rho) > 0:
 				vels = np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1)**0.5 * (particle_type[np.array(neighbor[j])] == 2)
 				dest_fracs = (np.array([u(vels/1000.) for u in intf]) * np.nan_to_num(rho/rho_base)).T
-				
 				loss_relative = rho/np.sum(rho)
 				final_fracs = dens/critical_density * dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 1.] = 1.
@@ -691,6 +690,46 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 #ARE TOO LARGE TO LOOK GOOD. THESE TAKE A LOT OF TIME TO RUN---
 #SO USE SPARINGLY!!!!
 
+
+
+def chemisputtering_2(points,  neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
+	#Indexes over all gas particles and sees if they intersect a dust, like supernovae
+	frac_destruction = copy.deepcopy(f_un * 0.)
+	frac_reuptake = copy.deepcopy(f_un * 0.)
+	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
+	for j in jarr:
+		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0):
+			x = points[neighbor[j]]
+			m = mass[neighbor[j]]
+			x_0 = points[j]
+			comps = f_un[j]
+			dustsize = sizes[neighbor[j]]
+			dens = densities[j]
+			
+			w2d = Weigh2_dust(x, x_0, m, dustsize)
+			w2_max = Weigh2_dust(x, x, m, dustsize)
+			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2);
+			rho_base = w2_max
+			if np.sum(rho) > 0:
+				dest_fracs = np.nan_to_num(rho/rho_base)).T
+				loss_relative = rho/np.sum(rho)
+				final_fracs = chemical_sputtering_yield() * dest_fracs.T #fraction destroyed
+				final_fracs[final_fracs >= 1.] = 1.
+				
+				N_dust = mass[neighbor[j]]/mu_array[neighbor[j]]
+				N_self = mass[j]/mu_array[j]
+				
+				refractory_fracs = np.sum((final_fracs * N_dust/N_self).T * f_un[neighbor[j]], axis=0).astype('float64')
+				dust_lost = final_fracs.T * f_un[neighbor[j]]
+				
+				#print refractory_fracs/dust_lost
+				
+				frac_destruction[neighbor[j]] += dust_lost
+				frac_reuptake[j] += refractory_fracs
+				#print refractory_fracs
+				
+	return frac_destruction, frac_reuptake		
+										 
 def neighbors_arb(points, arb_points):
     kdt = spatial.cKDTree(points)  
     qbp = kdt.query_ball_point(arb_points, d, p=2, eps=0.1)
