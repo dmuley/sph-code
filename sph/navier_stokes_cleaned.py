@@ -678,7 +678,6 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 				vels = np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1)**0.5 * (particle_type[np.array(neighbor[j])] == 2)
 				dest_fracs = (np.array([u(vels/1000.) for u in intf]) * np.nan_to_num(rho/rho_base)).T
 				#Distributing dust destruction over all intersecting dust particles
-				loss_relative = rho/np.sum(rho)
 				final_fracs = dens/critical_density * dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 1.] = 1.
 				
