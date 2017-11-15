@@ -575,7 +575,7 @@ def chemical_sputtering_yield(i,dt): #for a gas particle i, returns F_sput array
 	for u in range(len(F_sput)):
 		y_H = min[max[10**(-7),0.5*np.exp(-4600/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
 		y_He = min[max[10**(-6),0.5*np.exp(-4600/T[i])],10**(-2)]*(k*T[i]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.								   
-		if (u == 9): #if the element is a silicon
+		if ((u == 9)+(u==7)>0): #if the element is a silicon (or follows silicon sputtering rules)
 			y_H = y_H/0.464
 			y_He = y_He/0.464						     
 		num_dens_ref = num_dens_array(i)
@@ -726,7 +726,7 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, 
 				dest_fracs = np.array(chemical_sputtering_yield(j,dt)) #fraction destroyed
 				#Distributing dust destruction over all intersecting dust particles
 				loss_relative = rho/np.sum(rho)
-				final_fracs = dest_fracs.T #fraction destroyed
+				final_fracs =  dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 1.] = 1.
 				
 				N_dust = mass[neighbor[j]]/mu_array[neighbor[j]]
