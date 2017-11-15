@@ -563,14 +563,14 @@ def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timest
         
 def num_dens_array(x)
 	num_dens_ref = np.array([])
-	indices = neighbors(x,d)
+	indices = neighbor[x]
 	for j in range(len(indices)):
 		i = indices[j]
 		factor = f_un[i].T*(mass[i]/(mu_species*amu))
 		num_dens_ref += factor*weigh2(x,points[i],mass[i])
 	return(num_dens_ref) #retuns n_u_0 for chemisputtering, not sure if it is correct
 		
-def chemical_sputtering_yield(i,x,dt): #for a particle i, returns F_sput array for all species
+def chemical_sputtering_yield(i,x,dt): #for a gas particle i, returns F_sput array for all species for dust particles x
 	F_sput = np.zeros(13) #for all the 13 species
 	for u in range(len(F_sput)):
 		y_H = min[max[10**(-7),0.5*np.exp(-4600/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
@@ -722,9 +722,8 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, 
 			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2);
 			rho_base = w2_max
 			if np.sum(rho) > 0:
-				#Obtaining relative velocities between gas/dust, and destruction efficiency
-
-				dest_fracs = np.array(chemical_sputtering_yield(x,j,dt)) * np.nan_to_num(rho/rho_base)).T #fraction destroyed
+		
+				dest_fracs = np.array(chemical_sputtering_yield(neighbor,x,dt)) * np.nan_to_num(rho/rho_base)).T #fraction destroyed
 				#Distributing dust destruction over all intersecting dust particles
 				loss_relative = rho/np.sum(rho)
 				final_fracs = dest_fracs.T #fraction destroyed
