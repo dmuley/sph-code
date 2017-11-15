@@ -570,7 +570,7 @@ def num_dens_array(x)
 		num_dens_ref += factor*weigh2(x,points[i],mass[i])
 	return(num_dens_ref) #retuns n_u_0 for chemisputtering, not sure if it is correct
 		
-def chemical_sputtering_yield(i,x,dt): #for a gas particle i, returns F_sput array for all species for dust particles x
+def chemical_sputtering_yield(i,dt): #for a gas particle i, returns F_sput array for all species for neighboring dust particles
 	F_sput = np.zeros(13) #for all the 13 species
 	for u in range(len(F_sput)):
 		y_H = min[max[10**(-7),0.5*np.exp(-4600/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
@@ -578,7 +578,7 @@ def chemical_sputtering_yield(i,x,dt): #for a gas particle i, returns F_sput arr
 		if (u == 9): #if the element is a silicon
 			y_H = y_H/0.464
 			y_He = y_He/0.464						     
-		num_dens_ref = num_dens_array(x)
+		num_dens_ref = num_dens_array(i)
 		a_min = mrn_constants[0]
 		a_max = mrn_constants[1]
 		K_u = mu_specie[u]*num_dens_ref[u]+mineral_densities[u]-num_dens_ref[3]*y_H*mu_specie[u]-num_dens_ref[4]*y_He[u]*mu_specie[u]
@@ -706,8 +706,8 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, 
 		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0): #making sure that this gas particle has dusty neighbors!
 			#no need to append j to this, because j is included as its own neighbor since it has a distance of 0 from itself
 			x = points[neighbor[j]]
-			N_total = mass[neighbor[j]]/np.dot(mu_array[neighborhood[j]],f_un[neigbhorhood[j]]) #the total number of molecules in each particle								 
-			m = N_total*f_un[neighbor[j]]*mu_array[neighbor[j]] #mass of each specie u						 
+			#N_total = mass[neighbor[j]]/np.dot(mu_array[neighborhood[j]],f_un[neigbhorhood[j]]) #the total number of molecules in each particle								 
+			m = mass[neighbor[j]]					 
 			x_0 = points[j]
 			comps = f_un[j]
 			dustsize = sizes[neighbor[j]]
@@ -723,7 +723,7 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, 
 			rho_base = w2_max
 			if np.sum(rho) > 0:
 		
-				dest_fracs = np.array(chemical_sputtering_yield(neighbor,x,dt)) * np.nan_to_num(rho/rho_base)).T #fraction destroyed
+				dest_fracs = np.array(chemical_sputtering_yield(j,dt)) #fraction destroyed
 				#Distributing dust destruction over all intersecting dust particles
 				loss_relative = rho/np.sum(rho)
 				final_fracs = dest_fracs.T #fraction destroyed
