@@ -565,6 +565,9 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 	#Indexes over all gas particles and sees if they intersect a dust,
 	#rather than the other way around as previously, because gas particles
 	#are much smaller than dust particles, by design
+	
+	#Calculate an old and new mass, then normalize f_un. Without relative changes in mass
+	#this is pointless
 	frac_destruction = copy.deepcopy(f_un * 0.)
 	frac_reuptake = copy.deepcopy(f_un * 0.)
 	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0] #setting up array where all particles are gas
@@ -610,6 +613,7 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 	return frac_destruction, frac_reuptake												    
 
 def chemisputtering_3(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
+	#Add to (or subtract from) f_un, find out the change in mass, then normalize
 	frac_destruction = copy.deepcopy(f_un * 0.)
 	frac_reuptake = copy.deepcopy(f_un * 0.)
 	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
@@ -629,8 +633,14 @@ def chemisputtering_3(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 			w2g_num = Weigh2(x, x_0, m)/(mu_local * amu)
 			w2d = Weigh2_dust(x, x_0, m, dustsize)/(mu_local * amu)
 			
+			rel_w2g = Weigh2(x, x_0, m)/Weigh2(x, x, m)
+			rel_w2d = Weigh2_dust(x, x_0, m, dustsize)/Weigh2_dust(x, x, m, dustsize)
+			
 			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
 			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
+			
+			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
+			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
 			
 			sph_indiv_composition = (w2g_num * comps.T).T * mu_specie * amu
 			sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie * amu #SPH density by composition of GAS
@@ -652,76 +662,20 @@ def chemisputtering_3(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 			F_sput[np.isnan(F_sput)] = 1.
 			F_sput *= np.exp(K_u * J_u * dt)
 			
-			frac_contr_dust = dust_indiv_composition/dust_composition
-			frac_contr_dust[np.isnan(frac_contr_dust)] = 0.
-			
-			frac_contr_gas = sph_indiv_composition/sph_composition_density
-			frac_contr_gas[np.isnan(frac_contr_gas)] = 0.
-			
 			#How to weight the amount of material deposited wherever?
-			effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[0], Y_H) - np.outer(sph_indiv_composition.T[1], Y_He))		
+			effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[0], Y_H) - np.outer(sph_indiv_composition.T[1], Y_He))
+			frac_gained = np.sum(dust_composition)/np.sum(sph_composition_density)
 			
-			dust_number_amount = (1. - F_sput) * frac_contr_dust * dust_composition/(mu_specie * amu)
-			gas_number_amount = (1. - F_sput) * dust_composition/(mu_specie * amu) * np.sum(frac_contr_gas, axis=1)/np.sum(frac_contr_gas)
-			
-			frac_destruction[neighbor[j]] = (1. - F_sput) * f_un[neighbor[j]] * frac_contr_dust * dust_composition
-			frac_accretion[neighbor[j]] = (1. - F_sput) * f_un[neighbor[j]] * frac_contr_gas * dust_composition
-			
-			
-			ndens_sputtered_frac = (1. - F_sput) * dust_composition/(mu_specie * amu)
-			ngas_sputtered_frac = ndens_sputtered_frac/(
+			reuptake_weight = np.nan_to_num(effective_mass/np.sum(effective_mass))/np.sum((particle_type[neighbor[j]] == 0))
+			dest_frac = (1. - F_sput) * f_un[neighbor[j]] * (particle_type[neighbor[j]] == 2)
+			df = np.sum(dest_frac, axis=0)
 			
 			
-			
-			
-			
-
-def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
-	#Indexes over all gas particles and sees if they intersect a dust, like supernova
-	frac_destruction = copy.deepcopy(f_un * 0.)
-	frac_reuptake = copy.deepcopy(f_un * 0.)
-	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0] #setting up array where all particles are gas
-	for j in jarr:
-		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0): #making sure that this gas particle has dusty neighbors!
-			#no need to append j to this, because j is included as its own neighbor since it has a distance of 0 from itself
-			x = points[neighbor[j]]
-			#N_total = mass[neighbor[j]]/np.dot(mu_array[neighborhood[j]],f_un[neigbhorhood[j]]) #the total number of molecules in each particle								 
-			m = mass[neighbor[j]]					 
-			x_0 = points[j]
-			comps = f_un[j]
-			dustsize = sizes[neighbor[j]]
-			dens = densities[j]
-			
-			#Density of dust at the center of the gas particle
-			w2d = Weigh2_dust(x, x_0, m, dustsize)
-			#density of dust at the center of the dust particles
-			w2_max = Weigh2_dust(x, x, m, dustsize)
-			
-			#density of dust at the selected gas particle
-			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2);
-			rho_base = w2_max
-			if np.sum(rho) > 0:
-		
-				dest_fracs = np.array(chemical_sputtering_yield(j,dt)) #fraction destroyed
-				#Distributing dust destruction over all intersecting dust particles
-				loss_relative = rho/np.sum(rho)
-				final_fracs =  dest_fracs.T #fraction destroyed
-				final_fracs[final_fracs >= 1.] = 1.
-				
-				N_dust = mass[neighbor[j]]/mu_array[neighbor[j]]
-				N_self = mass[j]/mu_array[j]
-				
-				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
-				refractory_fracs = np.sum((final_fracs * N_dust/N_self).T * f_un[neighbor[j]], axis=0).astype('float64')
-				#Conversely, how much dust is fractionally lost from each intersecting gas particle?
-				dust_lost = final_fracs.T * f_un[neighbor[j]]
-				
-				#Dust lost in each dust particle, which is taken up as refractory gas by the gas particle
-				frac_destruction[neighbor[j]] += dust_lost
-				frac_reuptake[j] += refractory_fracs
-				#print refractory_fracs
-				
-	return frac_destruction, frac_reuptake	
+			frac_destruction[neighbor[j]] += dest_frac
+			#frac gained distributes evenly amongst gas particles
+			frac_reuptake[neighbor[j]] += reuptake_weight * dest_frac * frac_gained
+	
+	return frac_destruction, frac_reuptake
 										 
 def neighbors_arb(points, arb_points):
     kdt = spatial.cKDTree(points)  
