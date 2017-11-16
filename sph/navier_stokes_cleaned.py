@@ -559,94 +559,7 @@ def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timest
     K_u = K_u*(m_ref_species[u]*num_dens_ref+mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])
     rho = mineral_density[u]*K_u*np.exp(K_u*dt)/(m_ref_species[u]*num_dens_ref+np.exp(K_u*dt)*mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])     
     n_u = num_dens_ref-(rho-mineral_density[u])/mol_weights[u]                                              
-    return(rho,n_u)
-        
-def num_dens_array(x)
-	num_dens_ref = np.array([])
-	indices = neighbor[x]
-	for j in range(len(indices)):
-		i = indices[j]
-		factor = f_un[i].T*(mass[i]/(mu_species*amu))
-		num_dens_ref += factor*weigh2(x,points[i],mass[i])
-	return(num_dens_ref) #retuns n_u_0 for chemisputtering, not sure if it is correct
-		
-def chemical_sputtering_yield(i,dt): #for a gas particle i, returns F_sput array for all species for neighboring dust particles
-	F_sput = np.zeros(13) #for all the 13 species
-	for u in range(len(F_sput)):
-		y_H = min[max[10**(-7),0.5*np.exp(-4600/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
-		y_He = min[max[10**(-6),0.5*np.exp(-4600/T[i])],10**(-2)]*(k*T[i]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.								   
-		if ((u == 9)+(u==7)>0): #if the element is a silicon (or follows silicon sputtering rules)
-			y_H = y_H/0.464
-			y_He = y_He/0.464						     
-		num_dens_ref = num_dens_array(i)
-		a_min = mrn_constants[0]
-		a_max = mrn_constants[1]
-		K_u = mu_specie[u]*num_dens_ref[u]+mineral_densities[u]-num_dens_ref[3]*y_H*mu_specie[u]-num_dens_ref[4]*y_He[u]*mu_specie[u]
-		J_u = (a_min**-0.5-a_max**-0.5)/(3*dens_u(i,u)*(a_max**0.5-a_min**0.5))*(k*T[i]/(2*np.pi*mu_specie[u])**0.5*factor
-		F_sput[u] = K_u*np.exp(K_u*J_u*dt)/(mu_specie[u]*num_dens_ref[u]-num_dens_ref[3]*mu_specie[u]*y_H+mineral_densities[u]*np.exp(K_u*dt)-num_dens_ref[4]*mu_specie[u]*y_He)
-	return(F_sput)									 
-''''
-def nearest_gas(i): #returns the nearest gas particles for a particle i
-	gas_particle_array = np.array([])									 
-	indices = neighbor[i]
-	for j in range(len(indices)):
-		if (particle_type[indices[j]] == 0):
-			gas_particle_array = np.append(gas_particle_array,indices[j])
-	return(gas_particle_array)
-										 
-def chemical_sputtering(i,u,dt):
-	y_H = min[max[10**(-7),0.5*np.exp(-4600*k/T[i])],10**(-3)]*(k*T[i]/(2*np.pi*m_h)**0.5 #for carbon, Fe, etc.
-	y_He = min[max[10**(-6),0.5*np.exp(-4600*k/T[i])],10**(-2)]*(k*T[i]/(2*np.pi*mu_specie[1]*amu)**0.5 #for carbon, Fe, etc.								   
-	if (u == 9): #if the element is a silicon
-		y_H = y_H/0.464
-		y_He = y_He/0.464
-	total_diff_mass_u = 0 #total difference in mass for each dust particle i									 
-	indices = neighbors(x,d)
-	normalization = 0 #normalization factor for dust particles
-	normalization_gas = 0 #normalization factor for gas particles									 
-	all_intersecting_gas = np.array([]) #the array of all the gas particles that intersect the dust particles									 
-	for k in range(len(indices)):
-		jj = indices[k]
-		if(particle_type[jj] !=1): #if it is not dust
-			continue:
-		else:
-			total_N = mass[jj]/np.dot(f_un[jj],mu_specie)
-			mass_u = total_N*f_un[jj][u]*mu_specie[u]									      
-			normalization += mass_u*weigh2(x,points[jj],mass[jj])										      
-	for j in range(len(indices)): #this is where I consider the destruction of dust of specie u in a dust particle
-		i = indices[j]
-		total_diff_mass_u								 
-		if(particle_type[i] !=1): #if it is not dust
-			continue:										      
- 		else:   #accretion/sputtering 
-			total_N = mass[i]/np.dot(f_un[i],mu_specie)
-			mass_u = total_N*f_un[i][u]*mu_specie[u] #mass of specie u contained in the dust
-			F_u = chemical_sputtering_yield(i,u,x,dt) #returns the intersecting gas particle indices, for each dust particle i										      
-			gas_particle_arrray = nearest_gas(i)
-			all_intersecting_gas = np.append(all_intersecting_gas,gas_particle_array)
-			diff_mass_u = (F_u-1)*mass_u**2*weigh2(x,points[i],mass[i])/normalization #mass change in the dust particle
-			total_diff_mass_u += diff_mass_u 
-			mass[i] = mass[i]+diff_mass_u							 
-			num_u_molecules = diff_mass_u/mu_specie[u] #number of gas particles precipitating into dust
-			total_N = total_N + num_u_molecules							 
-			f_un[i][u] = (mass_u+diff_mass_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)									 
-	#this is where I consider the addition of dust to gas particles
-	for ii in range(len(all_intersecting_gas)):
-		index = all_intersecting_gas[ii]
-		total_N = mass[index]/np.dot(f_un[index],mu_specie)
-		new_mass = mu_specie[u]*total_N*f_un[index][u]-total_N*f_un[index][3]*mu_specie[u]*y_H - y_He*total_N*f_un[index][4]*mu_specie[u] #this is m_u_j'								 
-		normalization_2 += new_mass*weigh2(x,points[index],new_mass)	#normalization factor for gas particles							 
-	for zz in range(len(all_intersecting_gas)):
-		index = all_intersecting_gas[zz]								 
-		total_N = mass[index]/np.dot(f_un[index],mu_specie)
-		mass_u = total_N*f_un[index][u]*mu_specie[u] #mass of specie u contained in the gas
-		new_mass = mu_specie[u]*total_N*f_un[index][u]-total_N*f_un[index][3]*mu_specie[u]*y_h_u - y_he_u*total_N*f_un[index][4]*mu_specie[u]							 
-		diff_mass_gas_u = -1*new_mass*weigh2(x,points[index],new_mass)/normalization_2*total_diff_mass_u #corresponding change in gas
-		mass[index] = mass[index]+diff_mass_u	#new mass						 
-		num_u_molecules = diff_mass_gas_u/mu_specie[u] #number of gas molecules of specie u that get added
-		total_N = total_N + num_u_molecules							 
-		f_un[index][u] = (mass_u+diff_mass_gas_u)/(mu_specie[u]*total_N) #the new fraction of species (in terms of ratio of number of molecules)								 
-	return(1)	'''									 
+    return(rho,n_u)					 								 
 
 def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
 	#Indexes over all gas particles and sees if they intersect a dust,
@@ -694,7 +607,74 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 				frac_reuptake[j] += refractory_fracs
 				#print refractory_fracs
 				
-	return frac_destruction, frac_reuptake													    
+	return frac_destruction, frac_reuptake												    
+
+def chemisputtering_3(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
+	frac_destruction = copy.deepcopy(f_un * 0.)
+	frac_reuptake = copy.deepcopy(f_un * 0.)
+	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
+	for j in jarr:
+		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0):
+			m = mass[neighbor[j]]
+			x = points[neighbor[j]]
+			x_0 = points[j]
+			comps = f_un[neighbor[j]]
+			composition = f_un[j]
+			dustsize = sizes[neighbor[j]]
+			dens = densities[j]
+			mu_local = mu_array[neighbor[j]]
+			T_local = T[neighbor[j]]
+			
+			#Calculating SPH composition of gas particles
+			w2g_num = Weigh2(x, x_0, m)/(mu_local * amu)
+			w2d = Weigh2_dust(x, x_0, m, dustsize)/(mu_local * amu)
+			
+			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
+			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
+			
+			sph_indiv_composition = (w2g_num * comps.T).T * mu_specie * amu
+			sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie * amu #SPH density by composition of GAS
+			
+			sph_temperature = np.sum((w2g_num * T_local))/np.sum(w2g_num)
+			
+			dust_indiv_composition = (w2d * comps.T).T * mu_specie * amu
+			dust_composition = np.sum((w2d * comps.T).T,axis=0) * mu_specie * amu #SPH density of DUST
+			
+			J_u = -np.diff(mrn_constants**-0.5)/np.diff(mrn_constants**0.5)/(3 * mineral_densities)
+			J_u *= (k * sph_temperature/(2 * np.pi * mu_specie * amu))**0.5
+			
+			Y_H = min(max(0.5 * np.exp(-4600/sph_temperature), 1e-7),1e-3) * sputtering_yields/max(sputtering_yields)
+			Y_He = min(max(5 * np.exp(-4600/sph_temperature), 1e-6),1e-2) * sputtering_yields/max(sputtering_yields)
+			K_u = sph_composition_density + dust_composition - sph_composition_density[0] * Y_H - sph_composition_density[1] * Y_He
+			L_u = sph_composition_density + dust_composition * np.exp(K_u * J_u * dt) - sph_composition_density[0] * Y_H - sph_composition_density[1] * Y_He
+			
+			F_sput = K_u/L_u
+			F_sput[np.isnan(F_sput)] = 1.
+			F_sput *= np.exp(K_u * J_u * dt)
+			
+			frac_contr_dust = dust_indiv_composition/dust_composition
+			frac_contr_dust[np.isnan(frac_contr_dust)] = 0.
+			
+			frac_contr_gas = sph_indiv_composition/sph_composition_density
+			frac_contr_gas[np.isnan(frac_contr_gas)] = 0.
+			
+			#How to weight the amount of material deposited wherever?
+			effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[0], Y_H) - np.outer(sph_indiv_composition.T[1], Y_He))		
+			
+			dust_number_amount = (1. - F_sput) * frac_contr_dust * dust_composition/(mu_specie * amu)
+			gas_number_amount = (1. - F_sput) * dust_composition/(mu_specie * amu) * np.sum(frac_contr_gas, axis=1)/np.sum(frac_contr_gas)
+			
+			frac_destruction[neighbor[j]] = (1. - F_sput) * f_un[neighbor[j]] * frac_contr_dust * dust_composition
+			frac_accretion[neighbor[j]] = (1. - F_sput) * f_un[neighbor[j]] * frac_contr_gas * dust_composition
+			
+			
+			ndens_sputtered_frac = (1. - F_sput) * dust_composition/(mu_specie * amu)
+			ngas_sputtered_frac = ndens_sputtered_frac/(
+			
+			
+			
+			
+			
 
 def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
 	#Indexes over all gas particles and sees if they intersect a dust, like supernova
@@ -954,6 +934,7 @@ while (age < MAX_AGE):
     com = bg[0] #center of masses of each bin
     grav_accel = compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
     
+    f_un = f_un/np.sum(f_un, axis=1) #normalizing composition
     densities = np.array([density(j) for j in range(len(neighbor))])
     delp = np.array([del_pressure(j) for j in range(len(neighbor))])
     num_densities = np.array([num_dens(j) for j in range(len(neighbor))])
