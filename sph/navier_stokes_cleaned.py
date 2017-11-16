@@ -232,6 +232,10 @@ def compute_gravitational_force(particle_positions, grid_com, grid_masses, lengt
 #THESE FUNCTIONS ARE USED TO SIMULATE THE HYDRODYNAMICS OF OUR SYSTEM. THEY ARE BASED BOTH ON THE ESTABLISHED
 #LITERATURE IN THE FIELD (Monaghan 1993 for artificial viscosity, for instance) AND SOME ORIGINAL CONTRIBUTIONS
 #TO HANDLE DUST.
+
+#Future possibilities---turn these functions into parametric versions that don't assume variables like position,
+#velocity, etc. are constants. This will eliminate the need for dummy variables and make the code that runs the
+#simulation a lot more concise.
 def neighbors(points, dist):
     kdt = spatial.cKDTree(points)  
     qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
@@ -548,20 +552,8 @@ def supernova_impulse(points, masses, supernova_pos, ptypes):
 	return d_vels.T, selected_points
 
 #### PHYSICS OF DUST ####
-# VERY SIMILAR IN PURPOSE TO THE SPH SECTION, BUT WITH A SPECIAL EMPHASIS ON DUST.
-def dust_accretion(j,u,dt,T): #index of each dust particle, specie index, timestep, and Temperature. Returns accreated dust mass
-    #Still need to add n_h, sputtering yield, mineral density, initial number density, etc.
-    n_H = 1;
-    num_dens_ref = dust_comps[j]*mass[j]/m_ref_species[u] #initial number density of species, n_u_0
-    #K_u calculation divided into 3 for convenience 
-    K_u = (min_radius_array[u]**(-0.5)-max_radius_array[u]**(-0.5))/(3*mineral_density[u]*(max_radius_array[u]**(0.5)-min_radius_array[u]**(0.5)))
-    K_u = K_u*(k*T/(2*np.pi*m_ref_species[u]))**0.5 
-    K_u = K_u*(m_ref_species[u]*num_dens_ref+mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])
-    rho = mineral_density[u]*K_u*np.exp(K_u*dt)/(m_ref_species[u]*num_dens_ref+np.exp(K_u*dt)*mineral_density[u]-n_H*m_ref_species[u]*sputtering_yield[u])     
-    n_u = num_dens_ref-(rho-mineral_density[u])/mol_weights[u]                                              
-    return(rho,n_u)					 								 
-
-def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
+# VERY SIMILAR IN PURPOSE TO THE SPH SECTION, BUT WITH A SPECIAL EMPHASIS ON DUST.			 								 
+def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
 	#Indexes over all gas particles and sees if they intersect a dust,
 	#rather than the other way around as previously, because gas particles
 	#are much smaller than dust particles, by design
@@ -612,8 +604,11 @@ def supernova_destruction_2(points, velocities, neighbor, mass, f_un, mu_array, 
 				
 	return frac_destruction, frac_reuptake												    
 
-def chemisputtering_3(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
+def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
 	#Add to (or subtract from) f_un, find out the change in mass, then normalize
+	#Destruction fraction here can be negative if dust is being accreted!
+	#And you can experience a situation where dust is being sputtered from some particles
+	#while being accreted from others
 	frac_destruction = copy.deepcopy(f_un * 0.)
 	frac_reuptake = copy.deepcopy(f_un * 0.)
 	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
@@ -676,7 +671,11 @@ def chemisputtering_3(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 			frac_reuptake[neighbor[j]] += reuptake_weight * dest_frac * frac_gained
 	
 	return frac_destruction, frac_reuptake
-										 
+
+#### ARBITRARY INTERPOLATIONS #####
+#To be used after all methods are verified to obtain very high-resolution
+#graphs for publication. Extremely slow and time-consuming, so should not
+#be used in real time---these are just one-shots.										 
 def neighbors_arb(points, arb_points):
     kdt = spatial.cKDTree(points)  
     qbp = kdt.query_ball_point(arb_points, d, p=2, eps=0.1)
