@@ -589,18 +589,22 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				final_fracs = dens/critical_density * dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 1.] = 1.
 				
-				N_dust = mass[neighbor[j]]/mu_array[neighbor[j]]
-				N_self = mass[j]/mu_array[j]
+				N_dust = mass[neighbor[j]]/(mu_array[neighbor[j]] * amu)
 				
 				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
-				refractory_fracs = np.sum((final_fracs * N_dust/N_self).T * f_un[neighbor[j]], axis=0).astype('float64')
 				#Conversely, how much dust is fractionally lost from each intersecting gas particle?
-				dust_lost = final_fracs.T * f_un[neighbor[j]]
+				dust_lost = ((final_fracs.T * f_un[neighbor[j]]).T * N_dust).T
+				refractory_fracs = np.sum(dust_lost,axis=0)
+				#This does not ensure conservativity for some reason, I have no clue why.
 				
+				print np.sum(dust_lost) - np.sum(refractory_fracs)			
 				#Dust lost in each dust particle, which is taken up as refractory gas by the gas particle
 				frac_destruction[neighbor[j]] += dust_lost
 				frac_reuptake[j] += refractory_fracs
-				#print refractory_fracs
+				
+
+	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
+	frac_reuptake = (frac_reuptake.T/(mass/(mu_array * amu))).T
 				
 	return frac_destruction, frac_reuptake												    
 
@@ -659,16 +663,23 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			
 			#How to weight the amount of material deposited wherever?
 			effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[0], Y_H) - np.outer(sph_indiv_composition.T[1], Y_He))
+			
+			#should be: (MOLECULES IN DUST SPH PARTICLES/MOLECULES IN GAS SPH PARTICLES)
 			frac_gained = np.sum(dust_composition)/np.sum(sph_composition_density)
 			
-			reuptake_weight = np.nan_to_num(effective_mass/np.sum(effective_mass))/np.sum((particle_type[neighbor[j]] == 0))
-			dest_frac = (1. - F_sput) * f_un[neighbor[j]] * (particle_type[neighbor[j]] == 2)
-			df = np.sum(dest_frac, axis=0)
+			#frac_gained = np.sum((m/mu_array[neighbor[j]])[particle_type[neighbor[j]] == 2])/np.sum((m/mu_array[neighbor[j]])[particle_type[neighbor[j]] == 0])
 			
+			reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
+			reuptake_weight = np.nan_to_num(effective_mass/np.sum(effective_mass,axis=0))
 			
-			frac_destruction[neighbor[j]] += dest_frac
-			#frac gained distributes evenly amongst gas particles
-			frac_reuptake[neighbor[j]] += reuptake_weight * dest_frac * frac_gained
+			dest_frac = (((1. - F_sput) * f_un[neighbor[j]]).T * ((w2d > 0) & (particle_type[neighbor[j]] == 2))).T
+			df = np.sum(dest_frac.T * (mass[neighbor[j]]/mu_array[neighbor[j]]), axis=1).T
+			
+			frac_destruction[neighbor[j]] += (dest_frac.T * (mass[neighbor[j]]/mu_array[neighbor[j]])).T
+			frac_reuptake[neighbor[j]] += reuptake_weight * df
+	
+	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
+	frac_reuptake = (frac_reuptake.T/(mass/(mu_array * amu))).T
 	
 	return frac_destruction, frac_reuptake
 
