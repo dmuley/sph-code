@@ -1025,8 +1025,7 @@ plt.plot((utime/year), (dustt + 2 * dusts), c='maroon', alpha=0.25)
 plt.plot((utime/year), (dustt - 2 * dusts), c='maroon', alpha=0.25)
 
 
-VARIOUS FORMS OF PLOTTING THAT ONE CAN USE
-TO REPRESENT THE FINAL STATE OF THE SIMULATION
+VARIOUS FORMS OF PLOTTING THAT ONE CAN USE TO REPRESENT THE FINAL STATE OF THE SIMULATION
 
 3D PLOTTING:
 fig = plt.figure()
