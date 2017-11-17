@@ -74,9 +74,7 @@ def grain_mass(mineral_densities, mrn_constants):
 	return meff
 
 def interpolation_functions(): #interpolation of carbon and silicon destruction efficiency, returns the calculated e_c and e_s
-    #v_new = v/1000. #in km/s rather than m/s
-    #v_new[(v_new < 0)] = 0
-    #v_new[v_new > 200.] = 200.
+    #velocities here in km/s
     v_s = np.array([0., 50., 75., 100., 125., 150., 175., 200.])
     e_c = np.array([0., 0.01,0.04,0.10,0.18,0.17,0.18,0.23])
     e_si = np.array([0., 0.02,0.09,0.23,0.41,0.40,0.42,0.40])
@@ -372,6 +370,7 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 	return visc_accel, visc_heat
     
 def supernova_explosion():
+    #should make parametric later, and should include Nozawa 03 material
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
     total_release = supernova_base_release
     trsum = np.sum(total_release)
@@ -382,7 +381,6 @@ def supernova_explosion():
     dust_release = total_release - gas_release
     drsum = np.sum(dust_release)
     
-    #total_release /= trsum
     gas_release /= grsum
     dust_release /= drsum
     
@@ -397,7 +395,6 @@ def supernova_explosion():
     star_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
     
     dust_mass = np.ones(supernova_dust_len) * 0.05 * solar_mass
-    #dust_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/trsum
     gas_mass = (mass[supernova_pos] - 2 * solar_mass) * drsum/grsum
     stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
     
@@ -600,7 +597,6 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				frac_destruction[neighbor[j]] += dust_lost
 				frac_reuptake[j] += refractory_fracs
 				
-
 	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
 	frac_reuptake = (frac_reuptake.T/(mass/(mu_array * amu))).T
 				
@@ -664,9 +660,7 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			
 			#should be: (MOLECULES IN DUST SPH PARTICLES/MOLECULES IN GAS SPH PARTICLES)
 			frac_gained = np.sum(dust_composition)/np.sum(sph_composition_density)
-			
-			#frac_gained = np.sum((m/mu_array[neighbor[j]])[particle_type[neighbor[j]] == 2])/np.sum((m/mu_array[neighbor[j]])[particle_type[neighbor[j]] == 0])
-			
+						
 			reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
 			reuptake_weight = np.nan_to_num(effective_mass/np.sum(effective_mass,axis=0))
 			
