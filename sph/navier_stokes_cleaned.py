@@ -593,11 +593,9 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				
 				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
 				#Conversely, how much dust is fractionally lost from each intersecting gas particle?
-				dust_lost = ((final_fracs.T * f_un[neighbor[j]]).T * N_dust).T
+				dust_lost = (final_fracs * f_un[neighbor[j]].T * N_dust).T
 				refractory_fracs = np.sum(dust_lost,axis=0)
-				#This does not ensure conservativity for some reason, I have no clue why.
-				
-				print np.sum(dust_lost) - np.sum(refractory_fracs)			
+				#print np.nan_to_num(dust_lost/refractory_fracs)
 				#Dust lost in each dust particle, which is taken up as refractory gas by the gas particle
 				frac_destruction[neighbor[j]] += dust_lost
 				frac_reuptake[j] += refractory_fracs
@@ -606,7 +604,7 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
 	frac_reuptake = (frac_reuptake.T/(mass/(mu_array * amu))).T
 				
-	return frac_destruction, frac_reuptake												    
+	return frac_destruction, frac_reuptake								    
 
 def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
 	#Add to (or subtract from) f_un, find out the change in mass, then normalize
