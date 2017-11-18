@@ -259,7 +259,7 @@ def grad_weight(x, x_0, m, type_particle):
     #checks if SPH particles intersect or not
     return((np.nan_to_num(W.astype('float') * ((m/m_0)**(2./3.)*d**2-norms_sq > 0))).T)
 
-def mu_j(j): #mean molecular weight of the SPH particle
+def mu_j(j,f_u,mu_specie,): #mean molecular weight of the SPH particle
     #species = 13
     mu = 0
     for u in range(len(mu_specie)):
@@ -270,7 +270,7 @@ def mu_j(j): #mean molecular weight of the SPH particle
         mu = 1/(m_h*mu)
         return(mu)
 
-def density(j):
+def density(j,points,masses,particle_type,neighbor):
     x_0 = points[j]
     x = np.array(points[np.array(neighbor[j])])
     m = np.array(mass[np.array(neighbor[j])])
@@ -278,7 +278,7 @@ def density(j):
     rho = Weigh2(x, x_0, m) * (particle_type[np.array(np.array(neighbor[j]))] == 0)
     return np.sum(rho[rho > 0])
     
-def dust_density(j):
+def dust_density(j,points,mass,neighbor,particle_type,sizes):
 	#evaluating dust density at each gas particle
 	#including only neighboring points so that self-density of dust particles
 	#is not counted
@@ -290,7 +290,7 @@ def dust_density(j):
     rho = Weigh2_dust(x, x_0, m, ds) * (particle_type[np.array(neighbor[j])] == 2)
     return np.sum(rho[rho > 0])
     
-def net_impulse(j):
+def net_impulse(j,points,mass,sizes,velocities,particle_type,neighbor):
 	meff = grain_mass(mineral_densities, mrn_constants)
 	seff = sigma_effective(mineral_densities, mrn_constants, mu_specie)
 	mean_grainmass = np.sum(meff * f_un[np.array(neighbor[j])], axis=1)
@@ -307,7 +307,7 @@ def net_impulse(j):
 	accel_net = weight_factor/mean_grainmass * mean_cross * np.sum((net_vels.T)**2, axis=0)**0.5 * net_vels.T * (particle_type[np.array(neighbor[j])] == 2) * (weight_factor > 0)
 	return np.sum(accel_net.T,axis=0), -accel_net, neighbor[j]		
     
-def num_dens(j):
+def num_dens(j,mass,points,mu_array):
     x_0 = points[j]
     x = np.array(points[np.array(neighbor[j])])
     m = np.array(mass[np.array(neighbor[j])])
@@ -315,7 +315,7 @@ def num_dens(j):
     n_dens = Weigh2(x, x_0, m)/(mu_array[np.array(neighbor[j])] * m_h)
     return np.sum(n_dens[n_dens > 0])
     
-def del_pressure(i): #gradient of the pressure
+def del_pressure(i,points,mass,particle_type,neighbor,E_internal): #gradient of the pressure
     if (particle_type[i] != 0):
         return(np.zeros(3))
     else:
