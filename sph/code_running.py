@@ -9,6 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy import spatial, stats
 import copy
 from time import sleep
+import navier_stokes_cleaned as nsc
 
 G = constants.G
 k = constants.Boltzmann
@@ -24,7 +25,7 @@ solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
 t_solar = 5776
-supernova_energy = 1e44 #in Joules
+nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
@@ -41,8 +42,6 @@ W6_constant = (3 * np.pi/80)
 
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 
-from navier_stokes_cleaned import *
-
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 0.75e6 * AU
@@ -50,8 +49,11 @@ N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
+nsc.d = d
 d_sq = d**2
 dt = dt_0
+nsc.dt = dt
+nsc.dt_0 = dt_0
 DUST_FRAC = 0.050000
 DUST_MASS = 0.05
 N_RADIATIVE = 100
@@ -61,15 +63,15 @@ specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
 dust_base_frac = (specie_fraction_array - supernova_base_release)
 dust_base = dust_base_frac/np.sum(dust_base_frac)
-cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
+cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
 
 base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
-imf = kroupa_imf(base_imf) * d_base_imf
+imf = nsc.kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
 points = np.random.normal(size=(N_PARTICLES, 3)) * DIAMETER
 points2 = copy.deepcopy(points)
-neighbor = neighbors(points, d)
+neighbor = nsc.neighbors(points, d)
 #print(nbrs)
 #print(points)
 velocities = np.random.normal(size=(N_PARTICLES, 3)) * 10.
@@ -110,9 +112,9 @@ optical_depth = mass/(m_h * mu_array) * cross_array
 
 critical_density = 1000*amu*10**6 #critical density of star formation
 
-densities = np.array([density(j) for j in range(len(neighbor))])
-delp = np.array([del_pressure(j) for j in range(len(neighbor))])
-num_densities = np.array([num_dens(j) for j in range(len(neighbor))])
+densities = nsc.density(points,mass,particle_type,neighbor)
+dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
+delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
 
 star_ages = np.ones(len(points)) * -1.
 age = 0
@@ -127,11 +129,11 @@ plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 while (age < MAX_AGE):
     #timestep reset here
-    ct = crossing_time(neighbor, velocities, sizes, particle_type)
+    ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
     dt = min(dt_0, ct)
     if np.sum(particle_type[particle_type == 1]) > 0:
-        supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
-        rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
+        supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
+        rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos, mu_array, T)
         f_un0 = f_un
         N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
         area = (4 * np.pi * sizes**2)
@@ -162,14 +164,14 @@ while (age < MAX_AGE):
         #in future, want to spew multiple low-mass dust particles
         #rather than one single very large one
         
-        print (np.max(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10)))
+        print (np.max(star_ages/nsc.luminosity_relation(mass/nsc.solar_mass, np.ones(len(mass)), 1)/(year * 1e10)))
         print (np.max(mass[particle_type == 1]/solar_mass))
         
         print (len(supernova_pos))
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
         	for ku in supernova_pos:
-        		impulse, indices = supernova_impulse(points, mass, ku, particle_type)
+        		impulse, indices = nsc.supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
 			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = supernova_explosion()
 			E_internal[supernova_pos] = new_eint_stars
@@ -189,7 +191,7 @@ while (age < MAX_AGE):
 			Tnew[:len(T)] += T
 			T = Tnew
 
-			neighbor = neighbors(points, d)
+			neighbor = nsc.neighbors(points, d)
             
         #specie_fraction_array's retention is deliberate; number densities are in fact increasing
         #so we want to divide by the same base
@@ -198,30 +200,27 @@ while (age < MAX_AGE):
         cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
         optical_depth = mass/(m_h * mu_array) * cross_array
         
-    neighbor = neighbors(points, d)#find neighbors in each timestep
+    neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-    bg = bin_generator(mass, points, [4, 4, 4]); age += dt
+    bg = nsc.bin_generator(mass, points, [4, 4, 4]); age += dt
     com = bg[0] #center of masses of each bin
-    grav_accel = compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
+    grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
     
-    f_un = f_un/np.sum(f_un, axis=1) #normalizing composition
-    densities = np.array([density(j) for j in range(len(neighbor))])
-    delp = np.array([del_pressure(j) for j in range(len(neighbor))])
-    num_densities = np.array([num_dens(j) for j in range(len(neighbor))])
-    dust_densities = np.array([dust_density(j) for j in range(len(neighbor))])
+    f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
+    
+    densities = nsc.density(points,mass,particle_type,neighbor)
+    dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
     #viscous force causing dust to accelerate/decelerate along with gas
-    dust_net_impulse = np.array([net_impulse(j)[0] for j in range(len(neighbor))])
+    viscous_drag = nsc.net_impulse(points,mass,sizes,velocities,particle_type,neighbor,f_un)
+    num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
+    delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
     #artificial viscosity to ensure proper blast wave
-    av = artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T)
-    
-    drag_accel_dust = np.zeros((len(neighbor), 3))
-    for j in range(len(neighbor)):
-    	drag_accel_dust[neighbor[j]] += net_impulse(j)[1].T
+    av = nsc.artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array)
     
     pressure_accel = -np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
     #drag is a very small factor, only seems to matter at the solar-system scale
-    drag_accel_gas = np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
-    drag_accel_dust = -np.nan_to_num(drag_accel_dust)
+    drag_accel_gas = np.nan_to_num(((viscous_drag[0].T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
+    drag_accel_dust = np.nan_to_num(viscous_drag[1])
     
     #leapfrog integration
     old_accel = copy.deepcopy(total_accel)

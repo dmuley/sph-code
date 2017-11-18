@@ -15,6 +15,8 @@ from scipy import spatial, stats
 import copy
 from time import sleep
 
+#These constants should be exclusively PHYSICAL---they should be independent
+#of any properties of a particular SPH simulation
 G = constants.G
 k = constants.Boltzmann
 sb = constants.Stefan_Boltzmann
@@ -47,14 +49,14 @@ W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 
 #DUMMY VALUES
-DIAMETER = 1e6 * AU
+'''DIAMETER = 1e6 * AU
 N_PARTICLES = 15000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_0 = 1e5 * AU
 d_sq = d**2
-specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
+specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])'''
 	
 #These are "constant functions" which you can just call once and forget. They encapsulate the results
 #of previous literature about dust grain radius distribution and destruction in supernovae.
@@ -240,17 +242,17 @@ def neighbors(points, dist):
     
     return qbp
 
-def Weigh2(x, x_0, m):
+def Weigh2(x, x_0, m, d):
     norms_sq = np.sum((x - x_0)**2, axis=1)
     W = m * 315*(m_0/m)**3*((m/m_0)**(2./3.)*d**2-norms_sq)**3/(64*np.pi*d**9)
     return(W)
 
-def Weigh2_dust(x, x_0, m, dustsize):
+def Weigh2_dust(x, x_0, m, d, dustsize):
     norms_sq = np.sum((x - x_0)**2, axis=1)
     W = m * 315*(dustsize**2-norms_sq)**3/(64*np.pi*dustsize**9)
     return(W)
     
-def grad_weight(x, x_0, m, type_particle):
+def grad_weight(x, x_0, m, d, type_particle):
     vec = (x - x_0)
     norms_sq = np.sum((x - x_0)**2, axis=1)
     
@@ -259,77 +261,83 @@ def grad_weight(x, x_0, m, type_particle):
     #checks if SPH particles intersect or not
     return((np.nan_to_num(W.astype('float') * ((m/m_0)**(2./3.)*d**2-norms_sq > 0))).T)
 
-def mu_j(j,f_u,mu_specie,): #mean molecular weight of the SPH particle
-    #species = 13
-    mu = 0
-    for u in range(len(mu_specie)):
-        mu = mu + f_u[j][u]/mu_specie[u]
-    if(mu == 0):
-        return(0)
-    else:
-        mu = 1/(m_h*mu)
-        return(mu)
-
-def density(j,points,masses,particle_type,neighbor):
-    x_0 = points[j]
-    x = np.array(points[np.array(neighbor[j])])
-    m = np.array(mass[np.array(neighbor[j])])
+def density(points,mass,particle_type,neighbor):
+	final_density = np.zeros(len(points))
+	for j in range(len(neighbor)):
+		x_0 = points[j]
+		x = np.array(points[np.array(neighbor[j])])
+		m = np.array(mass[np.array(neighbor[j])])
+	
+		rho = Weigh2(x, x_0, m, d) * (particle_type[np.array(np.array(neighbor[j]))] == 0)
+		final_density[j] += np.sum(rho[rho > 0])
+	return final_density
     
-    rho = Weigh2(x, x_0, m) * (particle_type[np.array(np.array(neighbor[j]))] == 0)
-    return np.sum(rho[rho > 0])
-    
-def dust_density(j,points,mass,neighbor,particle_type,sizes):
+def dust_density(points,mass,neighbor,particle_type,sizes):
 	#evaluating dust density at each gas particle
 	#including only neighboring points so that self-density of dust particles
 	#is not counted
-    x_0 = points[j]
-    x = points[np.array(neighbor[j])]
-    m = mass[np.array(neighbor[j])]
-    ds = sizes[np.array(neighbor[j])]
+	final_dust_density = np.zeros(len(points))
+	for j in range(len(neighbor)):
+		x_0 = points[j]
+		x = points[np.array(neighbor[j])]
+		m = mass[np.array(neighbor[j])]
+		ds = sizes[np.array(neighbor[j])]
+	
+		rho = Weigh2_dust(x, x_0, m, d, ds) * (particle_type[np.array(neighbor[j])] == 2)
+		final_dust_density[j] += np.sum(rho[rho > 0])
+	return final_dust_density
     
-    rho = Weigh2_dust(x, x_0, m, ds) * (particle_type[np.array(neighbor[j])] == 2)
-    return np.sum(rho[rho > 0])
-    
-def net_impulse(j,points,mass,sizes,velocities,particle_type,neighbor):
+def net_impulse(points,mass,sizes,velocities,particle_type,neighbor,f_un):
 	meff = grain_mass(mineral_densities, mrn_constants)
 	seff = sigma_effective(mineral_densities, mrn_constants, mu_specie)
-	mean_grainmass = np.sum(meff * f_un[np.array(neighbor[j])], axis=1)
-	mean_cross = np.sum(seff * f_un[np.array(neighbor[j])], axis=1)
-	net_vels = velocities[np.array(neighbor[j])] - velocities[j]
 	
-	x_0 = points[j]
-	x = points[np.array(neighbor[j])]
-	m = mass[np.array(neighbor[j])]
-	ds = sizes[np.array(neighbor[j])]
+	accel_onto = np.zeros(points.shape)
+	accel_reaction = np.zeros(points.shape)
 	
-	weight_factor = Weigh2_dust(x, x_0, m, ds)
-	#gives units of m/s^2, which is exactly what we want
-	accel_net = weight_factor/mean_grainmass * mean_cross * np.sum((net_vels.T)**2, axis=0)**0.5 * net_vels.T * (particle_type[np.array(neighbor[j])] == 2) * (weight_factor > 0)
-	return np.sum(accel_net.T,axis=0), -accel_net, neighbor[j]		
+	for j in range(len(neighbor)):
+		mean_grainmass = np.sum(meff * f_un[np.array(neighbor[j])], axis=1)
+		mean_cross = np.sum(seff * f_un[np.array(neighbor[j])], axis=1)
+		net_vels = velocities[np.array(neighbor[j])] - velocities[j]
+	
+		x_0 = points[j]
+		x = points[np.array(neighbor[j])]
+		m = mass[np.array(neighbor[j])]
+		ds = sizes[np.array(neighbor[j])]
+	
+		weight_factor = Weigh2_dust(x, x_0, m, d, ds)
+		#gives units of m/s^2, which is exactly what we want
+		accel_net = weight_factor/mean_grainmass * mean_cross * np.sum((net_vels.T)**2, axis=0)**0.5 * net_vels.T * (particle_type[np.array(neighbor[j])] == 2) * (weight_factor > 0)
+		#need to account for relative weights over here!
+		accel_onto[j] += np.sum(accel_net.T,axis=0)
+		accel_reaction[neighbor[j]] += -accel_net.T
+	return accel_onto, accel_reaction	
     
-def num_dens(j,mass,points,mu_array):
-    x_0 = points[j]
-    x = np.array(points[np.array(neighbor[j])])
-    m = np.array(mass[np.array(neighbor[j])])
+def num_dens(mass, points, mu_array, neighbor):
+	number_density = np.zeros(len(points))
+	for j in range(len(neighbor)):
+		x_0 = points[j]
+		x = np.array(points[np.array(neighbor[j])])
+		m = np.array(mass[np.array(neighbor[j])])
+
+		n_dens = Weigh2(x, x_0, m, d)/(mu_array[np.array(neighbor[j])] * m_h)
+		number_density[j] += np.sum(n_dens[n_dens > 0])
+	return number_density
     
-    n_dens = Weigh2(x, x_0, m)/(mu_array[np.array(neighbor[j])] * m_h)
-    return np.sum(n_dens[n_dens > 0])
-    
-def del_pressure(i,points,mass,particle_type,neighbor,E_internal): #gradient of the pressure
-    if (particle_type[i] != 0):
-        return(np.zeros(3))
-    else:
-        x_0 = points[i]
-        x = np.append([x_0], points[np.array(neighbor[i])],axis=0)
-        m = np.append(mass[i], mass[np.array(neighbor[i])])
-        pt = np.append(particle_type[i], particle_type[neighbor[i]])
-        
-        #symmetrizing pressure gradient
-        gw = (grad_weight(x, x_0, m, pt) + grad_weight(x, x_0, m[0], pt))/2.
-        
-        del_pres = np.sum((gw.T * E_internal[np.append(i, neighbor[i])]/gamma_array[np.append(i, neighbor[i])]).T, axis=0)
-        
-        return del_pres
+def del_pressure(points,mass,particle_type,neighbor,E_internal, gamma_array): #gradient of the pressure
+	grad_pressure = np.zeros(points.shape)
+	for i in range(len(neighbor)):
+		if (particle_type[i] == 0):
+			x_0 = points[i]
+			x = np.append([x_0], points[np.array(neighbor[i])],axis=0)
+			m = np.append(mass[i], mass[np.array(neighbor[i])])
+			pt = np.append(particle_type[i], particle_type[neighbor[i]])
+		
+			#symmetrizing pressure gradient
+			gw = (grad_weight(x, x_0, m, d, pt) + grad_weight(x, x_0, m[0], d, pt))/2.
+		
+			del_pres = np.sum((gw.T * E_internal[np.append(i, neighbor[i])]/gamma_array[np.append(i, neighbor[i])]).T, axis=0)
+			points[i] += del_pres
+	return grad_pressure
 
 def crossing_time(neighbor, velocities, sizes, particle_type):
 	max_relvel = np.zeros(len(neighbor))
@@ -340,7 +348,7 @@ def crossing_time(neighbor, velocities, sizes, particle_type):
 	crossing_time = np.nan_to_num(sizes/max_relvel) * (particle_type == 0)
 	return min(crossing_time[crossing_time != 0])
 
-def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T):
+def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array):
 	css_base = (gamma_array * k * T/(mu_array * amu))**0.5
 	visc_accel = np.zeros((len(points),3))
 	visc_heat = np.zeros(len(points))
@@ -356,8 +364,8 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 		
 			PI_ij = -1./2. * vsig_ij * w_ij/rho_ij
 			#symmetrizing pressure
-			gw0 = grad_weight(points[neighbor[j]], points[j], mass[j], particle_type[neighbor[j]])
-			gw1 = grad_weight(points[neighbor[j]], points[j], mass[neighbor[j]], particle_type[neighbor[j]])
+			gw0 = grad_weight(points[neighbor[j]], points[j], mass[j], d, particle_type[neighbor[j]])
+			gw1 = grad_weight(points[neighbor[j]], points[j], mass[neighbor[j]], d, particle_type[neighbor[j]])
 			gw = (gw0 + gw1)/2.
 			accel_ij = (mass[neighbor[j]] * PI_ij * gw.T).T
 			heat_ij = 0.5 * mass[neighbor[j]] * PI_ij * np.sum((velocities[neighbor[j]] - velocities[j]) * gw, axis=1)
@@ -420,7 +428,7 @@ def supernova_explosion():
 
 #THE ENERGY/DUST PRODUCTION IMPARTED BY SUPERNOVAE ARE ALSO PLACED HERE.
 
-def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos):
+def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T):
     random_stars = positions[ptypes == 1]
     rs2 = np.array([])
     rs2 = random_stars
@@ -451,7 +459,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     for i in np.arange(0, len(rs2)):
         for j in np.arange(0, len(rg2)):
             ray = np.array([rs2[i], rg2[j]])
-            dists = (np.sum(np.cross(points - ray[0], ray[1] - ray[0])**2, axis=1)/(np.sum((ray[1] - ray[0])**2)))
+            dists = (np.sum(np.cross(positions - ray[0], ray[1] - ray[0])**2, axis=1)/(np.sum((ray[1] - ray[0])**2)))
             blocking_kernel = np.sum((W6_constant * sizes[dists < sizes**2]**(-2) * cross_array[dists < sizes**2] * masses[dists < sizes**2]/(mu_array[dists < sizes**2] * amu)))
             
             blocked[i][j] += blocking_kernel
@@ -471,13 +479,13 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     
     lum_factor = []
     for ei in range(len(star_distance)):
-        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + sizes[particle_type != 1]/2).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + sizes[particle_type != 1]/2)**-2, axis=0)))
+        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + sizes[ptypes != 1]/2).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + sizes[ptypes != 1]/2)**-2, axis=0)))
     
     lum_factor = np.array(lum_factor)
     extinction = (W6_constant * masses[ptypes != 1]/(mu_array[ptypes != 1] * amu) * cross_array[ptypes != 1]) * sizes[ptypes != 1]**(-2)
     
     exponential = np.exp(-np.nan_to_num(lum_factor))
-    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.average(sizes[particle_type != 1])**2 * np.ones(np.shape(star_distance_2))) * 4. * np.pi
+    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.average(sizes[ptypes != 1])**2 * np.ones(np.shape(star_distance_2))) * 4. * np.pi
     a_intercepted = (np.pi * sizes**2)[ptypes != 1]
     
     lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
@@ -571,9 +579,9 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 			dens = densities[j]
 			
 			#Density of dust at the center of the gas particle
-			w2d = Weigh2_dust(x, x_0, m, dustsize)
+			w2d = Weigh2_dust(x, x_0, m, d, dustsize)
 			#density of dust at the center of the dust particles
-			w2_max = Weigh2_dust(x, x, m, dustsize)
+			w2_max = Weigh2_dust(x, x, m, d, dustsize)
 			
 			#density of dust at the selected gas particle
 			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2);
@@ -623,11 +631,11 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			T_local = T[neighbor[j]]
 			
 			#Calculating SPH composition of gas particles
-			w2g_num = Weigh2(x, x_0, m)/(mu_local * amu)
-			w2d = Weigh2_dust(x, x_0, m, dustsize)/(mu_local * amu)
+			w2g_num = Weigh2(x, x_0, m, d)/(mu_local * amu)
+			w2d = Weigh2_dust(x, x_0, m, d, dustsize)/(mu_local * amu)
 			
-			rel_w2g = Weigh2(x, x_0, m)/Weigh2(x, x, m)
-			rel_w2d = Weigh2_dust(x, x_0, m, dustsize)/Weigh2_dust(x, x, m, dustsize)
+			rel_w2g = Weigh2(x, x_0, m, d)/Weigh2(x, x, m, d)
+			rel_w2d = Weigh2_dust(x, x_0, m, d, dustsize)/Weigh2_dust(x, x, m, d, dustsize)
 			
 			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
 			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
@@ -695,7 +703,7 @@ def density_arb(arb_points):
             #print np.array(narb[j])
             x = points[np.array(narb[j])]
             m = mass[np.array(narb[j])]
-            rho = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0)
+            rho = Weigh2(x, x_0, m, d) * (particle_type[np.array(narb[j])] == 0)
         
             density_array.append(np.sum(rho[rho > 0]))
         else:
@@ -714,8 +722,8 @@ def temperature_arb(arb_points):
             m = mass[np.array(narb[j])]
             temps = T[np.array(narb[j])]
         
-            temp_sum = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0) * temps
-            temp_w = Weigh2(x, x_0, m) * (particle_type[np.array(narb[j])] == 0)
+            temp_sum = Weigh2(x, x_0, m, d) * (particle_type[np.array(narb[j])] == 0) * temps
+            temp_w = Weigh2(x, x_0, m, d) * (particle_type[np.array(narb[j])] == 0)
             
             #print temp_sum
             #print temp_w
@@ -730,342 +738,4 @@ def temperature_arb(arb_points):
     
 #END ARBITRARY INTERPOLATIONS.
 
-#### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
-#SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 0.75e6 * AU
-N_PARTICLES = 2000
-N_INT_PER_PARTICLE = 100
-V = (DIAMETER)**3
-d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
-d_sq = d**2
-dt = dt_0
-DUST_FRAC = 0.050000
-DUST_MASS = 0.05
-N_RADIATIVE = 100
-MAX_AGE = 4e7 * year
-#relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
-specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
-supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
-dust_base_frac = (specie_fraction_array - supernova_base_release)
-dust_base = dust_base_frac/np.sum(dust_base_frac)
-cross_sections += sigma_effective(mineral_densities, mrn_constants, mu_specie)
-
-base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)
-d_base_imf = np.append(base_imf[0], np.diff(base_imf))
-imf = kroupa_imf(base_imf) * d_base_imf
-imf /= np.sum(imf)
-points = np.random.normal(size=(N_PARTICLES, 3)) * DIAMETER
-points2 = copy.deepcopy(points)
-neighbor = neighbors(points, d)
-#print(nbrs)
-#print(points)
-velocities = np.random.normal(size=(N_PARTICLES, 3)) * 10.
-total_accel = np.random.rand(N_PARTICLES, 3) * 0.
-mass = np.random.choice(base_imf, N_PARTICLES, p = imf) * solar_mass
-sizes = (mass/m_0)**(1./3.) * d
-
-particle_type = np.zeros([N_PARTICLES]) #0 for gas, 1 for star, 2 for dust
-
-mu_array = np.zeros([N_PARTICLES])#array of all mu
-E_internal = np.zeros([N_PARTICLES]) #array of all Energy
-#copy of generate_E_array
-#fills in E_internal array specified at the beginning
-T = 20 * np.ones([N_PARTICLES]) #5 kelvins
-
-#fills the f_u array
-dust_fracs = ((np.random.rand(N_PARTICLES) > DUST_FRAC))
-dust_fracs = dust_fracs.astype('bool')
-particle_type[dust_fracs == False] = 2
-fgas = np.array([specie_fraction_array] * N_PARTICLES)
-fdust = np.array([dust_base[0]] * N_PARTICLES)
-f_un = (fgas.T * dust_fracs + fdust.T * (1 - dust_fracs)).T
-mass[particle_type == 2] = DUST_MASS * solar_mass
-sizes[particle_type == 2] = d
-
-#based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
-base_sfr = 0.0057 
-T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
-
-#f_un = np.array([specie_fraction_array] * N_PARTICLES)
-mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
-gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
-cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-E_internal = gamma_array * mass * k * T/(mu_array * m_h)
-optical_depth = mass/(m_h * mu_array) * cross_array
-
-#copy of generate_mu_array
-
-critical_density = 1000*amu*10**6 #critical density of star formation
-
-densities = np.array([density(j) for j in range(len(neighbor))])
-delp = np.array([del_pressure(j) for j in range(len(neighbor))])
-num_densities = np.array([num_dens(j) for j in range(len(neighbor))])
-
-star_ages = np.ones(len(points)) * -1.
-age = 0
-
-time_coord = np.array([])
-dust_temps = np.array([])
-star_frac = np.array([])
-
-print("Simulation time: " + str(MAX_AGE/year) + " y")
-print("Estimated free fall time: " + str(T_FF) + " y")
-plt.ion()
-#RUNNING SIMULATION FOR SPECIFIED TIME!
-while (age < MAX_AGE):
-    #timestep reset here
-    ct = crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = min(dt_0, ct)
-    if np.sum(particle_type[particle_type == 1]) > 0:
-        supernova_pos = np.where(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
-        rh = rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos)
-        f_un0 = f_un
-        N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
-        area = (4 * np.pi * sizes**2)
-        N_PART = mass/(m_h * mu_array)
-        W6_integral = 9./area #evaluating integral of W6 kernel
-        optd = 1. - np.exp(-optical_depth * W6_integral)
-        T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
-        E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
-        for nrad in range(N_RADIATIVE):
-        	optd = 1. - np.exp(-optical_depth * W6_integral)
-        	#dust particles function as if always in thermal equilibrium, F proportional to T^6. Last two variables are obtained from integration. http://www.astronomy.ohio-state.edu/~pogge/Ast871/Notes/Dust.pdf pg. 27
-        	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optd * W6_integral**(-1) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
-        	E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/N_RADIATIVE
-        	E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
-        	T[T < t_cmb] = t_cmb
-        	
-        	f_un = ((N_RADIATIVE - nrad) * f_un0 + nrad * rh[1])/N_RADIATIVE	
-        	mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
-        	gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
-        	cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-        	cross_array[particle_type == 1] == 1.e-90
-        	optical_depth = mass/(m_h * mu_array) * cross_array
-        	
-        f_un = rh[1]
-        velocities[particle_type != 1] += rh[2]
-        
-        #on supernova event--- add new dust particle (particle_type == 2)
-        #in future, want to spew multiple low-mass dust particles
-        #rather than one single very large one
-        
-        print (np.max(star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10)))
-        print (np.max(mass[particle_type == 1]/solar_mass))
-        
-        print (len(supernova_pos))
-        #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
-        if len(supernova_pos) > 0:
-        	for ku in supernova_pos:
-        		impulse, indices = supernova_impulse(points, mass, ku, particle_type)
-        		velocities[indices] += impulse
-			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = supernova_explosion()
-			E_internal[supernova_pos] = new_eint_stars
-			f_un[supernova_pos] = star_comps
-			mass[supernova_pos] = stars_mass
-			E_internal = np.concatenate((E_internal, new_eint_dust, new_eint_gas))
-			particle_type = np.concatenate((particle_type, newdusttype, newgastype))
-			mass = np.concatenate((mass, dust_mass, gas_mass))
-			f_un = np.vstack([f_un, dust_comps, gas_comps])
-			velocities = np.concatenate((velocities, dustvels, newvels))
-			star_ages = np.concatenate((star_ages, np.ones(len(dustpoints))* (-2), np.ones(len(supernova_pos))* (-2)))
-			points = np.vstack([points, dustpoints, newpoints])
-			sizes = np.zeros(len(points))
-			sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
-			sizes[particle_type == 2] = d
-			Tnew = np.zeros(len(sizes));
-			Tnew[:len(T)] += T
-			T = Tnew
-
-			neighbor = neighbors(points, d)
-            
-        #specie_fraction_array's retention is deliberate; number densities are in fact increasing
-        #so we want to divide by the same base
-        mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
-        gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
-        cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-        optical_depth = mass/(m_h * mu_array) * cross_array
-        
-    neighbor = neighbors(points, d)#find neighbors in each timestep
-    num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-    bg = bin_generator(mass, points, [4, 4, 4]); age += dt
-    com = bg[0] #center of masses of each bin
-    grav_accel = compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
-    
-    f_un = f_un/np.sum(f_un, axis=1) #normalizing composition
-    densities = np.array([density(j) for j in range(len(neighbor))])
-    delp = np.array([del_pressure(j) for j in range(len(neighbor))])
-    num_densities = np.array([num_dens(j) for j in range(len(neighbor))])
-    dust_densities = np.array([dust_density(j) for j in range(len(neighbor))])
-    #viscous force causing dust to accelerate/decelerate along with gas
-    dust_net_impulse = np.array([net_impulse(j)[0] for j in range(len(neighbor))])
-    #artificial viscosity to ensure proper blast wave
-    av = artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T)
-    
-    drag_accel_dust = np.zeros((len(neighbor), 3))
-    for j in range(len(neighbor)):
-    	drag_accel_dust[neighbor[j]] += net_impulse(j)[1].T
-    
-    pressure_accel = -np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
-    #drag is a very small factor, only seems to matter at the solar-system scale
-    drag_accel_gas = np.nan_to_num(((dust_net_impulse.T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
-    drag_accel_dust = -np.nan_to_num(drag_accel_dust)
-    
-    #leapfrog integration
-    old_accel = copy.deepcopy(total_accel)
-    visc_accel = drag_accel_gas + drag_accel_dust + av[0]
-    #want perturbations of artificial viscosity to die out in time
-    visc_accel[np.sum(velocities**2, axis=1)**0.5 - np.sum(visc_accel**2, axis=1)**0.5 * dt < 0] = (-velocities/dt)[np.sum(velocities**2, axis=1)**0.5 - np.sum(visc_accel**2, axis=1)**0.5 * dt < 0]
-    
-    total_accel = grav_accel + pressure_accel + visc_accel
-        
-    points += ((total_accel * (dt)**2)/2.) + velocities * dt
-    if np.shape(total_accel) == np.shape(old_accel):
-    	dv = (total_accel + old_accel)/2. * dt
-    else:
-    	dv = total_accel * dt
-    velocities += dv
-    
-    E_internal = np.nan_to_num(E_internal) + np.nan_to_num(av[1] * dt)
-    T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
-
-    star_ages[(particle_type == 1) & (star_ages > -2)] += dt
-    probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
-    diceroll = np.random.rand(len(probability))
-    particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
-    #this helps ensure that lone SPH particles don't form stars at late times in the simulation
-    #ideally, there is an infinite number of SPH particles, each with infinitesimal density
-    #that only has any real physical effects in conjunction with other particles
-        
-    vel_condition = np.sum(velocities**2, axis=1)
-    
-    xmin = np.percentile(points.T[0][vel_condition < 80000**2], 10)/AU
-    xmax =  np.percentile(points.T[0][vel_condition < 80000**2], 90)/AU
-    ymin =  np.percentile(points.T[1][vel_condition < 80000**2], 10)/AU
-    ymax =  np.percentile(points.T[1][vel_condition < 80000**2], 90)/AU
-    zmin = np.percentile(points.T[2][vel_condition < 80000**2], 10)/AU
-    zmax = np.percentile(points.T[2][vel_condition < 80000**2], 90)/AU
-
-    x_dist = zmax - zmin
-    y_dist = xmax - xmin
-    z_dist = ymax - ymin
-    
-    #dynamic sizing of SPH particles helps ensure
-    #a more accurate simulation once gas is dispersed
-    #and moreover allows us to reduce the number of nominal intersections per particle
-    #which provides a speed boost at the beginning
-    
-    #moreover, this gives us a greater dynamic range of possible densities
-    #to work with, and helps avoid star formation at some arbitrary density floor
-    V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
-    d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
-    d_sq = d**2 
-    sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
-    sizes[particle_type == 2] = d
-    
-    dist_sq = np.sum(points**2,axis=1)
-    '''
-    min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
-    max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    
-    xpts = points.T[1:][0][particle_type == 0]/AU
-    ypts = points.T[1:][1][particle_type == 0]/AU
-    
-    xstars = points.T[1:][0][particle_type == 1]/AU
-    ystars = points.T[1:][1][particle_type == 1]/AU
-    sstars = (mass[particle_type == 1]/solar_mass) * 2.
-    
-    xdust = points.T[1:][0][particle_type == 2]/AU
-    ydust = points.T[1:][1][particle_type == 2]/AU
-    
-    #colors = (f_un.T[5]/np.sum(f_un, axis=1))[particle_type == 0]
-    colors = np.log10(T[particle_type == 0])
-    col_dust = np.log10(T[particle_type == 2])
-    
-    plt.clf()
-    plt.axis('equal')
-    
-    max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
-    min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
-    
-    plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
-    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,7]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100, [0.01, 0.01]), edgecolor='none', alpha=0.1)
-    #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
-    #plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append((m_0/solar_mass) * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
-    plt.colorbar()
-    plt.scatter(xstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], ystars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], c='black', s=sstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)])
-    #plt.scatter(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], c=col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], s = (m_0/solar_mass), alpha=0.25)
-    plt.xlabel('Position (astronomical units)')
-    plt.ylabel('Position (astronomical units)')
-    plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)
-    '''
-    time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
-    dust_temps = np.append(dust_temps, (E_internal/optical_depth)[particle_type == 2])
-    star_frac = np.append(star_frac, [float(np.sum(mass[particle_type == 1]))/np.sum(mass)] * len(T[particle_type == 2]))
-    
-    print ('age=', age/year)
-    #print (d/AU)
-    print ('stars/total = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
-    print ('==================================')
-    
-'''
-utime = np.unique(time_coord)
-dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
-dusts = np.array([np.std(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
-starf = np.array([np.average(star_frac[time_coord == med]) for med in np.unique(time_coord)])
-
-plt.scatter(np.log10(time_coord/year), np.log10(dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
-plt.plot(np.log10(utime/year), np.log10(dustt), c='maroon', alpha=0.5)
-plt.plot(np.log10(utime/year), np.log10(dustt + 2 * dusts), c='maroon', alpha=0.25)
-plt.plot(np.log10(utime/year), np.log10(dustt - 2 * dusts), c='maroon', alpha=0.25)
-
-plt.scatter((time_coord/year), (dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
-plt.plot((utime/year), (dustt), c='maroon', alpha=0.5)
-plt.plot((utime/year), (dustt + 2 * dusts), c='maroon', alpha=0.25)
-plt.plot((utime/year), (dustt - 2 * dusts), c='maroon', alpha=0.25)
-
-
-VARIOUS FORMS OF PLOTTING THAT ONE CAN USE TO REPRESENT THE FINAL STATE OF THE SIMULATION
-
-3D PLOTTING:
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-[ax.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, alpha=0.1)]
-[ax.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, points.T[2][particle_type == 1]/AU, alpha=0.2)]
-[ax.set_xlim3d(-DIAMETER * 10/AU, DIAMETER * 10/AU)]
-[ax.set_ylim3d(-DIAMETER * 10/AU, DIAMETER * 10/AU)]
-[ax.set_zlim3d(-DIAMETER * 10/AU, DIAMETER * 10/AU)]
-[plt.show()]
-
-PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.colorbar()]
-[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.01)]
-[plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
-[plt.axis('equal'), plt.show()]
-plt.xlabel('Position (astronomical units)')
-plt.ylabel('Position (astronomical units)')
-plt.title('Temperature in H II region')
-
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-[plt.colorbar()]
-[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.02)]
-[plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
-[plt.axis('equal'), plt.show()]
-plt.xlabel('Position (astronomical units)')
-plt.ylabel('Position (astronomical units)')
-plt.title('Density in H II region')
-
-INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 10, 3) - 0.5) * (max(ymax, xmax) - min(xmin, ymin))
-#narb = neighbors_arb(points, arb_points)
-darb = density_arb(arb_points)
-tarb = temperature_arb(arb_points)
-#[ax.scatter(points.T[0][particle_type == 0]/AU, points2.T[1][particle_type == 0]/AU, points2.T[2][particle_type == 0]/AU, alpha=0.1)]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=8, alpha=0.7, edgecolor='none'), plt.colorbar()]
-[plt.scatter(points.T[1:][0][particle_type == 1]/AU, points.T[1:][1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1)]
-[plt.axis('equal'), plt.show()]'''
+#SIMULATION IS RUN FROM ANOTHER FILE#
