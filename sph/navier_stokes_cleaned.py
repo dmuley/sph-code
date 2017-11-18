@@ -54,7 +54,7 @@ V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 d_0 = 1e5 * AU
 d_sq = d**2
-specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0]) 
+specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
 	
 #These are "constant functions" which you can just call once and forget. They encapsulate the results
 #of previous literature about dust grain radius distribution and destruction in supernovae.
