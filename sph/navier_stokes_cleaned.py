@@ -45,6 +45,7 @@ f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for specie
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
 supernova_base_release = np.array([[.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025]])
 W6_constant = (3 * np.pi/80)
+critical_density = 1000*amu*10**6 #critical density of star formation
 
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 
@@ -626,7 +627,7 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			comps = f_un[neighbor[j]]
 			composition = f_un[j]
 			dustsize = sizes[neighbor[j]]
-			dens = densities[j]
+			#dens = densities[j]
 			mu_local = mu_array[neighbor[j]]
 			T_local = T[neighbor[j]]
 			
@@ -656,7 +657,7 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			
 			Y_H = min(max(0.5 * np.exp(-4600/sph_temperature), 1e-7),1e-3) * sputtering_yields/max(sputtering_yields)
 			Y_He = min(max(5 * np.exp(-4600/sph_temperature), 1e-6),1e-2) * sputtering_yields/max(sputtering_yields)
-			K_u = sph_composition_density + dust_composition - sph_composition_density[0] * Y_H - sph_composition_density[1] * Y_He
+			K_u = sph_composition_density + dust_composition - sph_composition_density[3] * Y_H - sph_composition_density[4] * Y_He
 			L_u = sph_composition_density + dust_composition * np.exp(K_u * J_u * dt) - sph_composition_density[3] * Y_H - sph_composition_density[4] * Y_He
 			#yields are for ions!
 			
@@ -666,17 +667,21 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			
 			#How to weight the amount of material deposited wherever?
 			effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
-			
-			#should be: (MOLECULES IN DUST SPH PARTICLES/MOLECULES IN GAS SPH PARTICLES)
-			frac_gained = np.sum(dust_composition)/np.sum(sph_composition_density)
 						
 			reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
-			reuptake_weight = np.nan_to_num(effective_mass/np.sum(effective_mass,axis=0))
+			reuptake_weight = effective_mass/np.sum(effective_mass,axis=0)
+			reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
+			reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
 			
-			dest_frac = (((1. - F_sput) * f_un[neighbor[j]]).T * ((w2d > 0) & (particle_type[neighbor[j]] == 2))).T
-			df = np.sum(dest_frac.T * (mass[neighbor[j]]/mu_array[neighbor[j]]), axis=1).T/amu
+			print np.sum(reuptake_weight,axis=0)
 			
-			frac_destruction[neighbor[j]] += (dest_frac.T * (mass[neighbor[j]]/mu_array[neighbor[j]])).T/amu
+			dest_frac = (((1. - F_sput) * f_un[neighbor[j]]).T * (w2d > 0)) * mass[neighbor[j]]/(mu_array[neighbor[j]] * amu)
+			df = np.sum(dest_frac.T, axis=0).T
+			print df * amu/solar_mass
+			
+			#print np.sum(dest_frac) - np.sum(reuptake_weight * df)
+			
+			frac_destruction[neighbor[j]] += dest_frac.T
 			frac_reuptake[neighbor[j]] += reuptake_weight * df
 	
 	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
