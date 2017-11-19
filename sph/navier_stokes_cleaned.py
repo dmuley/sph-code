@@ -76,6 +76,91 @@ def grain_mass(mineral_densities, mrn_constants):
 	
 	return meff
 
+def mixed_CCSN_interpolate():
+    progen_mass = np.array([0,20,25,30,35,40])
+    dust_mass_al = np.array([10**(-4),10**(-3),2*10**(-3),10**(-2),10**(-2)*8,10**(-1)])
+    dust_mass_Fe = np.array([10**(-2),7*10**(-2),7*10**(-2),7*10**(-2),7*10**(-2),7*10**(-2)])
+    dust_mass_MgSiO3 = np.array([2*10**(-2),5*10**(-2),6*10**(-2),9*10**(-3),0,0])
+    dust_mass_Mg2SiO4 = np.array([6*10**(-2),10**(-1)*1.5,2*10**(-1),8*10**(-1),1,1])
+    dust_mass_SiO2 = np.array([4*10**(-2),4*10**(-1),4.1*10**(-1),5*10**(-1),10**(-1)*8,10**(-1)*8])
+    
+    f2 = interp1d(progen_mass, dust_mass_al, kind='linear')
+    f3 = interp1d(progen_mass, dust_mass_Fe, kind='linear')
+    f4 = interp1d(progen_mass, dust_mass_MgSiO3, kind='linear')
+    f5 = interp1d(progen_mass, dust_mass_Mg2SiO4, kind='linear')
+    f6 = interp1d(progen_mass, dust_mass_SiO2, kind='linear')
+    
+    xnew = np.arange(0,40)
+    plt.plot(progen_mass, dust_mass_al, 'o', label = '$Al_2O_3$',color = 'blue')
+    plt.plot(xnew, f2(xnew), '--', label = '$Al_2O_3$', color = 'red')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_Fe, 'x', label = '$Fe_3O_4$', color ='red')
+    plt.plot(xnew, f3(xnew), '--',label = '$Fe_3O_4$',color = 'red')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_MgSiO3, '^',label = '$MgSiO_3$', color = 'green')
+    plt.plot(xnew, f4(xnew), '--',label = '$MgSiO_3$', color = 'green')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_Mg2SiO4, 'x',color = 'brown')
+    plt.plot(xnew, f5(xnew), '--',label = '$Mg_2SiO_4$', color = 'brown')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_SiO2, 'o',label = '$SiO_2$',color = 'cyan')
+    plt.plot(xnew, f6(xnew), '--', label = '$SiO_2$', color = 'cyan')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    
+    pylab.legend(loc='upper left')
+    plt.xlabel("Progenitor Mass ($M_\odot$)")                        
+    plt.ylabel("$M_{dust}$ ($M_\odot$)")
+    plt.title("CCSNe (mixed)")
+    plt.show()
+
+def mixed_PISN_interpolate():
+    progen_mass = np.array([140,170,200,225,250,260])
+    dust_mass_al = np.array([7*10**(-2),6*10**(-2),3*10**(-2),10**(-2),0,0])
+    dust_mass_Fe = np.array([0,4,10,12,15,20])
+    dust_mass_MgSiO3 = np.array([2,6,10,12,15,20])
+    dust_mass_Mg2SiO4 = np.array([7,4,2,0,0,0])
+    dust_mass_SiO2 = np.array([5,20,30,55,60,70])
+    
+    f2 = interp1d(progen_mass, dust_mass_al, kind='linear')
+    f3 = interp1d(progen_mass, dust_mass_Fe, kind='linear')
+    f4 = interp1d(progen_mass, dust_mass_MgSiO3, kind='linear')
+    f5 = interp1d(progen_mass, dust_mass_Mg2SiO4, kind='linear')
+    f6 = interp1d(progen_mass, dust_mass_SiO2, kind='linear')
+    
+
+    xnew = np.arange(140,260)
+    plt.plot(progen_mass, dust_mass_al, 'o', label = '$Al_2O_3$',color = 'blue')
+    plt.plot(xnew, f2(xnew), '--', label = '$Al_2O_3$', color = 'red')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_Fe, 'x', label = '$Fe_3O_4$', color ='red')
+    plt.plot(xnew, f3(xnew), '--',label = '$Fe_3O_4$',color = 'red')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_MgSiO3, '^',label = '$MgSiO_3$', color = 'green')
+    plt.plot(xnew, f4(xnew), '--',label = '$MgSiO_3$', color = 'green')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_Mg2SiO4, 'x',color = 'brown')
+    plt.plot(xnew, f5(xnew), '--',label = '$Mg_2SiO_4$', color = 'brown')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    plt.plot(progen_mass, dust_mass_SiO2, 'o',label = '$SiO_2$',color = 'cyan')
+    plt.plot(xnew, f6(xnew), '--', label = '$SiO_2$', color = 'cyan')
+    plt.legend(['data', 'linear'], loc='best')
+    
+    
+    pylab.legend(loc='upper left')
+    plt.xlabel("Progenitor Mass ($M_\odot$)")                        
+    plt.ylabel("$M_{dust}$ ($M_\odot$)")
+    plt.title("PISNe (mixed)")
+    plt.show()
+	
 def interpolation_functions(): #interpolation of carbon and silicon destruction efficiency, returns the calculated e_c and e_s
     #velocities here in km/s
     v_s = np.array([0., 50., 75., 100., 125., 150., 175., 200.])
