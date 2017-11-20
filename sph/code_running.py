@@ -206,7 +206,29 @@ while (age < MAX_AGE):
         optical_depth = mass/(m_h * mu_array) * cross_array  
     
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition 
-        
+    
+    chems = nsc.chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
+    supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)
+    reduction = -chems[0] - supd[0]; reduction[reduction < -0.99] = -0.99; reduction[reduction > 0.99] = 0.99
+    increase = chems[1] + supd[1]; increase[increase < -0.99] = -0.99; increase[increase > 0.99] = 0.99
+    
+    #mass_reduction = -np.sum(np.sum((mass/(mu_array) * reduction.T).T * mu_specie,axis=1))
+    #mass_increase = np.sum(np.sum((mass/(mu_array) * increase.T).T * mu_specie,axis=1))
+    
+    #increase *= mass_reduction/mass_increase
+    delta_n = (reduction + increase).astype('longdouble')
+    mass_change = np.sum((mass/(mu_array) * delta_n.T).T * mu_specie,axis=1)
+    print np.sum(mass_change)/solar_mass
+    f_un += delta_n
+    f_un = np.abs(f_un)
+    f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
+    mass += mass_change
+    mass[mass < 0.001 * solar_mass] = 0.001 * solar_mass
+    mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+    gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+    cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
+    optical_depth = mass/(m_h * mu_array) * cross_array  
+    
     neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
     bg = nsc.bin_generator(mass, points, [4, 4, 4]); age += dt

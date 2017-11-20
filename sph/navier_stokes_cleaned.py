@@ -776,8 +776,8 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 	
 	frac_destruction = (frac_destruction.T/(mass/(mu_array))).T
 	frac_reuptake = (frac_reuptake.T/(mass/(mu_array))).T
-	#frac_destruction[frac_destruction > 0.99] = 0.99
-	#frac_reuptake[frac_reuptake < -0.99] = -0.99
+	frac_destruction[frac_destruction > 0.99] = 0.99
+	frac_reuptake[frac_reuptake < -0.99] = -0.99
 	
 	return frac_destruction, frac_reuptake
 
