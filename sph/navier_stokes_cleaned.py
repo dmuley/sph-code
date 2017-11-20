@@ -482,7 +482,7 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
     dust_masses = mass[supernova_pos] * drsum/trsum
     gas_masses = mass[supernova_pos] * grsum/trsum
     
-    supernova_dust_len = int((np.sum(dust_masses)/solar_mass - 2.)/0.05)
+    supernova_dust_len = int((np.sum(dust_masses)/solar_mass - 2. * np.sum(dust_masses)/np.sum(dust_masses + gas_masses))/0.05)
     print supernova_dust_len
     
     dust_comps = (np.vstack([dust_release] * supernova_dust_len).T).T
