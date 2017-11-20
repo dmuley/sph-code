@@ -44,7 +44,7 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 0.75e6 * AU
+DIAMETER = 0.5e6 * AU
 N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
@@ -94,8 +94,10 @@ particle_type[dust_fracs == False] = 2
 fgas = np.array([specie_fraction_array] * N_PARTICLES)
 fdust = np.array([dust_base[0]] * N_PARTICLES)
 f_un = (fgas.T * dust_fracs + fdust.T * (1 - dust_fracs)).T
+f_un = f_un.astype('longdouble')
 mass[particle_type == 2] = DUST_MASS * solar_mass
 sizes[particle_type == 2] = d
+mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
 base_sfr = 0.0057 
@@ -130,7 +132,8 @@ plt.ion()
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = min(dt_0, ct)
+    dt = max(10000 * year, min(dt_0, ct))
+    nsc.dt = dt
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos, mu_array, T)
@@ -148,7 +151,9 @@ while (age < MAX_AGE):
         	E_internal[particle_type == 0] *= np.nan_to_num((((sb * optd * W6_integral**(-1) * dt/N_RADIATIVE)/(N_PART * gamma_array * k)) * T**3 + 1.)**(-1./3.))[particle_type == 0]
         	E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/N_RADIATIVE
         	E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
+        	E_internal[E_internal > 1e7 * (gamma_array * mass * k)/(mu_array * m_h)] = (1e7 * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > 1e7 * (gamma_array * mass * k)/(mu_array * m_h)]
         	T[T < t_cmb] = t_cmb
+        	T[T >= 1e7] = 1e7
         	
         	f_un = ((N_RADIATIVE - nrad) * f_un0 + nrad * rh[1])/N_RADIATIVE	
         	mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -173,7 +178,7 @@ while (age < MAX_AGE):
         	for ku in supernova_pos:
         		impulse, indices = nsc.supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
-			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = supernova_explosion()
+			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = supernova_explosion(mass,points,velocities,E_internal,supernova_pos)
 			E_internal[supernova_pos] = new_eint_stars
 			f_un[supernova_pos] = star_comps
 			mass[supernova_pos] = stars_mass
@@ -198,15 +203,15 @@ while (age < MAX_AGE):
         mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
         gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
         cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-        optical_depth = mass/(m_h * mu_array) * cross_array
+        optical_depth = mass/(m_h * mu_array) * cross_array  
+    
+    f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition 
         
     neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
     bg = nsc.bin_generator(mass, points, [4, 4, 4]); age += dt
     com = bg[0] #center of masses of each bin
     grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
-    
-    f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
     
     densities = nsc.density(points,mass,particle_type,neighbor)
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
@@ -229,7 +234,9 @@ while (age < MAX_AGE):
     visc_accel[np.sum(velocities**2, axis=1)**0.5 - np.sum(visc_accel**2, axis=1)**0.5 * dt < 0] = (-velocities/dt)[np.sum(velocities**2, axis=1)**0.5 - np.sum(visc_accel**2, axis=1)**0.5 * dt < 0]
     
     total_accel = grav_accel + pressure_accel + visc_accel
-        
+    
+    #removed sputtering until numerical errors can be eliminated
+                
     points += ((total_accel * (dt)**2)/2.) + velocities * dt
     if np.shape(total_accel) == np.shape(old_accel):
     	dv = (total_accel + old_accel)/2. * dt

@@ -46,6 +46,7 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 supernova_base_release = np.array([[.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025]])
 W6_constant = (3 * np.pi/80)
 critical_density = 1000*amu*10**6 #critical density of star formation
+crit_mass = 0.0001 * solar_mass #setting a minimum dust mass to help avoid numerical errors!
 
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 
@@ -463,7 +464,7 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 	
 	return visc_accel, visc_heat
     
-def supernova_explosion():
+def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
     #should make parametric later, and should include Nozawa 03 material
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
     total_release = supernova_base_release
@@ -678,7 +679,7 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				dest_fracs = (np.array([u(vels/1000.) for u in intf]) * np.nan_to_num(rho/rho_base)).T
 				#Distributing dust destruction over all intersecting dust particles
 				final_fracs = dens/critical_density * dest_fracs.T #fraction destroyed
-				final_fracs[final_fracs >= 1.] = 1.
+				final_fracs[final_fracs >= 0.99] = 0.99
 				
 				N_dust = mass[neighbor[j]]/(mu_array[neighbor[j]] * amu)
 				
@@ -688,8 +689,8 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				refractory_fracs = np.sum(dust_lost,axis=0)
 				#print np.nan_to_num(dust_lost/refractory_fracs)
 				#Dust lost in each dust particle, which is taken up as refractory gas by the gas particle
-				frac_destruction[neighbor[j]] += dust_lost
-				frac_reuptake[j] += refractory_fracs
+				frac_destruction[neighbor[j]] += dust_lost * (mass[j] > crit_mass)
+				frac_reuptake[j] += refractory_fracs * (mass[j] > crit_mass)
 				
 	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
 	frac_reuptake = (frac_reuptake.T/(mass/(mu_array * amu))).T
@@ -701,8 +702,8 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 	#Destruction fraction here can be negative if dust is being accreted!
 	#And you can experience a situation where dust is being sputtered from some particles
 	#while being accreted from others
-	frac_destruction = copy.deepcopy(f_un * 0.)
-	frac_reuptake = copy.deepcopy(f_un * 0.)
+	frac_destruction = copy.deepcopy(f_un * 0.).astype('longdouble')
+	frac_reuptake = copy.deepcopy(f_un * 0.).astype('longdouble')
 	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
 	for j in jarr:
 		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0):
@@ -749,6 +750,8 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			F_sput = K_u/L_u
 			F_sput[np.isnan(F_sput)] = 1.
 			F_sput *= np.exp(K_u * J_u * dt)
+			#F_sput[F_sput < 0.01] = 0.01
+			#print F_sput
 			
 			#How to weight the amount of material deposited wherever?
 			effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
@@ -758,19 +761,23 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
 			reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
 			
-			print np.sum(reuptake_weight,axis=0)
+			#print np.sum(reuptake_weight,axis=0)
 			
-			dest_frac = (((1. - F_sput) * f_un[neighbor[j]]).T * (w2d > 0)) * mass[neighbor[j]]/(mu_array[neighbor[j]] * amu)
+			dest_frac = (((1. - F_sput) * f_un[neighbor[j]]).T * (w2d > 0)) * mass[neighbor[j]]/(mu_array[neighbor[j]])
+			dest_frac[dest_frac > 0.99] = 0.99
 			df = np.sum(dest_frac.T, axis=0).T
-			print df * amu/solar_mass
+			#print df * amu/solar_mass
 			
-			#print np.sum(dest_frac) - np.sum(reuptake_weight * df)
+			fracd = dest_frac.T * (mass[j] > crit_mass)
+			fracr = reuptake_weight * df * (mass[j] > crit_mass)
 			
-			frac_destruction[neighbor[j]] += dest_frac.T
-			frac_reuptake[neighbor[j]] += reuptake_weight * df
+			frac_destruction[neighbor[j]] += fracd
+			frac_reuptake[neighbor[j]] += fracr
 	
-	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
-	frac_reuptake = (frac_reuptake.T/(mass/(mu_array * amu))).T
+	frac_destruction = (frac_destruction.T/(mass/(mu_array))).T
+	frac_reuptake = (frac_reuptake.T/(mass/(mu_array))).T
+	#frac_destruction[frac_destruction > 0.99] = 0.99
+	#frac_reuptake[frac_reuptake < -0.99] = -0.99
 	
 	return frac_destruction, frac_reuptake
 
