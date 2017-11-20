@@ -51,10 +51,12 @@ V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 nsc.d = d
 d_sq = d**2
+d_0 = 1e5 * AU
+nsc.d_0 = 1e5 * AU
 dt = dt_0
 nsc.dt = dt
 nsc.dt_0 = dt_0
-DUST_FRAC = 0.050000
+DUST_FRAC = 0.10000
 DUST_MASS = 0.05
 N_RADIATIVE = 100
 MAX_AGE = 4e7 * year
@@ -178,7 +180,7 @@ while (age < MAX_AGE):
         	for ku in supernova_pos:
         		impulse, indices = nsc.supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
-			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = supernova_explosion(mass,points,velocities,E_internal,supernova_pos)
+			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos)
 			E_internal[supernova_pos] = new_eint_stars
 			f_un[supernova_pos] = star_comps
 			mass[supernova_pos] = stars_mass
@@ -206,19 +208,23 @@ while (age < MAX_AGE):
         optical_depth = mass/(m_h * mu_array) * cross_array  
     
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition 
+    densities = nsc.density(points,mass,particle_type,neighbor)
+    dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
+    num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     
     chems = nsc.chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
     supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)
-    reduction = -chems[0] - supd[0]; reduction[reduction < -0.99] = -0.99; reduction[reduction > 0.99] = 0.99
-    increase = chems[1] + supd[1]; increase[increase < -0.99] = -0.99; increase[increase > 0.99] = 0.99
+    reduction = -chems[0] - supd[0]; reduction[reduction < -0.99 * f_un] = -0.99 * f_un[reduction < -0.99 * f_un]
+    increase = chems[1] + supd[1]; increase[increase < -0.99 * f_un] = -0.99 * f_un[increase < -0.99 * f_un]
     
-    #mass_reduction = -np.sum(np.sum((mass/(mu_array) * reduction.T).T * mu_specie,axis=1))
-    #mass_increase = np.sum(np.sum((mass/(mu_array) * increase.T).T * mu_specie,axis=1))
+    mass_reduction = -np.sum(np.sum((mass/(mu_array) * reduction.T).T * mu_specie,axis=1))
+    mass_increase = np.sum(np.sum((mass/(mu_array) * increase.T).T * mu_specie,axis=1))
     
-    #increase *= mass_reduction/mass_increase
+    increase *= mass_reduction/mass_increase
     delta_n = (reduction + increase).astype('longdouble')
     mass_change = np.sum((mass/(mu_array) * delta_n.T).T * mu_specie,axis=1)
-    print np.sum(mass_change)/solar_mass
+    print (str(np.sum(mass_change)/solar_mass) + " solar masses")
+    print (str(np.sum(mass)/solar_mass) + " solar masses")
     f_un += delta_n
     f_un = np.abs(f_un)
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
@@ -235,11 +241,11 @@ while (age < MAX_AGE):
     com = bg[0] #center of masses of each bin
     grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
     
-    densities = nsc.density(points,mass,particle_type,neighbor)
-    dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
+    #densities = nsc.density(points,mass,particle_type,neighbor)
+    #dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
     #viscous force causing dust to accelerate/decelerate along with gas
     viscous_drag = nsc.net_impulse(points,mass,sizes,velocities,particle_type,neighbor,f_un)
-    num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
+    #num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
     #artificial viscosity to ensure proper blast wave
     av = nsc.artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array)
@@ -300,7 +306,7 @@ while (age < MAX_AGE):
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
     d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2 
-    sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
+    sizes[particle_type == 0] = (np.abs(mass[particle_type == 0])/m_0)**(1./3.) * d
     sizes[particle_type == 2] = d
     
     dist_sq = np.sum(points**2,axis=1)

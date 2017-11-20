@@ -695,8 +695,8 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 	frac_destruction = (frac_destruction.T/(mass/(mu_array * amu))).T
 	frac_reuptake = (frac_reuptake.T/(mass/(mu_array * amu))).T
 				
-	return frac_destruction, frac_reuptake								    
-
+	return frac_destruction, frac_reuptake			
+			
 def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
 	#Add to (or subtract from) f_un, find out the change in mass, then normalize
 	#Destruction fraction here can be negative if dust is being accreted!
@@ -704,16 +704,15 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 	#while being accreted from others
 	frac_destruction = copy.deepcopy(f_un * 0.).astype('longdouble')
 	frac_reuptake = copy.deepcopy(f_un * 0.).astype('longdouble')
-	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
+	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 2]
 	for j in jarr:
-		if (np.sum(particle_type[np.array(neighbor[j])] == 2) > 0):
+		if (np.sum(particle_type[np.array(neighbor[j])] == 0) > 0):
 			m = mass[neighbor[j]]
 			x = points[neighbor[j]]
 			x_0 = points[j]
 			comps = f_un[neighbor[j]]
 			composition = f_un[j]
 			dustsize = sizes[neighbor[j]]
-			#dens = densities[j]
 			mu_local = mu_array[neighbor[j]]
 			T_local = T[neighbor[j]]
 			
@@ -730,54 +729,55 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
 			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
 			
-			sph_indiv_composition = (w2g_num * comps.T).T * mu_specie * amu
-			sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie * amu #SPH density by composition of GAS
+			if np.sum(w2g_num) > 0:
+				sph_indiv_composition = (w2g_num * comps.T).T * mu_specie * amu
+				sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie * amu #SPH density by composition of GAS
 			
-			sph_temperature = np.sum((w2g_num * T_local))/np.sum(w2g_num)
+				sph_temperature = np.sum((w2g_num * T_local))/np.sum(w2g_num)
 			
-			dust_indiv_composition = (w2d * comps.T).T * mu_specie * amu
-			dust_composition = np.sum((w2d * comps.T).T,axis=0) * mu_specie * amu #SPH density of DUST
+				dust_indiv_composition = (w2d * comps.T).T * mu_specie * amu
+				dust_composition = np.sum((w2d * comps.T).T,axis=0) * mu_specie * amu #SPH density of DUST
 			
-			J_u = -np.diff(mrn_constants**-0.5)/np.diff(mrn_constants**0.5)/(3 * mineral_densities)
-			J_u *= (k * sph_temperature/(2 * np.pi * mu_specie * amu))**0.5
+				J_u = -np.diff(mrn_constants**-0.5)/np.diff(mrn_constants**0.5)/(3 * mineral_densities)
+				J_u *= (k * sph_temperature/(2 * np.pi * mu_specie * amu))**0.5
 			
-			Y_H = min(max(0.5 * np.exp(-4600/sph_temperature), 1e-7),1e-3) * sputtering_yields/max(sputtering_yields)
-			Y_He = min(max(5 * np.exp(-4600/sph_temperature), 1e-6),1e-2) * sputtering_yields/max(sputtering_yields)
-			K_u = sph_composition_density + dust_composition - sph_composition_density[3] * Y_H - sph_composition_density[4] * Y_He
-			L_u = sph_composition_density + dust_composition * np.exp(K_u * J_u * dt) - sph_composition_density[3] * Y_H - sph_composition_density[4] * Y_He
-			#yields are for ions!
+				Y_H = min(max(0.5 * np.exp(-4600/sph_temperature), 1e-7),1e-3) * sputtering_yields/max(sputtering_yields)
+				Y_He = min(max(5 * np.exp(-4600/sph_temperature), 1e-6),1e-2) * sputtering_yields/max(sputtering_yields)
+				K_u = sph_composition_density + dust_composition - sph_composition_density[3] * Y_H - sph_composition_density[4] * Y_He
+				L_u = sph_composition_density + dust_composition * np.exp(K_u * J_u * dt) - sph_composition_density[3] * Y_H - sph_composition_density[4] * Y_He
+				#yields are for ions!
 			
-			F_sput = K_u/L_u
-			F_sput[np.isnan(F_sput)] = 1.
-			F_sput *= np.exp(K_u * J_u * dt)
-			#F_sput[F_sput < 0.01] = 0.01
-			#print F_sput
+				F_sput = K_u/L_u
+				F_sput[np.isnan(F_sput)] = 1.
+				F_sput *= np.exp(K_u * J_u * dt)
+				print F_sput
+				#F_sput[F_sput < 0.01] = 0.01
+				#print F_sput
 			
-			#How to weight the amount of material deposited wherever?
-			effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
+				#How to weight the amount of material deposited wherever?
+				#effective_mass = sph_indiv_composition
+				effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
 						
-			reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
-			reuptake_weight = effective_mass/np.sum(effective_mass,axis=0)
-			reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
-			reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
+				reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
+				reuptake_weight = effective_mass/np.sum(effective_mass,axis=0)
+				reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
+				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
 			
-			#print np.sum(reuptake_weight,axis=0)
-			
-			dest_frac = (((1. - F_sput) * f_un[neighbor[j]]).T * (w2d > 0)) * mass[neighbor[j]]/(mu_array[neighbor[j]])
-			dest_frac[dest_frac > 0.99] = 0.99
-			df = np.sum(dest_frac.T, axis=0).T
-			#print df * amu/solar_mass
-			
-			fracd = dest_frac.T * (mass[j] > crit_mass)
-			fracr = reuptake_weight * df * (mass[j] > crit_mass)
-			
-			frac_destruction[neighbor[j]] += fracd
-			frac_reuptake[neighbor[j]] += fracr
+				#print np.sum(reuptake_weight,axis=0)
+				dest_frac = ((1. - F_sput) * f_un[neighbor[j]]).T * (w2d > 0) * mass[neighbor[j]]/(mu_array[neighbor[j]])
+				df = np.sum(dest_frac.T, axis=0).T
+				#print df * amu/solar_mass
+
+				fracd = dest_frac.T * (mass[j] > crit_mass)
+				fracr = reuptake_weight * df * (mass[j] > crit_mass)
+
+				frac_destruction[neighbor[j]] += fracd
+				frac_reuptake[neighbor[j]] += fracr
 	
 	frac_destruction = (frac_destruction.T/(mass/(mu_array))).T
 	frac_reuptake = (frac_reuptake.T/(mass/(mu_array))).T
-	frac_destruction[frac_destruction > 0.99] = 0.99
-	frac_reuptake[frac_reuptake < -0.99] = -0.99
+	#frac_destruction[frac_destruction > 0.99 * f_un] = 0.99 * f_un[frac_destruction > 0.99 * f_un]
+	#frac_reuptake[frac_reuptake < -0.99 * f_un] = -0.99 * f_un[frac_reuptake < -0.99 * f_un]
 	
 	return frac_destruction, frac_reuptake
 
