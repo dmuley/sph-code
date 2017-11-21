@@ -132,6 +132,9 @@ print("Simulation time: " + str(MAX_AGE/year) + " y")
 print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
+#simulating supernova asap
+particle_type[mass == max(mass)] = 1
+
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
@@ -178,9 +181,11 @@ while (age < MAX_AGE):
         print (len(supernova_pos))
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
+        	print('beginning supernova impulse')
         	for ku in supernova_pos:
         		impulse, indices = nsc.supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
+			print('end supernova impulse')
 			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos)
 			E_internal[supernova_pos] = new_eint_stars
 			f_un[supernova_pos] = star_comps
@@ -213,29 +218,28 @@ while (age < MAX_AGE):
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     
-    chems = nsc.chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
-    supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)
-    reduction = -chems[0] - supd[0]; reduction[reduction < -0.99 * f_un] = -0.99 * f_un[reduction < -0.99 * f_un]
-    increase = chems[1] + supd[1]; increase[increase < -0.99 * f_un] = -0.99 * f_un[increase < -0.99 * f_un]
+    chems = nsc.chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
+    f_un = chems[1]; mass = chems[0]
+    supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)    
+    mass_reduction = -np.sum(np.sum((mass/(mu_array) * supd[0].T).T * mu_specie,axis=1))
+    mass_increase = np.sum(np.sum((mass/(mu_array) * supd[1].T).T * mu_specie,axis=1))
     
-    mass_reduction = -np.sum(np.sum((mass/(mu_array) * reduction.T).T * mu_specie,axis=1))
-    mass_increase = np.sum(np.sum((mass/(mu_array) * increase.T).T * mu_specie,axis=1))
-    
-    increase *= mass_reduction/mass_increase
-    delta_n = (reduction + increase).astype('longdouble')
+    #increase *= mass_reduction/mass_increase
+    delta_n = np.nan_to_num(-supd[0] + supd[1]).astype('longdouble')
     mass_change = np.sum((mass/(mu_array) * delta_n.T).T * mu_specie,axis=1)
     print (str(np.sum(mass_change)/solar_mass) + " solar masses")
     print (str(np.sum(mass)/solar_mass) + " solar masses")
     f_un += delta_n
-    f_un = np.abs(f_un)
+    #f_un = np.abs(f_un)
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
     mass += mass_change
     mass[mass < 0.001 * solar_mass] = 0.001 * solar_mass
     mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
     gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-    optical_depth = mass/(m_h * mu_array) * cross_array  
-    
+    optical_depth = mass/(m_h * mu_array) * cross_array
+    sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
+    sizes[particle_type == 2] = d
     neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
     bg = nsc.bin_generator(mass, points, [4, 4, 4]); age += dt

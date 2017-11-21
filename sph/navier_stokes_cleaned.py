@@ -433,10 +433,10 @@ def crossing_time(neighbor, velocities, sizes, particle_type):
 	max_relvel[neighbor_lengths > 0] = np.array([np.max(np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1))**0.5 for j in j_range[neighbor_lengths]])
 	
 	crossing_time = np.nan_to_num(sizes/max_relvel) * (particle_type == 0)
-	return min(crossing_time[crossing_time != 0])
+	return np.average(crossing_time) + dt_0/10.
 
 def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array):
-	css_base = (gamma_array * k * T/(mu_array * amu))**0.5
+	css_base = np.nan_to_num((gamma_array * k * T/(mu_array * amu))**0.5)
 	visc_accel = np.zeros((len(points),3))
 	visc_heat = np.zeros(len(points))
 	for j in np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]:
@@ -697,6 +697,76 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				
 	return frac_destruction, frac_reuptake			
 			
+def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
+	num_particles = (f_un.T * (mass/mu_array)).T
+	jarr = np.arange(len(neighbor))[particle_type == 2]
+	for j in jarr:
+		if (np.sum(particle_type[neighbor[j]] == 0) > 0):
+			m = mass[neighbor[j]]
+			x = points[neighbor[j]]
+			x_0 = points[j]
+			comps = f_un[neighbor[j]]
+			dustsize = sizes[neighbor[j]]
+			mu_local = mu_array[neighbor[j]]
+			T_local = T[neighbor[j]]
+			
+			w2g_num = Weigh2(x, x_0, m, d)/(mu_local)
+			w2d = Weigh2_dust(x, x_0, m, d, dustsize)/(mu_local)
+			
+			rel_w2g = Weigh2(x, x_0, m, d)/Weigh2(x, x, m, d)
+			rel_w2d = Weigh2_dust(x, x_0, m, d, dustsize)/Weigh2_dust(x, x, m, d, dustsize)
+			
+			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
+			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
+			
+			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
+			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
+			if np.sum(w2g_num) > 0:
+				sph_indiv_composition = (w2g_num * comps.T).T * mu_specie
+				sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie #SPH density by composition of GAS
+			
+				sph_temperature = np.sum((w2g_num * T_local))/np.sum(w2g_num)
+			
+				dust_indiv_composition = (w2d * comps.T).T * mu_specie
+				dust_composition = np.sum((w2d * comps.T).T,axis=0) * mu_specie #SPH density of DUST
+			
+				J_u = -np.diff(mrn_constants**-0.5)/np.diff(mrn_constants**0.5)/(3 * mineral_densities)
+				J_u *= (k * sph_temperature/(2 * np.pi * mu_specie * amu))**0.5
+			
+				Y_H = min(max(0.5 * np.exp(-4600/sph_temperature), 1e-7),1e-3) * sputtering_yields/max(sputtering_yields)
+				Y_He = min(max(5 * np.exp(-4600/sph_temperature), 1e-6),1e-2) * sputtering_yields/max(sputtering_yields)
+				#cannot sputter more mass than exists!
+				sput_y = sph_composition_density[3] * Y_H - sph_composition_density[4] * Y_He
+				sput_y[sput_y > dust_composition] = dust_composition[sput_y > dust_composition]
+				K_u = sph_composition_density + dust_composition - sput_y
+				
+				L_u = sph_composition_density + dust_composition * np.exp(K_u * J_u * dt) - sput_y
+				#yields are for ions!
+			
+				F_sput = K_u/L_u
+				F_sput[np.isnan(F_sput)] = 1.
+				F_sput *= np.exp(K_u * J_u * dt)
+				
+				print F_sput - 1
+				#effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
+				effective_mass = sph_indiv_composition
+						
+				reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
+				reuptake_weight = effective_mass/np.sum(effective_mass,axis=0)
+				reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
+				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
+				
+				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
+				particle_loss = np.sum(new_particles, axis=0) * reuptake_weight
+				
+				num_particles[neighbor[j]] += new_particles - particle_loss
+	
+	mass_new = np.sum(num_particles * mu_specie,axis=1)
+	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T
+	
+	return mass_new, f_un_new
+			
+			
 def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
 	#Add to (or subtract from) f_un, find out the change in mass, then normalize
 	#Destruction fraction here can be negative if dust is being accreted!
@@ -728,7 +798,6 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 			
 			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
 			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
-			
 			if np.sum(w2g_num) > 0:
 				sph_indiv_composition = (w2g_num * comps.T).T * mu_specie * amu
 				sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie * amu #SPH density by composition of GAS
@@ -750,7 +819,7 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 				F_sput = K_u/L_u
 				F_sput[np.isnan(F_sput)] = 1.
 				F_sput *= np.exp(K_u * J_u * dt)
-				print F_sput
+				#print F_sput
 				#F_sput[F_sput < 0.01] = 0.01
 				#print F_sput
 			
@@ -780,7 +849,6 @@ def chemisputtering(points, neighbor, mass, f_un, mu_array, sizes, T, particle_t
 	#frac_reuptake[frac_reuptake < -0.99 * f_un] = -0.99 * f_un[frac_reuptake < -0.99 * f_un]
 	
 	return frac_destruction, frac_reuptake
-
 #### ARBITRARY INTERPOLATIONS #####
 #To be used after all methods are verified to obtain very high-resolution
 #graphs for publication. Extremely slow and time-consuming, so should not
