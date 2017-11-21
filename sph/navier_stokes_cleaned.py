@@ -709,6 +709,7 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 			dustsize = sizes[neighbor[j]]
 			mu_local = mu_array[neighbor[j]]
 			T_local = T[neighbor[j]]
+			T_local[particle_type[neighbor[j]] == 1] = 2.73
 			
 			w2g_num = Weigh2(x, x_0, m, d)/(mu_local)
 			w2d = Weigh2_dust(x, x_0, m, d, dustsize)/(mu_local)
