@@ -46,7 +46,7 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 0.3e6 * AU
+DIAMETER = 0.6e6 * AU
 N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 200
 V = (DIAMETER)**3
@@ -148,6 +148,8 @@ while (age < MAX_AGE):
     velocities[points < -1e11 * AU] = -0.1
     points = np.nan_to_num(points)
     velocities = np.nan_to_num(velocities)
+    print('=====================================================================')
+    print("Negative compositions before radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos, mu_array, T)
@@ -182,22 +184,21 @@ while (age < MAX_AGE):
         	
         f_un = rh[1]
         velocities[particle_type != 1] += rh[2]
-        
+        print("Negative compositions after radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
         #on supernova event--- add new dust particle (particle_type == 2)
-        #in future, want to spew multiple low-mass dust particles
-        #rather than one single very large one
         
-        print (np.max(star_ages/nsc.luminosity_relation(mass/nsc.solar_mass, np.ones(len(mass)), 1)/(year * 1e10)))
-        print (np.max(mass[particle_type == 1]/solar_mass))
+        max_rel_age = np.max(star_ages/nsc.luminosity_relation(mass/nsc.solar_mass, np.ones(len(mass)), 1)/(year * 1e10))
+        print ("Maximum relative stellar age: " + str(max_rel_age))
+        print ("Maximum stellar mass: " + str(np.max(mass[particle_type == 1]/solar_mass)) + " solar masses")
         
         print (len(supernova_pos))
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
-        	print('beginning supernova impulse')
+        	#print('beginning supernova impulse')
         	for ku in supernova_pos:
         		impulse, indices = nsc.supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
-			print('end supernova impulse')
+			#print('end supernova impulse')
 			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos)
 			particle_type = np.concatenate((particle_type, newdusttype, newgastype))
 			E_internal[supernova_pos] = new_eint_stars
@@ -222,7 +223,8 @@ while (age < MAX_AGE):
         mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
         gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
         cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-        optical_depth = mass/(m_h * mu_array) * cross_array  
+        optical_depth = mass/(m_h * mu_array) * cross_array
+        print("Negative compositions after supernova: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
     
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition 
     densities = nsc.density(points,mass,particle_type,neighbor)
@@ -234,15 +236,15 @@ while (age < MAX_AGE):
     supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)    
     mass_reduction = -np.sum(np.sum((mass/(mu_array) * supd[0].T).T * mu_specie,axis=1))
     mass_increase = np.sum(np.sum((mass/(mu_array) * supd[1].T).T * mu_specie,axis=1))
-    
+    print("Negative compositions after chemisputtering: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
     #increase *= mass_reduction/mass_increase
     delta_n = (np.nan_to_num(-supd[0] + supd[1]).astype('longdouble').T * (mass > 0.001 * solar_mass)).T
     mass_change = np.nan_to_num(np.sum((mass/(mu_array) * delta_n.T).T * mu_specie,axis=1)) * (mass > 0.001 * solar_mass)
-    print (str(np.sum(mass_change)/solar_mass) + " solar masses")
-    print (str(np.sum(mass)/solar_mass) + " solar masses")
+    print ("Mass error from sputtering: " + str(np.sum(mass_change)/solar_mass) + " solar masses")
+    print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
     f_un += delta_n
     #f_un = np.abs(f_un)
-    f_un[np.isnan(f_un)] = 1e-15
+    f_un[(np.isnan(f_un))] = 1e-15
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
     mass += mass_change
     #mass = np.nan_to_num(mass)
@@ -253,6 +255,7 @@ while (age < MAX_AGE):
     optical_depth = mass/(m_h * mu_array) * cross_array
     sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
     sizes[particle_type == 2] = d
+    print("Negative compositions after supernova sputtering: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
 
     neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
@@ -295,7 +298,7 @@ while (age < MAX_AGE):
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
 
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
-    print star_ages[(particle_type == 1)]/year
+    #print star_ages[(particle_type == 1)]/year
     probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
     diceroll = np.random.rand(len(probability))
     particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
@@ -370,10 +373,14 @@ while (age < MAX_AGE):
     dust_temps = np.append(dust_temps, (E_internal/optical_depth)[particle_type == 2])
     star_frac = np.append(star_frac, [float(np.sum(mass[particle_type == 1]))/np.sum(mass)] * len(T[particle_type == 2]))
     
+    star_massfrac = float(np.sum(mass[particle_type == 1]))/np.sum(mass)
+    star_numfrac = np.sum(float(len(particle_type[particle_type == 1]))/float(len(particle_type)))
+    
     print ('age=', age/year)
     #print (d/AU)
-    print ('stars/total = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
-    print ('==================================')
+    print ('Stellar mass/total mass = ', float(np.sum(mass[particle_type == 1]))/np.sum(mass))
+    print ('(stellar mass/total mass)/(Stellar number/total number)' + str(star_massfrac/star_numfrac))
+    print ('=====================================================================')
     
 '''
 utime = np.unique(time_coord)

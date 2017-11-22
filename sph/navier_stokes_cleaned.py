@@ -210,7 +210,7 @@ def luminosity_relation(base_imf, imf, lifetime=0):
     
     luminosity_relation = coeff_luminosity * base_imf**exp_luminosity
     lifetime_relation = coeff_luminosity**(-1) * base_imf**(1 - exp_luminosity)
-    lifetime_relation[lifetime_relation < 2.6e-4] = 2.6e-4
+    lifetime_relation[lifetime_relation < 3.6e-4] = 3.6e-4
     #per Murray (2011), http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta,
     #stars have a minimum lifespan of about 3.6 Myr
     if lifetime == 0:
@@ -608,7 +608,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     frac_destroyed_1[frac_destroyed_1 > 1.] = 1.
     frac_destroyed_1[frac_destroyed_1 < 0.00001] = 0.00001
     frac_destroyed_by_species = 1. - frac_destroyed_1
-    print frac_destroyed_by_species
+    #print frac_destroyed_by_species
     
     new_fun = f_un.T
 
@@ -768,11 +768,14 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				
 				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
 				particle_loss = np.sum(new_particles, axis=0) * reuptake_weight
+				ploss = copy.deepcopy(particle_loss)
+				ploss[ploss > num_particles[neighbor[j]]] = num_particles[neighbor[j]][ploss > num_particles[neighbor[j]]]
 				
-				num_particles[neighbor[j]] += new_particles - particle_loss
+				num_particles[neighbor[j]] += new_particles * np.sum(np.nan_to_num(ploss/particle_loss), axis=0) - ploss
 	
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T
+	f_un_new[f_un_new < 0] == 0
 	
 	return mass_new, f_un_new
 	
