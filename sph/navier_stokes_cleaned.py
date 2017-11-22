@@ -767,11 +767,15 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
 				
 				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
+				new_particles[new_particles < 0.] = 0.
 				particle_loss = np.sum(new_particles, axis=0) * reuptake_weight
 				ploss = copy.deepcopy(particle_loss)
 				ploss[ploss > num_particles[neighbor[j]]] = num_particles[neighbor[j]][ploss > num_particles[neighbor[j]]]
 				
-				num_particles[neighbor[j]] += new_particles * np.sum(np.nan_to_num(ploss/particle_loss), axis=0) - ploss
+				scale_f = np.sum(ploss, axis=0)/np.sum(new_particles, axis=0)
+				scale_f[np.isnan(scale_f)] = 1.
+				
+				num_particles[neighbor[j]] += new_particles * scale_f - ploss
 	
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T
