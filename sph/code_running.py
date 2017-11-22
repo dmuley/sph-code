@@ -142,10 +142,10 @@ while (age < MAX_AGE):
     dt = max(10000 * year, min(dt_0, ct))
     nsc.dt = dt
     #stop points from going ridiculously far
-    '''points[points > 1e11 * AU] = 1e11 * AU
+    points[points > 1e11 * AU] = 1e11 * AU
     points[points < -1e11 * AU] = -1e11 * AU
     velocities[points > 1e11 * AU] = 0.1
-    velocities[points < -1e11 * AU] = -0.1'''
+    velocities[points < -1e11 * AU] = -0.1
     points = np.nan_to_num(points)
     velocities = np.nan_to_num(velocities)
     if np.sum(particle_type[particle_type == 1]) > 0:
@@ -261,9 +261,9 @@ while (age < MAX_AGE):
     
     densities = nsc.density(points,mass,particle_type,neighbor)
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
+    num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     #viscous force causing dust to accelerate/decelerate along with gas
     viscous_drag = nsc.net_impulse(points,mass,sizes,velocities,particle_type,neighbor,f_un)
-    #num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
     #artificial viscosity to ensure proper blast wave
     av = nsc.artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array)

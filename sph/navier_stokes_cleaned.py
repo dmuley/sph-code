@@ -433,7 +433,10 @@ def crossing_time(neighbor, velocities, sizes, particle_type):
 	max_relvel[neighbor_lengths > 0] = np.array([np.max(np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1))**0.5 for j in j_range[neighbor_lengths > 0]])
 	
 	crossing_time = np.nan_to_num(sizes/max_relvel) * (particle_type == 0)
-	return np.average(crossing_time) + dt_0/10.
+	if len(crossing_time[crossing_time != 0]) == 0:
+		return min(crossing_time[crossing_time != 0]) + 0.0001
+	else:
+		return dt_0/10.
 
 def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array):
 	css_base = np.nan_to_num((gamma_array * k * T/(mu_array * amu))**0.5)
@@ -467,14 +470,16 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
     #should make parametric later, and should include Nozawa 03 material
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
-    total_release = supernova_base_release
+    total_release = supernova_base_release[0]
     trsum = np.sum(total_release)
 
-    gas_release = f_u
+    gas_release = f_u[0]
     grsum = np.sum(gas_release)
     
     dust_release = total_release - gas_release
     drsum = np.sum(dust_release)
+    dust_release[0] = 1e-15
+    dust_release[1] = 1e-15
     
     gas_release /= grsum
     dust_release /= drsum
