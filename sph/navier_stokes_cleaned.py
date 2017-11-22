@@ -434,9 +434,9 @@ def crossing_time(neighbor, velocities, sizes, particle_type):
 	
 	crossing_time = np.nan_to_num(sizes/max_relvel) * (particle_type == 0)
 	if len(crossing_time[crossing_time != 0]) == 0:
-		return min(crossing_time[crossing_time != 0]) + 0.0001
-	else:
 		return dt_0/10.
+	else:
+		return min(crossing_time[crossing_time != 0]) + 0.0001
 
 def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array):
 	css_base = np.nan_to_num((gamma_array * k * T/(mu_array * amu))**0.5)
@@ -603,8 +603,12 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     atoms_destroyed = ((weighted_interception * frac_dest)[ptypes != 1].T * n_photons).T
     atoms_total = (f_un[ptypes != 1].T * mols).T
     
-    frac_destroyed_by_species = atoms_destroyed/atoms_total
-    frac_destroyed_by_species = 1. - np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
+    frac_destroyed_0 = atoms_destroyed/atoms_total
+    frac_destroyed_1 = np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
+    frac_destroyed_1[frac_destroyed_1 > 1.] = 1.
+    frac_destroyed_1[frac_destroyed_1 < 0.00001] = 0.00001
+    frac_destroyed_by_species = 1. - frac_destroyed_1
+    print frac_destroyed_by_species
     
     new_fun = f_un.T
 

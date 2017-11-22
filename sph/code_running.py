@@ -48,7 +48,7 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 0.5e6 * AU
 N_PARTICLES = 2000
-N_INT_PER_PARTICLE = 100
+N_INT_PER_PARTICLE = 200
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 nsc.d = d
@@ -134,12 +134,12 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass == max(mass)] = 1
+#particle_type[mass == max(mass)] = 1
 
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = max(10000 * year, min(dt_0, ct))
+    dt = max(dt_0/10., min(dt_0, ct))
     nsc.dt = dt
     #stop points from going ridiculously far
     points[points > 1e11 * AU] = 1e11 * AU
@@ -245,6 +245,7 @@ while (age < MAX_AGE):
     f_un[np.isnan(f_un)] = 1e-15
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
     mass += mass_change
+    #mass = np.nan_to_num(mass)
     mass[mass < 0.001 * solar_mass] = 0.001 * solar_mass
     mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
     gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
@@ -294,7 +295,7 @@ while (age < MAX_AGE):
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
 
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
-    print star_ages[(particle_type == 1)]
+    print star_ages[(particle_type == 1)]/year
     probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
     diceroll = np.random.rand(len(probability))
     particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
