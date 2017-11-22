@@ -219,6 +219,7 @@ while (age < MAX_AGE):
 			Tnew[:len(T)] += T
 			T = Tnew
 			T[T < t_cmb] = t_cmb
+			supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
 			neighbor = nsc.neighbors(points, d)
         mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
