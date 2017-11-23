@@ -46,8 +46,8 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 0.6e6 * AU
-N_PARTICLES = 2000
+DIAMETER = 0.5e6 * AU
+N_PARTICLES = 3000
 N_INT_PER_PARTICLE = 200
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -129,13 +129,15 @@ time_coord = np.array([])
 dust_temps = np.array([])
 star_frac = np.array([])
 imf_measure = np.array([])
+chems_error = np.array([])
+sup_error = np.array([])
 
 print("Simulation time: " + str(MAX_AGE/year) + " y")
 print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass == max(mass)] = 1
+#particle_type[mass == max(mass)] = 1
 
 while (age < MAX_AGE):
     #timestep reset here
@@ -234,7 +236,8 @@ while (age < MAX_AGE):
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     
     chems = nsc.chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
-    print ("Mass error from chemisputtering: " + str((np.sum(mass) - np.sum(chems[0]))/solar_mass) + " solar masses")
+    deltam_chems = (np.sum(mass) - np.sum(chems[0]))/solar_mass
+    print ("Mass error from chemisputtering: " + str(deltam_chems) + " solar masses")
     f_un = chems[1]; mass = chems[0]
     supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)    
     mass_reduction = -np.sum(np.sum((mass/(mu_array) * supd[0].T).T * mu_specie,axis=1))
@@ -243,7 +246,8 @@ while (age < MAX_AGE):
     #increase *= mass_reduction/mass_increase
     delta_n = (np.nan_to_num(-supd[0] + supd[1]).astype('longdouble').T * (mass > 0.001 * solar_mass)).T
     mass_change = np.nan_to_num(np.sum((mass/(mu_array) * delta_n.T).T * mu_specie,axis=1)) * (mass > 0.001 * solar_mass)
-    print ("Mass error from supernova sputtering: " + str(np.sum(mass_change)/solar_mass) + " solar masses")
+    deltam_sup = np.sum(mass_change)/solar_mass
+    print ("Mass error from supernova sputtering: " + str(deltam_sup) + " solar masses")
     f_un += delta_n
     #f_un = np.abs(f_un)
     f_un[(np.isnan(f_un))] = 1e-15
@@ -379,6 +383,9 @@ while (age < MAX_AGE):
     dust_temps = np.append(dust_temps, (E_internal/optical_depth)[particle_type == 2])
     star_frac = np.append(star_frac, [star_massfrac] * len(T[particle_type == 2]))
     imf_measure = np.append(imf_measure, [star_massfrac/star_numfrac] * len(T[particle_type == 2]))
+    chems_error = np.append(chems_error, [deltam_chems] * len(T[particle_type == 2]))
+    sup_error = np.append(sup_error, [deltam_sup] * len(T[particle_type == 2]))
+    
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
     print ('Age:', age/year)
     #print (d/AU)
