@@ -77,47 +77,28 @@ def grain_mass(mineral_densities, mrn_constants):
 	
 	return meff
 
-def mixed_CCSN_interpolate():
+def mixed_CCSN_interpolate(): 
     progen_mass = np.array([0,20,25,30,35,40])
-    dust_mass_al = np.array([10**(-4),10**(-3),2*10**(-3),10**(-2),10**(-2)*8,10**(-1)])
+    #dust_mass_al = np.array([10**(-4),10**(-3),2*10**(-3),10**(-2),10**(-2)*8,10**(-1)])
     dust_mass_Fe = np.array([10**(-2),7*10**(-2),7*10**(-2),7*10**(-2),7*10**(-2),7*10**(-2)])
     dust_mass_MgSiO3 = np.array([2*10**(-2),5*10**(-2),6*10**(-2),9*10**(-3),0,0])
     dust_mass_Mg2SiO4 = np.array([6*10**(-2),10**(-1)*1.5,2*10**(-1),8*10**(-1),1,1])
     dust_mass_SiO2 = np.array([4*10**(-2),4*10**(-1),4.1*10**(-1),5*10**(-1),10**(-1)*8,10**(-1)*8])
     
-    f2 = interp1d(progen_mass, dust_mass_al, kind='linear')
+    #f2 = interp1d(progen_mass, dust_mass_al, kind='linear')
     f3 = interp1d(progen_mass, dust_mass_Fe, kind='linear')
     f4 = interp1d(progen_mass, dust_mass_MgSiO3, kind='linear')
     f5 = interp1d(progen_mass, dust_mass_Mg2SiO4, kind='linear')
     f6 = interp1d(progen_mass, dust_mass_SiO2, kind='linear')
     
-    xnew = np.arange(0,40)
-    plt.plot(progen_mass, dust_mass_al, 'o', label = '$Al_2O_3$',color = 'blue')
-    plt.plot(xnew, f2(xnew), '--', label = '$Al_2O_3$', color = 'red')
-    plt.legend(['data', 'linear'], loc='best')
-    
-    plt.plot(progen_mass, dust_mass_Fe, 'x', label = '$Fe_3O_4$', color ='red')
-    plt.plot(xnew, f3(xnew), '--',label = '$Fe_3O_4$',color = 'red')
-    plt.legend(['data', 'linear'], loc='best')
-    
-    plt.plot(progen_mass, dust_mass_MgSiO3, '^',label = '$MgSiO_3$', color = 'green')
-    plt.plot(xnew, f4(xnew), '--',label = '$MgSiO_3$', color = 'green')
-    plt.legend(['data', 'linear'], loc='best')
-    
-    plt.plot(progen_mass, dust_mass_Mg2SiO4, 'x',color = 'brown')
-    plt.plot(xnew, f5(xnew), '--',label = '$Mg_2SiO_4$', color = 'brown')
-    plt.legend(['data', 'linear'], loc='best')
-    
-    plt.plot(progen_mass, dust_mass_SiO2, 'o',label = '$SiO_2$',color = 'cyan')
-    plt.plot(xnew, f6(xnew), '--', label = '$SiO_2$', color = 'cyan')
-    plt.legend(['data', 'linear'], loc='best')
-    
-    
-    pylab.legend(loc='upper left')
-    plt.xlabel("Progenitor Mass ($M_\odot$)")                        
-    plt.ylabel("$M_{dust}$ ($M_\odot$)")
-    plt.title("CCSNe (mixed)")
-    plt.show()
+    def zero_function(v):
+        return np.zeros(len(v));
+    #(H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)
+    #list of interpolation functions for each species
+    return (zero_function, zero_function, zero_function, zero_function, zero_function, zero_function, f5, f6, zero_function, zero_function, f3, f4,zero_function)
+
+int_supernova = mixed_CCSN_interpolate(); #calling this beforehand 
+
 
 def mixed_PISN_interpolate():
     progen_mass = np.array([140,170,200,225,250,260])
@@ -470,17 +451,19 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
     #should make parametric later, and should include Nozawa 03 material
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
-    total_release = supernova_base_release[0]
-    trsum = np.sum(total_release)
+
 
     gas_release = f_u[0]
     grsum = np.sum(gas_release)
     
-    dust_release = total_release - gas_release
+    dust_release = np.array([u(mass/solar_mass) for u in int_supernova]) #int_supernova is the already called supernova interpolation from Nozawa
     drsum = np.sum(dust_release)
     dust_release[0] = 1e-15
     dust_release[1] = 1e-15
     
+    total_release = dust_release+gas_release
+    trsum = np.sum(total_release)
+	
     gas_release /= grsum
     dust_release /= drsum
     
