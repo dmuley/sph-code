@@ -89,7 +89,7 @@ mu_array = np.zeros([N_PARTICLES])#array of all mu
 E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 #copy of generate_E_array
 #fills in E_internal array specified at the beginning
-T = 20 * np.ones([N_PARTICLES]) #5 kelvins
+T = 10 * (np.ones([N_PARTICLES]) + np.random.rand(N_PARTICLES)) #20 kelvins
 
 #fills the f_u array
 dust_fracs = ((np.random.rand(N_PARTICLES) > DUST_FRAC))
@@ -193,8 +193,8 @@ while (age < MAX_AGE):
         max_rel_age = np.max(star_ages/nsc.luminosity_relation(mass/nsc.solar_mass, np.ones(len(mass)), 1)/(year * 1e10))
         print ("Maximum relative stellar age: " + str(max_rel_age))
         print ("Maximum stellar mass: " + str(np.max(mass[particle_type == 1]/solar_mass)) + " solar masses")
-        
-        print ("Number of supernovae: ", len(supernova_pos))
+        print ("Calculated timestep: " + str(ct/year) + " years")
+        print ("Number of supernovae: " + str(len(supernova_pos)))
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
         	#print('beginning supernova impulse')

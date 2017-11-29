@@ -99,7 +99,6 @@ def mixed_CCSN_interpolate():
 
 int_supernova = mixed_CCSN_interpolate(); #calling this beforehand 
 
-
 def mixed_PISN_interpolate():
     progen_mass = np.array([140,170,200,225,250,260])
     dust_mass_al = np.array([7*10**(-2),6*10**(-2),3*10**(-2),10**(-2),0,0])
@@ -396,15 +395,17 @@ def del_pressure(points,mass,particle_type,neighbor,E_internal, gamma_array): #g
 	for i in range(len(neighbor)):
 		if (particle_type[i] == 0):
 			x_0 = points[i]
-			x = np.append([x_0], points[np.array(neighbor[i])],axis=0)
-			m = np.append(mass[i], mass[np.array(neighbor[i])])
-			pt = np.append(particle_type[i], particle_type[neighbor[i]])
+			x = np.array(points[np.array(neighbor[i])])
+			m = np.array(mass[np.array(neighbor[i])])
+			pt = np.array(particle_type[neighbor[i]])
 		
 			#symmetrizing pressure gradient
 			gw = (grad_weight(x, x_0, m, d, pt) + grad_weight(x, x_0, m[0], d, pt))/2.
+			#print gw
 		
-			del_pres = np.sum((gw.T * E_internal[np.append(i, neighbor[i])]/gamma_array[np.append(i, neighbor[i])]).T, axis=0)
-			points[i] += del_pres
+			del_pres = np.sum((gw.T * E_internal[np.array(neighbor[i])]/gamma_array[np.array(neighbor[i])]).T, axis=0)
+			grad_pressure[i] += del_pres
+	#print grad_pressure
 	return grad_pressure
 
 def crossing_time(neighbor, velocities, sizes, particle_type):
@@ -587,6 +588,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     atoms_total = (f_un[ptypes != 1].T * mols).T
     
     frac_destroyed_0 = atoms_destroyed/atoms_total
+    print frac_destroyed_0
     frac_destroyed_1 = np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
     frac_destroyed_1[frac_destroyed_1 > 1.] = 1.
     frac_destroyed_1[frac_destroyed_1 < 0.00001] = 0.00001
@@ -594,33 +596,27 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     #print frac_destroyed_by_species
     
     new_fun = f_un.T
-
-    new_fun[2][ptypes != 1] += new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0] * 2.
-    new_fun[3][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
-    new_fun[4][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
+    new_fun2 = copy.deepcopy(new_fun)
     
-    new_fun[5][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
-    new_fun[5][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
+    #forward reactions
+    new_fun2[2][ptypes != 1] += new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0] * 2.
+    new_fun2[3][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
+    new_fun2[4][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     
-    new_fun[0][ptypes != 1] -= new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0]
-    new_fun[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
-    new_fun[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
+    new_fun2[5][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
+    new_fun2[5][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     
-    new_fun /= np.sum(new_fun,axis=0)
+    new_fun2[0][ptypes != 1] -= new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0]
+    new_fun2[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
+    new_fun2[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    subt = new_fun[3][ptypes != 1] * new_fun[5][ptypes != 1] * (3 * k * T[ptypes != 1])**0.5/(c**2 * mu_specie[3]**0.5 * mu_specie[5]**0.5 * amu)**0.5
-    subt2= new_fun[4][ptypes != 1] * new_fun[5][ptypes != 1] * (3 * k * T[ptypes != 1])**0.5/(c**2 * mu_specie[5]**0.5 * mu_specie[4]**0.5 * amu)**0.5
-    
-    new_fun[2][ptypes != 1] += subt
-    new_fun[3][ptypes != 1] -= subt
-    new_fun[4][ptypes != 1] -= subt2
-    new_fun[5][ptypes != 1] -= subt + subt2
-    
-    new_fun /= np.sum(new_fun,axis=0)
-    
+    new_fun /= np.sum(new_fun,axis=0)    
     #energy, composition change, impulse
-    return lf2, new_fun.T, momentum
-    
+    return lf2, new_fun2.T, momentum
+
+#def rad_cooling(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T):
+	#first, calculate an SPH density of electrons
+
 def supernova_impulse(points, masses, supernova_pos, ptypes):
 	mass_displaced = 194.28 * solar_mass #calculated from paper
 	s_basis = np.sum((points - points[supernova_pos])**2, axis=1)
