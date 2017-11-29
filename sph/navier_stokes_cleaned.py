@@ -588,7 +588,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     atoms_total = (f_un[ptypes != 1].T * mols).T
     
     frac_destroyed_0 = atoms_destroyed/atoms_total
-    print frac_destroyed_0
+    #print frac_destroyed_0
     frac_destroyed_1 = np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
     frac_destroyed_1[frac_destroyed_1 > 1.] = 1.
     frac_destroyed_1[frac_destroyed_1 < 0.00001] = 0.00001
@@ -610,7 +610,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     new_fun2[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun2[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    new_fun /= np.sum(new_fun,axis=0)    
+    new_fun2 /= np.sum(new_fun,axis=0)    
     #energy, composition change, impulse
     return lf2, new_fun2.T, momentum
 
