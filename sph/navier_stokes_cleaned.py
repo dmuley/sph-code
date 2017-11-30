@@ -589,9 +589,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     
     frac_destroyed_0 = atoms_destroyed/atoms_total
     #print frac_destroyed_0
-    frac_destroyed_1 = np.nan_to_num(np.exp(-atoms_destroyed/atoms_total))
-    frac_destroyed_1[frac_destroyed_1 > 1.] = 1.
-    frac_destroyed_1[frac_destroyed_1 < 0.00001] = 0.00001
+    frac_destroyed_1 = np.exp(np.nan_to_num(-atoms_destroyed/atoms_total))
     frac_destroyed_by_species = 1. - frac_destroyed_1
     #print frac_destroyed_by_species
     
@@ -610,27 +608,26 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     new_fun2[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun2[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    new_fun2 /= np.sum(new_fun,axis=0)    
+    new_fun2 /= np.sum(new_fun2,axis=0)    
     #energy, composition change, impulse
     return lf2, new_fun2.T, momentum
 
-def rad_cooling(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T):
+def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neighbor, mu_array, T):
 	#first, calculate an SPH density of electrons * temperature factor, then apply the model
 	#of Draine (2011)
 	
-	final_comp = f_un.T
-	rec_array = f_un.T * 0.
+	final_comp = copy.deepcopy(np.nan_to_num(f_un.T))
+	rec_array = copy.deepcopy(np.nan_to_num(f_un.T)) * 0
 	rel_array = sizes * 0.
-	energy_array = sizes * 0
+	energy_array = copy.deepcopy(np.nan_to_num(f_un.T)) * 0
 	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
 	for j in jarr:
 		if np.sum(particle_type[neighbor[j]] == 0) > 0: #making sure that there are gaseous neighbors
-			x = points[neighbor[j]]
-			m = mass[neighbor[j]]
-			x_0 = points[j]
+			x = positions[neighbor[j]]
+			m = masses[neighbor[j]]
+			x_0 = positions[j]
 			comps = f_un[neighbor[j]]
 			comp_0 = f_un[j]
-			dens = densities[neighbor[j]]
 			temps = T[neighbor[j]]
 			muloc = mu_array[neighbor[j]]
 			t4 = (temps/10000.)
@@ -639,46 +636,61 @@ def rad_cooling(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
 			#but independently acting on each particle. This works because electron thermal velocity is much
 			#faster than that of anything else
 	
-			n_e = Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[5] #times electron concentration
-			rel_weights = Weigh2(x, x_0, m, d)/Weigh2(x_0, x_0, m, d)
-			n_H_plus =  Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[3]
-			n_He_plus =  Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[4]
-			tot_e = Weigh2(x, x_0, m, d)/(muloc * m_h) #total number density
-			H_effect = 2.59e-19 * t4**(-0.833 - 0.034 * np.log(t4))
-			He_effect = 2.72e-19 * t4**(-0.789)
-			energy_coeff = (0.684 - 0.0416 * np.log(t4/1)) * k * temps
-			
-			
+			n_e = np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[5] * (particle_type[neighbor[j]] == 0)) #times electron concentration
+			rel_weights = np.nan_to_num(Weigh2(x, x_0, m, d) * (particle_type[neighbor[j]] == 0)/Weigh2(x, x, m, d))
+			n_H_plus =  np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[3] * (particle_type[neighbor[j]] == 0))
+			n_He_plus =  np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[4] * (particle_type[neighbor[j]] == 0))
+			#tot_e = Weigh2(x, x_0, m, d)/(muloc * m_h) * (particle_type[neighbor[j]] == 0) #total number density
+			H_effect = np.nan_to_num(2.59e-19 * t4**(-0.833 - 0.034 * np.log(t4)) * (particle_type[neighbor[j]] == 0))
+			He_effect = np.nan_to_num(2.72e-19 * t4**(-0.789) * (particle_type[neighbor[j]] == 0))
+			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1)) * k * temps * (particle_type[neighbor[j]] == 0))
+			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
+			#print energy_coeff_H, energy_coeff_He
 			num_e = np.sum(n_e[n_e > 0])
 			num_H_plus = np.sum(n_H_plus[n_H_plus > 0])
 			num_He_plus = np.sum(n_He_plus[n_He_plus > 0])
 			
+			#print num_e, num_H_plus, num_He_plus
+			
 			H_effect_rec = np.sum((H_effect * n_e)[n_e > 0])
 			He_effect_rec = np.sum((He_effect * n_e)[n_e > 0])
 			
-			H_effect_energy = np.sum((H_effect * n_e * energy_coeff)[n_e > 0])
-			He_effect_energy= np.sum((He_effect * n_e * energy_coeff)[n_e > 0])
+			#print H_effect_rec, He_effect_rec
 			
-			frac_rec_e = min((H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt, 0.999)
-			frac_rec_H = frac_rec_e * (H_effect_rec)/(H_effect_w + He_effect_rec)
-			frac_rec_He = frac_rec_e * (He_effect_rec)/(H_effect_w + He_effect_rec)
+			H_effect_energy = np.sum((H_effect * n_e * energy_coeff_H)[n_e > 0])
+			He_effect_energy= np.sum((He_effect * n_e * energy_coeff_He)[n_e > 0])
+			#print H_effect_energy, He_effect_energy
 			
-			energy_rec_e = (H_effect_energy * num_H_plus + He_effect_energy * num_He_plus) * dt
-			energy_array[neighbor[j]] += energy_rec_e * rel_weights * (rel_weights > 0)/np.sum(rel_weights * (rel_weights > 0))
+			frac_rec_e = np.nan_to_num(min((H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt, 0.999))
+			#print frac_rec_e
+			frac_rec_H = frac_rec_e * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec))
+			frac_rec_He = frac_rec_e * np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec))
+			#print frac_rec_e, frac_rec_H, frac_rec_He
 			
+			energy_rec_H = np.nan_to_num(H_effect_energy * dt)
+			energy_rec_He = np.nan_to_num(He_effect_energy * dt)
 			
-			rec_array.T[3][neighbor[j]] += frac_rec_H * (n_e > 0)
-			rec_array.T[4][neighbor[j]] += frac_rec_He * (n_e > 0)
-			rec_array.T[5][neighbor[j]] += frac_rec_e * (n_e > 0)
+			energy_array[3][neighbor[j]] += np.nan_to_num(energy_rec_H * rel_weights * (rel_weights > 0)/np.sum(rel_weights * (rel_weights > 0)))
+			energy_array[4][neighbor[j]] += np.nan_to_num(energy_rec_He * rel_weights * (rel_weights > 0)/np.sum(rel_weights * (rel_weights > 0)))
+						
+			rec_array[3][neighbor[j]] += np.nan_to_num(frac_rec_H) * (n_e > 0) * rel_weights * (rel_weights > 0)
+			rec_array[4][neighbor[j]] += np.nan_to_num(frac_rec_He) * (n_e > 0) * rel_weights * (rel_weights > 0)
+			rec_array[5][neighbor[j]] += np.nan_to_num(frac_rec_e) * (n_e > 0) * rel_weights * (rel_weights > 0)
 			
 			rel_array[neighbor[j]] += rel_weights * (rel_weights > 0)
 	
-	rec_array /= rel_array
-	energy_array /= rel_array
 	
-	H_plus_frac = f_un.T[5] * rec_array.T[3]
-	He_plus_frac = f_un.T[5] * rec_array.T[4]
-	elec_frac = f_un.T[5] * rec_array.T[5]
+	rec_array /= (rel_array + 1e-90)
+	energy_array /= (rel_array + 1e-90)
+	rec_array /= np.sum(rec_array/0.999, axis=0)
+	rec_array = np.nan_to_num(rec_array)
+	print np.min(rec_array), np.max(rec_array)
+	
+	H_plus_frac = f_un.T[5] * rec_array[3]
+	He_plus_frac = f_un.T[5] * rec_array[4]
+	elec_frac = f_un.T[5] * rec_array[5]
+	
+	energy = np.nan_to_num(np.sum(final_comp * energy_array, axis=0))
 	
 	final_comp[1] += H_plus_frac
 	final_comp[2] += He_plus_frac
@@ -686,9 +698,9 @@ def rad_cooling(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
 	final_comp[4] -= He_plus_frac
 	final_comp[5] -= elec_frac
 	
-	final_comp /= np.sum(final_comp, axis=1)
+	final_comp /= np.sum(final_comp, axis=0)
 	
-	return final_comp.T, rel_array
+	return final_comp.T, energy
 
 def supernova_impulse(points, masses, supernova_pos, ptypes):
 	mass_displaced = 194.28 * solar_mass #calculated from paper
