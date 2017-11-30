@@ -155,17 +155,21 @@ while (age < MAX_AGE):
     #print("Negative compositions before radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
+        N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
         rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un,supernova_pos, mu_array, T)
+        rc = nsc.rad_cooling(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T)
+
         f_un0 = f_un
         E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
-        E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > 1e7 * (gamma_array * mass * k)/(mu_array * m_h)]
+        E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
         T[T < t_cmb] = t_cmb
         T[T >= t_max] = t_max
-        N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
+        
         area = (4 * np.pi * sizes**2)
         N_PART = mass/(m_h * mu_array)
         W6_integral = 9./area #evaluating integral of W6 kernel
         optd = 1. - np.exp(-optical_depth * W6_integral)
+
         T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
         E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
         for nrad in range(N_RADIATIVE):
