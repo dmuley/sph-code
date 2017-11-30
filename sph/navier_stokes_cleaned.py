@@ -457,10 +457,10 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
     gas_release = f_u[0]
     grsum = np.sum(gas_release)
     
-    dust_release = np.array([u(mass/solar_mass) for u in int_supernova]) #int_supernova is the already called supernova interpolation from Nozawa
+    dust_release = np.array([u(mass[supernova_pos]/solar_mass) for u in int_supernova]).T #int_supernova is the already called supernova interpolation from Nozawa
     drsum = np.sum(dust_release)
-    dust_release[0] = 1e-15
-    dust_release[1] = 1e-15
+    #dust_release[0] = 1e-15
+    #dust_release[1] = 1e-15
     
     total_release = dust_release+gas_release
     trsum = np.sum(total_release)
@@ -504,7 +504,7 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
 
 #THE ENERGY/DUST PRODUCTION IMPARTED BY SUPERNOVAE ARE ALSO PLACED HERE.
 
-def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T):
+def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T, dt):
     random_stars = positions[ptypes == 1]
     rs2 = np.array([])
     rs2 = random_stars
@@ -612,7 +612,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     #energy, composition change, impulse
     return lf2, new_fun2.T, momentum
 
-def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neighbor, mu_array, T):
+def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neighbor, mu_array, T, dt):
 	#first, calculate an SPH density of electrons * temperature factor, then apply the model
 	#of Draine (2011)
 	
@@ -839,7 +839,7 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				scale_f = np.sum(ploss, axis=0)/np.sum(new_particles, axis=0)
 				scale_f[np.isnan(scale_f)] = 1.
 				
-				num_particles[neighbor[j]] += new_particles * scale_f - ploss
+				num_particles[neighbor[j]] += np.nan_to_num(new_particles * scale_f - ploss)
 	
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T

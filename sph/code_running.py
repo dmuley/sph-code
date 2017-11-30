@@ -24,7 +24,7 @@ solar_mass = 1.989e30 #kilograms
 solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
-t_max = 1e6
+t_max = 1e7
 t_solar = 5776
 nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
@@ -33,7 +33,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-cross_sections = np.array([6.65e-29, 6.65e-29, 6.3e-28, 5e-26, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([6.65e-22, 6.65e-22, 6.3e-22, 5e-50, 5e-50, 1.e-25, 0., 0., 0., 0., 0., 0., 0.]) * 0.05+ 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
@@ -46,8 +46,8 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 0.5e6 * AU
-N_PARTICLES = 3000
+DIAMETER = 1e6 * AU
+N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 200
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -142,7 +142,7 @@ particle_type[mass == max(mass)] = 1
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = max(dt_0/2.5, min(dt_0, ct))
+    dt = max(dt_0/20., min(dt_0, ct))
     nsc.dt = dt
     #stop points from going ridiculously far
     points[points > 1e11 * AU] = 1e11 * AU
@@ -155,44 +155,49 @@ while (age < MAX_AGE):
     #print("Negative compositions before radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
-        N_RADIATIVE = int(50 + np.average(np.nan_to_num(T))**(2./3.))
-        rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un, supernova_pos, mu_array, T)
-        
-        f_un = rh[1]
-        
-        mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
-        gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
-        cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-        optical_depth = mass/(m_h * mu_array) * cross_array
-        
-        #have to fix radiative cooling
-        rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T)
-        #f_un = rc[0]
-        
-        mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
-        gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
-        cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-        optical_depth = mass/(m_h * mu_array) * cross_array
-                
-        area = (4 * np.pi * sizes**2)
-        N_PART = mass/(m_h * mu_array)
-        W6_integral = 9./area #evaluating integral of W6 kernel
-        optd = 1. - np.exp(-optical_depth * W6_integral)
+        #N_RADIATIVE = int(10 + np.average(np.nan_to_num(T))**(1./3.)/10.)
+        N_RADIATIVE = 1
+        for nradiative in range(N_RADIATIVE):
+			rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un, supernova_pos, mu_array, T, dt/N_RADIATIVE)
+		
+			f_un = rh[1]
+		
+			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
+			optical_depth = mass/(m_h * mu_array) * cross_array
+		
+			#have to fix radiative cooling
+			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T, dt/N_RADIATIVE)
+			#f_un = rc[0]
+		
+			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
+			optical_depth = mass/(m_h * mu_array) * cross_array
+				
+			area = (4 * np.pi * sizes**2)
+			N_PART = mass/(m_h * mu_array)
+			W6_integral = 9./area #evaluating integral of W6 kernel
+			optd = 1. - np.exp(-optical_depth * W6_integral)
 
-        T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
-        E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
-        E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] #- (rc[1] * N_PART)[particle_type == 0]
-        T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] #- (rc[1]/gamma_array/k)[particle_type == 0]
-        
-        velocities[particle_type != 1] += rh[2]
-        
-        E_internal[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
-        T[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
+			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
+			E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
+			E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] - (rc[1] * N_PART)[particle_type == 0]
+			T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] - (rc[1]/gamma_array/k)[particle_type == 0]
+		
+			velocities[particle_type != 1] += rh[2]
+		
+			#E_internal[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
+			#T[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
 
-        E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
-        E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
-        T[T < t_cmb] = t_cmb
-        T[T >= t_max] = t_max
+			E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
+			E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
+			T[T < t_cmb] = t_cmb
+			T[T >= t_max] = t_max
+			massr = np.cumsum(mass[particle_type == 0][np.argsort(T[particle_type == 0])])
+			plt.plot(massr/max(massr), np.log10(np.sort(T)[particle_type == 0]))
+			plt.pause(0.01)
 
         #print("Negative compositions after radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
         #on supernova event--- add new dust particle (particle_type == 2)
