@@ -166,7 +166,7 @@ while (age < MAX_AGE):
         optical_depth = mass/(m_h * mu_array) * cross_array
         
         #have to fix radiative cooling
-        #rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T)
+        rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T)
         #f_un = rc[0]
         
         mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -185,6 +185,9 @@ while (age < MAX_AGE):
         T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] #- (rc[1]/gamma_array/k)[particle_type == 0]
         
         velocities[particle_type != 1] += rh[2]
+        
+        E_internal[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
+        T[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
 
         E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
         E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
