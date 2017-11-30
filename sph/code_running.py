@@ -184,10 +184,6 @@ while (age < MAX_AGE):
         E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] #- (rc[1] * N_PART)[particle_type == 0]
         T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] #- (rc[1]/gamma_array/k)[particle_type == 0]
         
-        #should help set a vague "upper limit" until code issues are resolved
-        E_internal[particle_type == 0] *= 0.9
-        T[particle_type == 2] *= 0.9
-        
         velocities[particle_type != 1] += rh[2]
 
         E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
