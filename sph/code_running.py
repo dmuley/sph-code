@@ -157,6 +157,10 @@ while (age < MAX_AGE):
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         #N_RADIATIVE = int(10 + np.average(np.nan_to_num(T))**(1./3.)/10.)
         N_RADIATIVE = 1
+        area = (4 * np.pi * sizes**2)
+        N_PART = mass/(m_h * mu_array)
+        W6_integral = 9./area #evaluating integral of W6 kernel
+        optd = 1. - np.exp(-optical_depth * W6_integral)
         for nradiative in range(N_RADIATIVE):
 			rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un, supernova_pos, mu_array, T, dt/N_RADIATIVE)
 		
