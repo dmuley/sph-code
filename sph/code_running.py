@@ -138,7 +138,7 @@ plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
 particle_type[mass == max(mass)] = 1
-
+fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
@@ -187,21 +187,35 @@ while (age < MAX_AGE):
 
 			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
 			E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
-			E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] - (rc[1] * N_PART)[particle_type == 0]
-			T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] - (rc[1]/gamma_array/k)[particle_type == 0]
+			E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] #- (rc[1] * N_PART)[particle_type == 0]
+			T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] #- (rc[1]/gamma_array/k)[particle_type == 0]
 		
 			velocities[particle_type != 1] += rh[2]
 		
-			#E_internal[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
-			#T[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
+			E_internal[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
+			T[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
 
 			E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
 			E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
 			T[T < t_cmb] = t_cmb
 			T[T >= t_max] = t_max
-			massr = np.cumsum(mass[particle_type == 0][np.argsort(T[particle_type == 0])])
-			'''plt.plot(massr/max(massr), np.log10(np.sort(T)[particle_type == 0]))
-			plt.pause(0.01)'''
+			
+			#another plotting function
+			plt.rc('font', family='tex')
+			massT = np.cumsum(mass[particle_type == 0][np.argsort(T[particle_type == 0])])
+			massT /= max(massT)
+			
+			massd = np.cumsum(mass[particle_type == 0][np.argsort(densities[particle_type == 0])])
+			massd /= max(massd)
+			
+			ax[0].plot(massd, np.log10(np.sort(densities[particle_type == 0])/critical_density), c='black', alpha=0.15)
+			ax[1].plot(massT, np.log10(np.sort(T[particle_type == 0])), c = 'maroon', alpha=0.15)
+			
+			ax[0].set_xlabel('Percentile'); ax[1].set_xlabel('Percentile')
+			ax[0].set_ylabel('Log10(density/critical density)')
+			ax[1].set_ylabel('Log10(T/K)')
+			plt.suptitle('Curves for density and temperature over time (t = ' + str(age/year) + ' years')
+			plt.pause(0.01)
 
         #print("Negative compositions after radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
         #on supernova event--- add new dust particle (particle_type == 2)
@@ -358,7 +372,8 @@ while (age < MAX_AGE):
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    
+    '''
+    #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
     
@@ -380,7 +395,7 @@ while (age < MAX_AGE):
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     
     plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,np.log10(t_max)]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
-    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,np.log10(t_max)]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100, [0.01, 0.01]), edgecolor='none', alpha=0.1)
+    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,np.log10(t_max)]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100 * 4, [0.01, 0.01]), edgecolor='none', alpha=0.1)
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
     #plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append((m_0/solar_mass) * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
     plt.colorbar()
@@ -389,7 +404,7 @@ while (age < MAX_AGE):
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)
+    plt.pause(1)'''
     
     
     star_massfrac = float(np.sum(mass[particle_type == 1]))/np.sum(mass[particle_type != 2])
