@@ -37,7 +37,7 @@ year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-cross_sections = np.array([6.65e-29, 6.65e-29, 6.3e-28, 5e-26, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([6.65e-29, 6.65e-29, 6.3e-28, 5e-26, 5e-26, 0., 0., 0., 0., 0., 0., 0., 0.]) * 10 + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
@@ -643,7 +643,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			#tot_e = Weigh2(x, x_0, m, d)/(muloc * m_h) * (particle_type[neighbor[j]] == 0) #total number density
 			H_effect = np.nan_to_num(2.59e-19 * t4**(-0.833 - 0.034 * np.log(t4)) * (particle_type[neighbor[j]] == 0))
 			He_effect = np.nan_to_num(2.72e-19 * t4**(-0.789) * (particle_type[neighbor[j]] == 0))
-			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1)) * k * temps * (particle_type[neighbor[j]] == 0))
+			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
 			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
 			#print energy_coeff_H, energy_coeff_He
 			num_e = np.sum(n_e[n_e > 0])
@@ -661,7 +661,8 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			He_effect_energy= np.sum((He_effect * n_e * energy_coeff_He)[n_e > 0])
 			#print H_effect_energy, He_effect_energy
 			
-			frac_rec_e = np.nan_to_num(min((H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt, 0.999))
+			frac_rec_e = (H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt
+			frac_rec_e = min(1. - np.exp(-np.nan_to_num(frac_rec_e)), 0.999)
 			#print frac_rec_e
 			frac_rec_H = frac_rec_e * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec))
 			frac_rec_He = frac_rec_e * np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec))

@@ -24,7 +24,7 @@ solar_mass = 1.989e30 #kilograms
 solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
-t_max = 1e7
+t_max = 2e4
 t_solar = 5776
 nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
@@ -33,7 +33,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-cross_sections = np.array([6.65e-22, 6.65e-22, 6.3e-22, 5e-50, 5e-50, 1.e-25, 0., 0., 0., 0., 0., 0., 0.]) * 0.05+ 1e-80
+cross_sections = np.array([6.65e-24/2., 6.65e-24/2., 5e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
@@ -46,9 +46,9 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1e6 * AU
+DIAMETER = 1.e6 * AU
 N_PARTICLES = 2000
-N_INT_PER_PARTICLE = 200
+N_INT_PER_PARTICLE = 300
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 nsc.d = d
@@ -58,7 +58,7 @@ nsc.d_0 = 1e5 * AU
 dt = dt_0
 nsc.dt = dt
 nsc.dt_0 = dt_0
-DUST_FRAC = 0.10000
+DUST_FRAC = 0.10000 * 0.1
 DUST_MASS = 0.05
 N_RADIATIVE = 100
 MAX_AGE = 4e7 * year
@@ -73,7 +73,7 @@ base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = nsc.kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
-points = np.random.normal(size=(N_PARTICLES, 3)) * DIAMETER
+points = (np.random.rand(N_PARTICLES, 3) - 0.5) * DIAMETER
 points2 = copy.deepcopy(points)
 neighbor = nsc.neighbors(points, d)
 #print(nbrs)
@@ -142,7 +142,7 @@ particle_type[mass == max(mass)] = 1
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = max(dt_0/20., min(dt_0, ct))
+    dt = max(dt_0/5., min(dt_0, ct))
     nsc.dt = dt
     #stop points from going ridiculously far
     points[points > 1e11 * AU] = 1e11 * AU
@@ -200,8 +200,8 @@ while (age < MAX_AGE):
 			T[T < t_cmb] = t_cmb
 			T[T >= t_max] = t_max
 			massr = np.cumsum(mass[particle_type == 0][np.argsort(T[particle_type == 0])])
-			plt.plot(massr/max(massr), np.log10(np.sort(T)[particle_type == 0]))
-			plt.pause(0.01)
+			'''plt.plot(massr/max(massr), np.log10(np.sort(T)[particle_type == 0]))
+			plt.pause(0.01)'''
 
         #print("Negative compositions after radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
         #on supernova event--- add new dust particle (particle_type == 2)
@@ -355,7 +355,7 @@ while (age < MAX_AGE):
     sizes[particle_type == 2] = d
     
     dist_sq = np.sum(points**2,axis=1)
-    '''
+    
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     
@@ -379,8 +379,8 @@ while (age < MAX_AGE):
     max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     
-    plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
-    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,7]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100, [0.01, 0.01]), edgecolor='none', alpha=0.1)
+    plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,np.log10(t_max)]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
+    plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,np.log10(t_max)]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100, [0.01, 0.01]), edgecolor='none', alpha=0.1)
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
     #plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append((m_0/solar_mass) * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
     plt.colorbar()
@@ -390,7 +390,7 @@ while (age < MAX_AGE):
     plt.ylabel('Position (astronomical units)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
-    '''
+    
     
     star_massfrac = float(np.sum(mass[particle_type == 1]))/np.sum(mass[particle_type != 2])
     star_numfrac = np.sum(float(len(particle_type[particle_type == 1]))/float(len(particle_type[particle_type != 2])))
