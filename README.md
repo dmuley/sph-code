@@ -3,6 +3,6 @@ PySPH is a lightweight Python smoothed-particle hydrodynamics code designed to s
 ##Use
 The file code\_running.py contains everything necessary to run the code, including free parameters (such as absorption cross-sections) that one can alter to get a more or less accurate picture of H II regions. All core functionality is stored in navier\_stokes\_cleaned.py.
 ##Authors
-* Dhruv Muley, UC Berkeley and Lawrence Berkeley National Lab ([dmuley@berkeley.edu][mailto:dmuley@berkeley.edu])
-* Umut Can Oktem, UC Santa Barbara and Lawrence Berkeley National Lab ([umbutcan@gmail.com][mailto:umbutcan@gmail.com])
+* Dhruv Muley, UC Berkeley and Lawrence Berkeley National Lab (dmuley@berkeley.edu)
+* Umut Can Oktem, UC Santa Barbara and Lawrence Berkeley National Lab (umbutcan@gmail.com)
 All rights reserved.
