@@ -501,11 +501,17 @@ plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
 INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 10, 3) - 0.5) * (max(ymax, xmax) - min(xmin, ymin))
-#narb = neighbors_arb(points, arb_points)
-darb = density_arb(arb_points)
-tarb = temperature_arb(arb_points)
-#[ax.scatter(points.T[0][particle_type == 0]/AU, points2.T[1][particle_type == 0]/AU, points2.T[2][particle_type == 0]/AU, alpha=0.1)]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=8, alpha=0.7, edgecolor='none'), plt.colorbar()]
+arb_points = (np.random.rand(N_PARTICLES * 25, 3) - 0.5) * max_dist**0.5 * 2
+darb = nsc.density_arb(points, arb_points, mass, particle_type)
+ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes)
+tarb = nsc.temperature_arb(points, arb_points, mass, particle_type, T)
+[plt.axis('equal')]
 [plt.scatter(points.T[1:][0][particle_type == 1]/AU, points.T[1:][1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1)]
-[plt.axis('equal'), plt.show()]'''
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=20, alpha=0.1, edgecolor='none'), plt.colorbar()]
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(tarb), s=20, alpha=0.1, edgecolor='none'), plt.colorbar()]
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(ddarb/critical_density), s=20, alpha=0.1, edgecolor='none'), plt.colorbar()]
+plt.xlabel('Position (astronomical units)')
+plt.ylabel('Position (astronomical units)')
+plt.title('Interpolated density in H II region')
+plt.title('Interpolated temperature in H II region')
+'''

@@ -856,7 +856,7 @@ def neighbors_arb(points, arb_points):
     
     return qbp
 
-def density_arb(arb_points):
+def density_arb(points, arb_points, mass, particle_type):
     density_array = []
     narb = neighbors_arb(points, arb_points)
     for j in range(len(arb_points)):
@@ -873,7 +873,25 @@ def density_arb(arb_points):
             
     return np.array(density_array)
 
-def temperature_arb(arb_points):
+def dust_density_arb(points, arb_points, mass, particle_type, sizes):
+    density_array = []
+    narb = neighbors_arb(points, arb_points)
+    for j in range(len(arb_points)):
+        if len(narb[j]) > 1:
+            x_0 = arb_points[j]
+            #print np.array(narb[j])
+            x = points[np.array(narb[j])]
+            m = mass[np.array(narb[j])]
+            ds = sizes[np.array(narb[j])]
+            rho = Weigh2_dust(x, x_0, m, d, ds) * (particle_type[np.array(narb[j])] == 2)
+        
+            density_array.append(np.sum(rho[rho > 0]))
+        else:
+            density_array.append(0)
+            
+    return np.array(density_array)
+
+def temperature_arb(points, arb_points, mass, particle_type, T):
     density_array = []
     narb = neighbors_arb(points, arb_points)
     for j in range(len(arb_points)):
