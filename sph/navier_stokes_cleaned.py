@@ -43,7 +43,7 @@ mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,23
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
-supernova_base_release = np.array([[.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025]])
+supernova_base_release = np.array([.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
 W6_constant = (3 * np.pi/80)
 critical_density = 1000*amu*10**6 #critical density of star formation
 crit_mass = 0.0001 * solar_mass #setting a minimum dust mass to help avoid numerical errors!
@@ -452,8 +452,6 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
     #should make parametric later, and should include Nozawa 03 material
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
-
-
     gas_release = f_u[0]
     grsum = np.sum(gas_release)
     

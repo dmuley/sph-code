@@ -39,7 +39,7 @@ mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,23
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
-supernova_base_release = np.array([[.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025]])
+supernova_base_release = np.array([.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
 W6_constant = (3 * np.pi/80)
 
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
@@ -58,14 +58,18 @@ nsc.d_0 = 1e5 * AU
 dt = dt_0
 nsc.dt = dt
 nsc.dt_0 = dt_0
-DUST_FRAC = 0.10000 * 0.1
-DUST_MASS = 0.05
-N_RADIATIVE = 100
-MAX_AGE = 4e7 * year
-#relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
+DUST_MASS = 0.05 #mass of each dust SPH particle
+N_RADIATIVE = 100 #number of timesteps for radiative transfer, deprecated
+MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae
+#relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3) in that order
+#import from file if it exists--refractory species survive between runs!
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
-supernova_base_release = np.array([[.86,.14,0.,0.,0.,0.,0.1,0.1,0.1,0.1,0.1,0.1,0.1]])
-dust_base_frac = (specie_fraction_array - supernova_base_release)
+#import dust_base_frac from file for future calculations, if the file exists
+dust_base_frac = supernova_base_release
+dust_base_frac[:2] = 0
+###
+#Take this from file as well if it exists. Dust mass fraction.
+DUST_FRAC = 0.005
 dust_base = dust_base_frac/np.sum(dust_base_frac)
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
 
@@ -73,6 +77,14 @@ base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = nsc.kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
+
+mass = np.random.choice(base_imf, N_PARTICLES, p = imf) * solar_mass
+N_DUST = int(DUST_FRAC * np.sum(mass)/(DUST_MASS * solar_mass))
+particle_type = np.zeros([N_PARTICLES]) #0 for gas, 1 for stars, 2 for dust
+N_PARTICLES += N_DUST
+particle_type = np.append(particle_type, [2] * N_DUST)
+mass = np.append(mass, [DUST_MASS * solar_mass] * N_DUST)
+
 points = (np.random.rand(N_PARTICLES, 3) - 0.5) * DIAMETER
 points2 = copy.deepcopy(points)
 neighbor = nsc.neighbors(points, d)
@@ -80,10 +92,7 @@ neighbor = nsc.neighbors(points, d)
 #print(points)
 velocities = np.random.normal(size=(N_PARTICLES, 3)) * 10.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
-mass = np.random.choice(base_imf, N_PARTICLES, p = imf) * solar_mass
 sizes = (mass/m_0)**(1./3.) * d
-
-particle_type = np.zeros([N_PARTICLES]) #0 for gas, 1 for star, 2 for dust
 
 mu_array = np.zeros([N_PARTICLES])#array of all mu
 E_internal = np.zeros([N_PARTICLES]) #array of all Energy
@@ -91,15 +100,14 @@ E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 #fills in E_internal array specified at the beginning
 T = 10 * (np.ones([N_PARTICLES]) + np.random.rand(N_PARTICLES)) #20 kelvins
 
+
 #fills the f_u array
-dust_fracs = ((np.random.rand(N_PARTICLES) > DUST_FRAC))
-dust_fracs = dust_fracs.astype('bool')
-particle_type[dust_fracs == False] = 2
-fgas = np.array([specie_fraction_array] * N_PARTICLES)
-fdust = np.array([dust_base[0]] * N_PARTICLES)
-f_un = (fgas.T * dust_fracs + fdust.T * (1 - dust_fracs)).T
+#import these from previous as needed
+fgas = np.array([specie_fraction_array] * N_PARTICLES).T * (particle_type == 0)
+fdust = np.array([dust_base] * N_PARTICLES).T * (particle_type == 2)
+
+f_un = (fgas + fdust).T
 f_un = f_un.astype('longdouble')
-mass[particle_type == 2] = DUST_MASS * solar_mass
 sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
 
@@ -142,7 +150,7 @@ fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = max(dt_0/5., min(dt_0, ct))
+    dt = max(dt_0/10., min(dt_0, ct))
     nsc.dt = dt
     #stop points from going ridiculously far
     points[points > 1e11 * AU] = 1e11 * AU
@@ -297,7 +305,7 @@ while (age < MAX_AGE):
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
     bg = nsc.bin_generator(mass, points, [4, 4, 4]); age += dt
     com = bg[0] #center of masses of each bin
-    grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], bg[2]).T #gravity is always acting, thus no cutoff distance introduced for gravity
+    grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], np.median(sizes)).T #gravity is always acting, thus no cutoff distance introduced for gravity
     
     densities = nsc.density(points,mass,particle_type,neighbor)
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
@@ -423,6 +431,14 @@ while (age < MAX_AGE):
     print ('Stellar mass/nondust mass = ', star_massfrac)
     print ('(stellar mass/nondust mass)/(Stellar number/total number)' + str(star_massfrac/star_numfrac))
     print ('=====================================================================')
+
+'''WE WANT SEVERAL OUTPUTS FROM THIS FILE
+1. mass fraction of dust
+2. Average composition of dust weighted by mass
+3. List of AGB progenitors and when they will form AGBs.
+4. Dust produced by type of source? (AGB, supernovae, nucleation)
+5. Find some way to calculate dilution based on mass fraction in GMCs at any given time.
+'''
     
 '''
 utime = np.unique(time_coord)
