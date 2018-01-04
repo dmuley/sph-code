@@ -146,11 +146,12 @@ plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
 particle_type[mass == max(mass)] = 1
+star_ages[mass == max(mass)] = 3.31e6 * year
 fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = max(dt_0/10., min(dt_0, ct))
+    dt = max(dt_0/20., min(dt_0, ct))
     nsc.dt = dt
     #stop points from going ridiculously far
     points[points > 1e11 * AU] = 1e11 * AU
@@ -207,7 +208,7 @@ while (age < MAX_AGE):
 			E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
 			T[T < t_cmb] = t_cmb
 			T[T >= t_max] = t_max
-			
+			'''
 			#another plotting function
 			plt.rc('font', family='tex')
 			massT = np.cumsum(mass[particle_type == 0][np.argsort(T[particle_type == 0])])
@@ -223,7 +224,7 @@ while (age < MAX_AGE):
 			ax[0].set_ylabel('Log10(density/critical density)')
 			ax[1].set_ylabel('Log10(T/K)')
 			plt.suptitle('Curves for density and temperature over time (t = ' + str(age/year) + ' years')
-			plt.pause(0.01)
+			plt.pause(0.01)'''
 
         #print("Negative compositions after radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
         #on supernova event--- add new dust particle (particle_type == 2)
@@ -240,6 +241,13 @@ while (age < MAX_AGE):
         		impulse, indices = nsc.supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
 			#print('end supernova impulse')
+			print supernova_pos
+			
+			#temporarily reducing timestep to allow AV to kick in
+			ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
+			dt = min(dt_0/100., ct)
+			nsc.dt = dt
+			
 			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos)
 			particle_type = np.concatenate((particle_type, newdusttype, newgastype))
 			E_internal[supernova_pos] = new_eint_stars
@@ -380,7 +388,7 @@ while (age < MAX_AGE):
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    '''
+    
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/AU
     ypts = points.T[1:][1][particle_type == 0]/AU
@@ -412,7 +420,7 @@ while (age < MAX_AGE):
     plt.xlabel('Position (astronomical units)')
     plt.ylabel('Position (astronomical units)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)'''
+    plt.pause(1)
     
     
     star_massfrac = float(np.sum(mass[particle_type == 1]))/np.sum(mass[particle_type != 2])

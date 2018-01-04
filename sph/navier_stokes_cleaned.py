@@ -481,7 +481,7 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
     stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
     
     dustpoints = np.vstack([points[supernova_pos][0]] * supernova_dust_len) + (np.random.normal(size = (supernova_dust_len,3))) * d_0
-    newpoints = points[supernova_pos] + (np.random.normal(size = (supernova_dust_len,3))) * d_0
+    newpoints = points[supernova_pos] + (np.random.normal(size = (len(points[supernova_pos]),3))) * d_0
     dustvels = np.vstack([velocities[supernova_pos][0]] * supernova_dust_len)
     newvels = velocities[supernova_pos]
     #newaccel = accel[supernova_pos]
