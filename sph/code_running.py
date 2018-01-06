@@ -33,7 +33,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-cross_sections = np.array([6.65e-24/2., 6.65e-24/2., 5e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 5e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
@@ -145,13 +145,13 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass == max(mass)] = 1
+'''particle_type[mass == max(mass)] = 1
 star_ages[mass == max(mass)] = 3.31e6 * year
-fig, ax = plt.subplots(nrows=1, ncols = 2)
+fig, ax = plt.subplots(nrows=1, ncols = 2)'''
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = max(dt_0/20., min(dt_0, ct))
+    dt = max(dt_0/5., min(dt_0, ct))
     nsc.dt = dt
     #stop points from going ridiculously far
     points[points > 1e11 * AU] = 1e11 * AU
@@ -422,7 +422,6 @@ while (age < MAX_AGE):
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
-    
     star_massfrac = float(np.sum(mass[particle_type == 1]))/np.sum(mass[particle_type != 2])
     star_numfrac = np.sum(float(len(particle_type[particle_type == 1]))/float(len(particle_type[particle_type != 2])))
     
@@ -501,17 +500,20 @@ plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
 INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 25, 3) - 0.5) * max_dist**0.5 * 2
+arb_points = (np.random.rand(N_PARTICLES * 100, 3) - 0.5) * max_dist**0.5 * 2 * 10./9.
 darb = nsc.density_arb(points, arb_points, mass, particle_type)
 ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes)
 tarb = nsc.temperature_arb(points, arb_points, mass, particle_type, T)
 [plt.axis('equal')]
-[plt.scatter(points.T[1:][0][particle_type == 1]/AU, points.T[1:][1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1)]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=20, alpha=0.1, edgecolor='none'), plt.colorbar()]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(tarb), s=20, alpha=0.1, edgecolor='none'), plt.colorbar()]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(ddarb/critical_density), s=20, alpha=0.1, edgecolor='none'), plt.colorbar()]
+[plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1)]
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=20, alpha=0.025, edgecolor='none')]
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=0, alpha=0.5, edgecolor='none'), plt.colorbar()]
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(tarb), s=20, alpha=0.05, edgecolor='none')]
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(tarb), s=0, alpha=0.5, edgecolor='none'), plt.colorbar()]
+[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(ddarb/critical_density), s=20, alpha=0.025, edgecolor='none'), plt.colorbar()]
 plt.xlabel('Position (astronomical units)')
 plt.ylabel('Position (astronomical units)')
 plt.title('Interpolated density in H II region')
+plt.title('Interpolated dust density in H II region')
 plt.title('Interpolated temperature in H II region')
 '''
