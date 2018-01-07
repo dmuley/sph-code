@@ -47,7 +47,7 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 1.e6 * AU
-N_PARTICLES = 2000
+N_PARTICLES = 2100
 N_INT_PER_PARTICLE = 300
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -145,8 +145,8 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass == max(mass)] = 1
-star_ages[mass == max(mass)] = 3.31e6 * year
+'''particle_type[mass == max(mass)] = 1
+star_ages[mass == max(mass)] = 3.31e6 * year'''
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
@@ -311,7 +311,7 @@ while (age < MAX_AGE):
 
     neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-    bg = nsc.bin_generator(mass, points, [4, 4, 4]); age += dt
+    bg = nsc.bin_generator(mass, points, [5, 4, 4]); age += dt
     com = bg[0] #center of masses of each bin
     grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], np.median(sizes)).T #gravity is always acting, thus no cutoff distance introduced for gravity
     
@@ -503,8 +503,8 @@ plt.xlabel('Position (astronomical units)')
 plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
-INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 1000, 3) - 0.5) * max_dist**0.5/1.5 * 10./9.
+#INTERPOLATED PLOTTING:
+arb_points = (np.random.rand(N_PARTICLES * 40, 3) - 0.5) * max_dist**0.5 * 10./9. * 2
 narb = nsc.neighbors_arb(points, arb_points)
 darb = nsc.density_arb(points, arb_points, mass, particle_type, narb)
 ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes, narb)
@@ -513,20 +513,20 @@ dtarb = nsc.dust_temperature_arb(points, arb_points, mass, particle_type, sizes,
 
 fig, ax = plt.subplots(nrows=2, ncols = 2, sharex = True, sharey = True)
 [plt.axis('equal')]
-[ax[0][0].scatter(arb_points.T[0][darb!= 0]/constants.parsec, arb_points.T[1][darb!= 0]/constants.parsec, c = np.log10(darb[darb!= 0]/critical_density), s=30, alpha=0.01, edgecolor='none')]
-ax00 = ax[0][0].scatter(arb_points.T[0][darb!= 0]/constants.parsec, arb_points.T[1][darb!= 0]/constants.parsec, c = np.log10(darb[darb!= 0]/critical_density), s=0, alpha=0.5, edgecolor='none')
+[ax[0][0].scatter(arb_points.T[1][darb!= 0]/constants.parsec, arb_points.T[2][darb!= 0]/constants.parsec, c = np.log10(darb[darb!= 0]/critical_density), s=30, alpha=0.01, edgecolor='none')]
+ax00 = ax[0][0].scatter(arb_points.T[1][darb!= 0]/constants.parsec, arb_points.T[2][darb!= 0]/constants.parsec, c = np.log10(darb[darb!= 0]/critical_density), s=0, alpha=0.5, edgecolor='none')
 
-[ax[1][0].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=30, alpha=0.025, edgecolor='none')]
-ax10 = ax[1][0].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.5, edgecolor='none')
+[ax[1][0].scatter(arb_points.T[1][tarb != 0]/constants.parsec, arb_points.T[2][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=30, alpha=0.025, edgecolor='none')]
+ax10 = ax[1][0].scatter(arb_points.T[1][tarb != 0]/constants.parsec, arb_points.T[2][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.5, edgecolor='none')
 
-[ax[0][1].scatter(arb_points.T[0][ddarb != 0]/constants.parsec, arb_points.T[1][ddarb != 0]/constants.parsec, c = np.log10(ddarb[ddarb != 0]/critical_density), s=30, alpha=0.01, edgecolor='none')]
+[ax[0][1].scatter(arb_points.T[1][ddarb != 0]/constants.parsec, arb_points.T[2][ddarb != 0]/constants.parsec, c = np.log10(ddarb[ddarb != 0]/critical_density), s=30, alpha=0.01, edgecolor='none')]
 #to ensure equal bounds to the others
-[ax[0][1].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.005, edgecolor='none')]
-ax01 = ax[0][1].scatter(arb_points.T[0][ddarb != 0]/constants.parsec, arb_points.T[1][ddarb != 0]/constants.parsec, c = np.log10(ddarb[ddarb != 0]/critical_density), s=0, alpha=0.5, edgecolor='none')
+[ax[0][1].scatter(arb_points.T[1][tarb != 0]/constants.parsec, arb_points.T[2][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.005, edgecolor='none')]
+ax01 = ax[0][1].scatter(arb_points.T[1][ddarb != 0]/constants.parsec, arb_points.T[2][ddarb != 0]/constants.parsec, c = np.log10(ddarb[ddarb != 0]/critical_density), s=0, alpha=0.5, edgecolor='none')
 
-[ax[1][1].scatter(arb_points.T[0][dtarb != 0]/constants.parsec, arb_points.T[1][dtarb != 0]/constants.parsec, c = np.log10(dtarb[dtarb != 0]), s=30, alpha=0.01, edgecolor='none')]
-ax11 = ax[1][1].scatter(arb_points.T[0][dtarb != 0]/constants.parsec, arb_points.T[1][dtarb != 0]/constants.parsec, c = np.log10(dtarb[dtarb != 0]), s=0, alpha=0.5, edgecolor='none')
-[ax[1][1].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.005, edgecolor='none')]
+[ax[1][1].scatter(arb_points.T[1][dtarb != 0]/constants.parsec, arb_points.T[2][dtarb != 0]/constants.parsec, c = np.log10(dtarb[dtarb != 0]), s=30, alpha=0.01, edgecolor='none')]
+ax11 = ax[1][1].scatter(arb_points.T[1][dtarb != 0]/constants.parsec, arb_points.T[2][dtarb != 0]/constants.parsec, c = np.log10(dtarb[dtarb != 0]), s=0, alpha=0.5, edgecolor='none')
+[ax[1][1].scatter(arb_points.T[1][tarb != 0]/constants.parsec, arb_points.T[2][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.005, edgecolor='none')]
 
 c00 = plt.colorbar(ax00, ax = ax[0][0])
 c10 = plt.colorbar(ax10, ax = ax[1][0])
@@ -538,7 +538,7 @@ c10.set_label(r'$\log{(T / K)}$')
 c01.set_label(r'$\log{(\rho/\rho_{crit})}$')
 c11.set_label(r'$\log{(T / K)}$')
 
-[qrst.scatter(points.T[0][particle_type == 1]/constants.parsec, points.T[1][particle_type == 1]/constants.parsec, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1) for qrst in ax.flatten()]
+[qrst.scatter(points.T[1][particle_type == 1]/constants.parsec, points.T[2][particle_type == 1]/constants.parsec, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1) for qrst in ax.flatten()]
 
 [qrst.set_xlabel(r'Position (parsec)') for qrst in ax[1]]
 [qrst.set_ylabel(r'Position (parsec)') for qrst in ax.T[0]]
@@ -546,5 +546,5 @@ c11.set_label(r'$\log{(T / K)}$')
 [ax[1][0].set_title(r'Gas temperature in H II region')]
 [ax[0][1].set_title(r'Dust density in H II region')]
 [ax[1][1].set_title(r'Dust temperature in H II region')]
-plt.suptitle(r'Molecular cloud 800000 y after supernova of 16.21 $M_\odot$ star')
+plt.suptitle(r'Fragmentation of collapsing molecular cloud')
 '''

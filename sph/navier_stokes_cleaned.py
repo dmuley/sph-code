@@ -247,6 +247,69 @@ def overall_spectrum(base_imf, imf):
 #A VERY SIMPLE n-BODY SIMULATION THAT BREAKS THE CLOUD INTO A NUMBER OF BINS
 #WHICH ARE INTENDED TO BE OF APPROXIMATELY EQUAL MASS. EACH OF THESE BINS THEN EXERTS A
 #GRAVITATIONAL FORCE (dampened by the length scale of each bin) ON ALL OTHER ITEMS.
+def grav_force_calculation(mass, points, sizes):
+#NO LONGER USES A GRID METHOD
+#DYNAMICALLY GENERATES SUB-CLUSTERS WHICH INTERACT WITH EACH OTHER USING A SMOOTHED GRAVITATIONAL FORCE
+#WHILE INTERNAL FORCES ARE COMPUTED JUST AS N^2 INTERACTIONS
+	pts_added = []
+	pts_init = np.arange(len(points))
+	kdt = spatial.cKDTree(points)
+	uniq = 0
+	for vwx in pts_init:
+		#kdt = spatial.cKDTree(points[pts_init])
+		distances, nbrs = kdt.query(points[vwx], int(np.sqrt(len(np.append(pts_init, 1))) + 1), distance_upper_bound = d)
+		red_nbrs = np.array(nbrs)[np.array(distances) < d]
+	
+		pts_init_base = np.unique(np.append(pts_init, red_nbrs))
+		pts_init_2 = np.unique(np.setdiff1d(pts_init_base, red_nbrs))
+		uniq += len(pts_init) - len(pts_init_2)
+		#print uniq
+	
+		pts_added.append(np.setdiff1d(pts_init, pts_init_2))
+	
+		pts_init = pts_init_2
+	
+	clusters = np.array(pts_added)[np.array([len(aide) for aide in pts_added]) != 0]
+	total_mass = []
+	center_of_mass = []
+	squared_distance_com = []
+	mean_size = []
+	for xkz in clusters:
+		total_mass.append(np.sum(mass[xkz]))
+		center_of_mass.append(np.sum((points[xkz].T * mass[xkz]), axis=1)/np.sum(mass[xkz]))
+		squared_distance_com.append(np.sum((points[xkz].T**2 * mass[xkz]), axis=1)/np.sum(mass[xkz]))
+		mean_size.append(np.average(sizes[xkz]))
+
+	squared_distance_com = np.array(squared_distance_com)
+	center_of_mass = np.array(center_of_mass)
+	mean_size = np.array(mean_size)
+	total_mass = np.array(total_mass)
+	
+	#use square_distance_com to evaluate smoothing length scale
+	smoothing_scale = (np.sum(squared_distance_com - center_of_mass**2, axis=1)**2 + mean_size**4)**0.25
+	
+	indices = np.arange(len(center_of_mass))
+	indices_pairs = itertools.product(indices, indices)
+	indices_assign = np.array([np.array([a, b]) for a, b in indices_pairs])
+	grav_forces_indices = np.array([G * (center_of_mass[a] - center_of_mass[b])/(np.sum((center_of_mass[a] - center_of_mass[b])**2) + smoothing_scale[a]**2 + smoothing_scale[b]**2)**(3./2.) for a, b in indices_assign])
+	mass_array_indices = total_mass[np.array(indices_assign)] * np.array([1, -1])
+	
+	grav_accels_clusters = np.zeros(shape=(3, len(smoothing_scale)))
+	grav_accels_clusters.T[indices_assign.T[0]] += (grav_forces_indices.T * mass_array_indices.T[0]).T
+	grav_accels_clusters.T[indices_assign.T[1]] += (grav_forces_indices.T * mass_array_indices.T[1]).T
+	
+	grav_accels = np.zeros(shape=(len(points), 3))
+	for int_cluster in np.arange(len(clusters)):
+		cluster_el = clusters[int_cluster]
+		grav_accels[cluster_el] += grav_accels_clusters.T[int_cluster]
+		#print grav_accels[cluster_el]
+		#for simplicity, assume basic central potential within clusters. Nothing too fancy needed
+		dist_to_center = points[cluster_el] - center_of_mass[int_cluster]
+		grav_accel_internal = -G * total_mass[int_cluster] * dist_to_center.T/(np.sum(dist_to_center**2, axis=1) + mean_size[int_cluster]**2)**(3./2.)
+		grav_accels[cluster_el] += grav_accel_internal.T
+	
+	return grav_accels
+	
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]
     positional_masses = np.array([masses[np.argsort(positions.T[b])] for b in range(len(subdivisions))])
@@ -300,9 +363,6 @@ def compute_gravitational_force(particle_positions, grid_com, grid_masses, lengt
 #LITERATURE IN THE FIELD (Monaghan 1993 for artificial viscosity, for instance) AND SOME ORIGINAL CONTRIBUTIONS
 #TO HANDLE DUST.
 
-#Future possibilities---turn these functions into parametric versions that don't assume variables like position,
-#velocity, etc. are constants. This will eliminate the need for dummy variables and make the code that runs the
-#simulation a lot more concise.
 def neighbors(points, dist):
     kdt = spatial.cKDTree(points)  
     qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
