@@ -145,9 +145,9 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-'''particle_type[mass == max(mass)] = 1
+particle_type[mass == max(mass)] = 1
 star_ages[mass == max(mass)] = 3.31e6 * year
-fig, ax = plt.subplots(nrows=1, ncols = 2)'''
+#fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
@@ -261,7 +261,7 @@ while (age < MAX_AGE):
 			points = np.vstack([points, dustpoints, newpoints])
 			sizes = np.zeros(len(points))
 			sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
-			sizes[particle_type == 1] = d/1000.
+			sizes[particle_type == 1] = d/10000.
 			sizes[particle_type == 2] = d
 			Tnew = np.zeros(len(sizes));
 			Tnew[:len(T)] += T
@@ -348,15 +348,6 @@ while (age < MAX_AGE):
     
     E_internal = np.nan_to_num(E_internal) + np.nan_to_num(av[1] * dt)
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
-
-    star_ages[(particle_type == 1) & (star_ages > -2)] += dt
-    #print star_ages[(particle_type == 1)]/year
-    probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
-    diceroll = np.random.rand(len(probability))
-    particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
-    #this helps ensure that lone SPH particles don't form stars at late times in the simulation
-    #ideally, there is an infinite number of SPH particles, each with infinitesimal density
-    #that only has any real physical effects in conjunction with other particles
         
     vel_condition = np.sum(velocities**2, axis=1)
     
@@ -410,6 +401,8 @@ while (age < MAX_AGE):
     max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     
+    #BEGIN PLOTTING
+    
     plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,np.log10(t_max)]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
     plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,np.log10(t_max)]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100 * 4, [0.01, 0.01]), edgecolor='none', alpha=0.1)
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
@@ -422,6 +415,17 @@ while (age < MAX_AGE):
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
+    #END PLOTTING
+    
+    star_ages[(particle_type == 1) & (star_ages > -2)] += dt
+    #print star_ages[(particle_type == 1)]/year
+    probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
+    diceroll = np.random.rand(len(probability))
+    particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
+    #this helps ensure that lone SPH particles don't form stars at late times in the simulation
+    #ideally, there is an infinite number of SPH particles, each with infinitesimal density
+    #that only has any real physical effects in conjunction with other particles
+
     star_massfrac = float(np.sum(mass[particle_type == 1]))/np.sum(mass[particle_type != 2])
     star_numfrac = np.sum(float(len(particle_type[particle_type == 1]))/float(len(particle_type[particle_type != 2])))
     
@@ -500,20 +504,47 @@ plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
 INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 100, 3) - 0.5) * max_dist**0.5 * 2 * 10./9.
-darb = nsc.density_arb(points, arb_points, mass, particle_type)
-ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes)
-tarb = nsc.temperature_arb(points, arb_points, mass, particle_type, T)
+arb_points = (np.random.rand(N_PARTICLES * 1000, 3) - 0.5) * max_dist**0.5/1.5 * 10./9.
+narb = nsc.neighbors_arb(points, arb_points)
+darb = nsc.density_arb(points, arb_points, mass, particle_type, narb)
+ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes, narb)
+tarb = nsc.temperature_arb(points, arb_points, mass, particle_type, T, narb)
+dtarb = nsc.dust_temperature_arb(points, arb_points, mass, particle_type, sizes, T, narb)
+
+fig, ax = plt.subplots(nrows=2, ncols = 2, sharex = True, sharey = True)
 [plt.axis('equal')]
-[plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1)]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=20, alpha=0.025, edgecolor='none')]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(darb/critical_density), s=0, alpha=0.5, edgecolor='none'), plt.colorbar()]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(tarb), s=20, alpha=0.05, edgecolor='none')]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(tarb), s=0, alpha=0.5, edgecolor='none'), plt.colorbar()]
-[plt.scatter(arb_points.T[0]/AU, arb_points.T[1]/AU, c = np.log10(ddarb/critical_density), s=20, alpha=0.025, edgecolor='none'), plt.colorbar()]
-plt.xlabel('Position (astronomical units)')
-plt.ylabel('Position (astronomical units)')
-plt.title('Interpolated density in H II region')
-plt.title('Interpolated dust density in H II region')
-plt.title('Interpolated temperature in H II region')
+[ax[0][0].scatter(arb_points.T[0][darb!= 0]/constants.parsec, arb_points.T[1][darb!= 0]/constants.parsec, c = np.log10(darb[darb!= 0]/critical_density), s=30, alpha=0.01, edgecolor='none')]
+ax00 = ax[0][0].scatter(arb_points.T[0][darb!= 0]/constants.parsec, arb_points.T[1][darb!= 0]/constants.parsec, c = np.log10(darb[darb!= 0]/critical_density), s=0, alpha=0.5, edgecolor='none')
+
+[ax[1][0].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=30, alpha=0.025, edgecolor='none')]
+ax10 = ax[1][0].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.5, edgecolor='none')
+
+[ax[0][1].scatter(arb_points.T[0][ddarb != 0]/constants.parsec, arb_points.T[1][ddarb != 0]/constants.parsec, c = np.log10(ddarb[ddarb != 0]/critical_density), s=30, alpha=0.01, edgecolor='none')]
+#to ensure equal bounds to the others
+[ax[0][1].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.005, edgecolor='none')]
+ax01 = ax[0][1].scatter(arb_points.T[0][ddarb != 0]/constants.parsec, arb_points.T[1][ddarb != 0]/constants.parsec, c = np.log10(ddarb[ddarb != 0]/critical_density), s=0, alpha=0.5, edgecolor='none')
+
+[ax[1][1].scatter(arb_points.T[0][dtarb != 0]/constants.parsec, arb_points.T[1][dtarb != 0]/constants.parsec, c = np.log10(dtarb[dtarb != 0]), s=30, alpha=0.01, edgecolor='none')]
+ax11 = ax[1][1].scatter(arb_points.T[0][dtarb != 0]/constants.parsec, arb_points.T[1][dtarb != 0]/constants.parsec, c = np.log10(dtarb[dtarb != 0]), s=0, alpha=0.5, edgecolor='none')
+[ax[1][1].scatter(arb_points.T[0][tarb != 0]/constants.parsec, arb_points.T[1][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.005, edgecolor='none')]
+
+c00 = plt.colorbar(ax00, ax = ax[0][0])
+c10 = plt.colorbar(ax10, ax = ax[1][0])
+c01 = plt.colorbar(ax01, ax = ax[0][1])
+c11 = plt.colorbar(ax11, ax = ax[1][1])
+
+c00.set_label(r'$\log{(\rho/\rho_{crit})}$')
+c10.set_label(r'$\log{(T / K)}$')
+c01.set_label(r'$\log{(\rho/\rho_{crit})}$')
+c11.set_label(r'$\log{(T / K)}$')
+
+[qrst.scatter(points.T[0][particle_type == 1]/constants.parsec, points.T[1][particle_type == 1]/constants.parsec, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1) for qrst in ax.flatten()]
+
+[qrst.set_xlabel(r'Position (parsec)') for qrst in ax[1]]
+[qrst.set_ylabel(r'Position (parsec)') for qrst in ax.T[0]]
+[ax[0][0].set_title(r'Gas density in H II region')]
+[ax[1][0].set_title(r'Gas temperature in H II region')]
+[ax[0][1].set_title(r'Dust density in H II region')]
+[ax[1][1].set_title(r'Dust temperature in H II region')]
+plt.suptitle(r'Molecular cloud 800000 y after supernova of 16.21 $M_\odot$ star')
 '''
