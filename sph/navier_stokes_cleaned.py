@@ -247,6 +247,7 @@ def overall_spectrum(base_imf, imf):
 #A VERY SIMPLE n-BODY SIMULATION THAT BREAKS THE CLOUD INTO A NUMBER OF BINS
 #WHICH ARE INTENDED TO BE OF APPROXIMATELY EQUAL MASS. EACH OF THESE BINS THEN EXERTS A
 #GRAVITATIONAL FORCE (dampened by the length scale of each bin) ON ALL OTHER ITEMS.
+
 def grav_force_calculation(mass, points, sizes):
 #NO LONGER USES A GRID METHOD
 #DYNAMICALLY GENERATES SUB-CLUSTERS WHICH INTERACT WITH EACH OTHER USING A SMOOTHED GRAVITATIONAL FORCE
@@ -270,6 +271,7 @@ def grav_force_calculation(mass, points, sizes):
 		pts_init = pts_init_2
 	
 	clusters = np.array(pts_added)[np.array([len(aide) for aide in pts_added]) != 0]
+	n_parts = np.array([len(tree_el) for tree_el in clusters])
 	total_mass = []
 	center_of_mass = []
 	squared_distance_com = []
@@ -278,7 +280,7 @@ def grav_force_calculation(mass, points, sizes):
 		total_mass.append(np.sum(mass[xkz]))
 		center_of_mass.append(np.sum((points[xkz].T * mass[xkz]), axis=1)/np.sum(mass[xkz]))
 		squared_distance_com.append(np.sum((points[xkz].T**2 * mass[xkz]), axis=1)/np.sum(mass[xkz]))
-		mean_size.append(np.average(sizes[xkz]))
+		mean_size.append(np.average(sizes[xkz]**3)**(1./3.))
 
 	squared_distance_com = np.array(squared_distance_com)
 	center_of_mass = np.array(center_of_mass)
@@ -286,17 +288,18 @@ def grav_force_calculation(mass, points, sizes):
 	total_mass = np.array(total_mass)
 	
 	#use square_distance_com to evaluate smoothing length scale
-	smoothing_scale = (np.sum(squared_distance_com - center_of_mass**2, axis=1)**2 + mean_size**4)**0.25
+	#smoothing_scale = (np.sum(squared_distance_com - center_of_mass**2, axis=1)**2 + mean_size**4)**0.25
+	smoothing_scale = mean_size * n_parts**(1./3.)
 	
 	indices = np.arange(len(center_of_mass))
 	indices_pairs = itertools.product(indices, indices)
 	indices_assign = np.array([np.array([a, b]) for a, b in indices_pairs])
-	grav_forces_indices = np.array([G * (center_of_mass[a] - center_of_mass[b])/(np.sum((center_of_mass[a] - center_of_mass[b])**2) + smoothing_scale[a]**2 + smoothing_scale[b]**2)**(3./2.) for a, b in indices_assign])
-	mass_array_indices = total_mass[np.array(indices_assign)] * np.array([1, -1])
+	grav_forces_indices = np.nan_to_num([G * (center_of_mass[qv[1]] - center_of_mass[qv[0]])/(np.sum((center_of_mass[qv[1]] - center_of_mass[qv[0]])**2) + smoothing_scale[qv[1]])**(3./2.) for qv in indices_assign])
+	mass_array_indices = total_mass[indices_assign.T]
 	
 	grav_accels_clusters = np.zeros(shape=(3, len(smoothing_scale)))
-	grav_accels_clusters.T[indices_assign.T[0]] += (grav_forces_indices.T * mass_array_indices.T[0]).T
-	grav_accels_clusters.T[indices_assign.T[1]] += (grav_forces_indices.T * mass_array_indices.T[1]).T
+	grav_accels_clusters.T[indices_assign.T[0]] += (grav_forces_indices.T * mass_array_indices[1]).T
+	grav_accels_clusters.T[indices_assign.T[1]] += -(grav_forces_indices.T * mass_array_indices[0]).T
 	
 	grav_accels = np.zeros(shape=(len(points), 3))
 	for int_cluster in np.arange(len(clusters)):
@@ -308,7 +311,7 @@ def grav_force_calculation(mass, points, sizes):
 		grav_accel_internal = -G * total_mass[int_cluster] * dist_to_center.T/(np.sum(dist_to_center**2, axis=1) + mean_size[int_cluster]**2)**(3./2.)
 		grav_accels[cluster_el] += grav_accel_internal.T
 	
-	return grav_accels
+	return grav_accels, center_of_mass, grav_accels_clusters.T
 	
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]

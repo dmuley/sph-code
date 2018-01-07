@@ -311,10 +311,13 @@ while (age < MAX_AGE):
 
     neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-    bg = nsc.bin_generator(mass, points, [5, 4, 4]); age += dt
+    age += dt
+    gfcalc = nsc.grav_force_calculation(mass, points, sizes);
+    grav_accel = gfcalc[0]
+    '''bg = nsc.bin_generator(mass, points, [5, 4, 4]); age += dt
     com = bg[0] #center of masses of each bin
     grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], np.median(sizes)).T #gravity is always acting, thus no cutoff distance introduced for gravity
-    
+    '''
     densities = nsc.density(points,mass,particle_type,neighbor)
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
