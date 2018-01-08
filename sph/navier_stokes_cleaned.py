@@ -695,12 +695,20 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			#but independently acting on each particle. This works because electron thermal velocity is much
 			#faster than that of anything else
 	
-			n_e = np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[5] * (particle_type[neighbor[j]] == 0)) #times electron concentration
-			rel_weights = np.nan_to_num(Weigh2(x, x_0, m, d) * (particle_type[neighbor[j]] == 0)/Weigh2(x, x, m, d))
+			n_e = np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[5] * (particle_type[neighbor[j]] == 0))
+			n_e *= n_e > 0 #times electron concentration
+			
+			rel_weights = np.nan_to_num(Weigh2(x, x_0, m, d)) * (particle_type[neighbor[j]] == 0)
+			rel_weights *= (rel_weights > 0)/Weigh2(x, x, m, d)
+			
 			n_H_plus =  np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[3] * (particle_type[neighbor[j]] == 0))
+			n_H_plus *= (n_H_plus > 0)
+			
 			n_He_plus =  np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[4] * (particle_type[neighbor[j]] == 0))
+			n_He_plus *= (n_He_plus > 0)			
+			
 			#tot_e = Weigh2(x, x_0, m, d)/(muloc * m_h) * (particle_type[neighbor[j]] == 0) #total number density
-			H_effect = np.nan_to_num(2.59e-19 * t4**(-0.833 - 0.034 * np.log(t4)) * (particle_type[neighbor[j]] == 0))
+			H_effect = np.nan_to_num(4.13e-19 * t4**(-0.7131 - 0.0115 * np.log(t4)) * (particle_type[neighbor[j]] == 0))
 			He_effect = np.nan_to_num(2.72e-19 * t4**(-0.789) * (particle_type[neighbor[j]] == 0))
 			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
 			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
@@ -742,7 +750,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	rec_array /= (rel_array + 1e-90)
 	energy_array /= (rel_array + 1e-90)
-	rec_array /= np.sum(rec_array/0.999, axis=0)
+	rec_array /= np.sum(rec_array/0.999, axis=0)/2
 	rec_array = np.nan_to_num(rec_array)
 	print np.min(rec_array), np.max(rec_array)
 	
@@ -752,8 +760,8 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	energy = np.nan_to_num(np.sum(final_comp * energy_array, axis=0))
 	
-	final_comp[1] += H_plus_frac
-	final_comp[2] += He_plus_frac
+	final_comp[1] += He_plus_frac
+	final_comp[2] += H_plus_frac
 	final_comp[3] -= H_plus_frac
 	final_comp[4] -= He_plus_frac
 	final_comp[5] -= elec_frac
@@ -994,6 +1002,25 @@ def dust_temperature_arb(points, arb_points, mass, particle_type, sizes, T, narb
             #print np.sum((rho * temps) * (rho > 0)), np.sum(rho * (rho > 0))
         
             density_array.append(np.nan_to_num(np.sum((rho * temps)[rho > 0])/np.sum(rho[rho > 0])))
+        else:
+            density_array.append(0)
+            
+    return np.array(density_array)
+
+def photoionization_arb(points, arb_points, mass, N_PART, photoionization, particle_type, narb):
+    density_array = []
+    #narb = neighbors_arb(points, arb_points)
+    for j in range(len(arb_points)):
+        if len(narb[j]) > 1:
+            x_0 = arb_points[j]
+            #print np.array(narb[j])
+            x = points[np.array(narb[j])]
+            m = mass[np.array(narb[j])]
+            numpart_loc = N_PART[np.array(narb[j])]
+            photio = photoionization[np.array(narb[j])]
+            rho = Weigh2(x, x_0, m, d)/Weigh2(x, x, m, d) * (particle_type[np.array(narb[j])] == 0) * numpart_loc
+        
+            density_array.append(np.sum((rho * np.nan_to_num(photio))[rho > 0])/np.sum(rho[rho > 0]))
         else:
             density_array.append(0)
             

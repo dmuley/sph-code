@@ -33,7 +33,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 5e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 6.65e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
@@ -59,7 +59,7 @@ dt = dt_0
 nsc.dt = dt
 nsc.dt_0 = dt_0
 DUST_MASS = 0.05 #mass of each dust SPH particle
-N_RADIATIVE = 100 #number of timesteps for radiative transfer, deprecated
+N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae
 #relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3) in that order
 #import from file if it exists--refractory species survive between runs!
@@ -145,13 +145,17 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-'''particle_type[mass == max(mass)] = 1
-star_ages[mass == max(mass)] = 3.31e6 * year'''
+particle_type[mass == max(mass)] = 1
+star_ages[mass == max(mass)] = 3.31e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
-    dt = max(dt_0/5., min(dt_0, ct))
+    if age == 0:
+    	dt = dt_0/10
+    else:
+    	dt = max(dt_0/5., min(dt_0, ct))
+    	
     nsc.dt = dt
     #stop points from going ridiculously far
     points[points > 1e11 * AU] = 1e11 * AU
@@ -165,7 +169,7 @@ while (age < MAX_AGE):
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         #N_RADIATIVE = int(10 + np.average(np.nan_to_num(T))**(1./3.)/10.)
-        N_RADIATIVE = 1
+        #N_RADIATIVE = 1
         area = (4 * np.pi * sizes**2)
         N_PART = mass/(m_h * mu_array)
         W6_integral = 9./area #evaluating integral of W6 kernel
@@ -384,15 +388,15 @@ while (age < MAX_AGE):
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
-    xpts = points.T[1:][0][particle_type == 0]/AU
-    ypts = points.T[1:][1][particle_type == 0]/AU
+    xpts = points.T[1:][0][particle_type == 0]/constants.parsec
+    ypts = points.T[1:][1][particle_type == 0]/constants.parsec
     
-    xstars = points.T[1:][0][particle_type == 1]/AU
-    ystars = points.T[1:][1][particle_type == 1]/AU
+    xstars = points.T[1:][0][particle_type == 1]/constants.parsec
+    ystars = points.T[1:][1][particle_type == 1]/constants.parsec
     sstars = (mass[particle_type == 1]/solar_mass) * 2.
     
-    xdust = points.T[1:][0][particle_type == 2]/AU
-    ydust = points.T[1:][1][particle_type == 2]/AU
+    xdust = points.T[1:][0][particle_type == 2]/constants.parsec
+    ydust = points.T[1:][1][particle_type == 2]/constants.parsec
     
     #colors = (f_un.T[5]/np.sum(f_un, axis=1))[particle_type == 0]
     colors = np.log10(T[particle_type == 0])
@@ -413,8 +417,8 @@ while (age < MAX_AGE):
     plt.colorbar()
     plt.scatter(xstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], ystars[(dist_sq[particle_type == 1] < max_dist * 11./9.)], c='black', s=sstars[(dist_sq[particle_type == 1] < max_dist * 11./9.)])
     #plt.scatter(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], c=col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)], s = (m_0/solar_mass), alpha=0.25)
-    plt.xlabel('Position (astronomical units)')
-    plt.ylabel('Position (astronomical units)')
+    plt.xlabel('Position (parsecs)')
+    plt.ylabel('Position (parsecs)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
@@ -459,6 +463,7 @@ utime = np.unique(time_coord)
 dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
 dusts = np.array([np.std(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
 starf = np.array([np.average(star_frac[time_coord == med]) for med in np.unique(time_coord)])
+photodissociation = (f_un.T[3] + f_un.T[2] + f_un.T[4])/(f_un.T[2] + f_un.T[0] + f_un.T[3] + f_un.T[1] + f_un.T[4]
 
 plt.scatter(np.log10(time_coord/year), np.log10(dust_temps), alpha=0.2, c='grey', s = 10, edgecolor='none')
 plt.plot(np.log10(utime/year), np.log10(dustt), c='maroon', alpha=0.5)
@@ -507,12 +512,13 @@ plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
 #INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 100, 3) - 0.5) * max_dist**0.5 * 10./9. * 2.5
+arb_points = (np.random.rand(N_PARTICLES * 50, 3) - 0.5) * max_dist**0.5 * 10./9. * 2
 narb = nsc.neighbors_arb(points, arb_points)
 darb = nsc.density_arb(points, arb_points, mass, particle_type, narb)
 ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes, narb)
 tarb = nsc.temperature_arb(points, arb_points, mass, particle_type, T, narb)
 dtarb = nsc.dust_temperature_arb(points, arb_points, mass, particle_type, sizes, T, narb)
+parb = nsc.photoionization_arb(points, arb_points, mass, N_PART, photio, particle_type, narb)
 
 fig, ax = plt.subplots(nrows=2, ncols = 2, sharex = True, sharey = True)
 [plt.axis('equal')]
@@ -549,5 +555,25 @@ c11.set_label(r'$\log{(T / K)}$')
 [ax[1][0].set_title(r'Gas temperature in H II region')]
 [ax[0][1].set_title(r'Dust density in H II region')]
 [ax[1][1].set_title(r'Dust temperature in H II region')]
-plt.suptitle(r'Fragmentation of collapsing molecular cloud at $t = 0.992 t_{ff}$')
+plt.suptitle(r'Post-supernova molecular cloud')
+
+fig, ax = plt.subplots(nrows=1, ncols=2, sharex = True, sharey = True)
+plt.axis('equal')
+ax[0].scatter(arb_points.T[1][tarb != 0]/constants.parsec, arb_points.T[2][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=40, alpha=0.025, edgecolor='none')
+ax0 = ax[0].scatter(arb_points.T[1][tarb != 0]/constants.parsec, arb_points.T[2][tarb != 0]/constants.parsec, c = np.log10(tarb[tarb != 0]), s=0, alpha=0.25, edgecolor='none')
+ax[1].scatter(arb_points.T[1][parb > 0]/constants.parsec, arb_points.T[2][parb > 0]/constants.parsec, c = np.log10(parb[parb > 0]), s=40, alpha=0.025, edgecolor='none')
+ax1 = ax[1].scatter(arb_points.T[1][parb > 0]/constants.parsec, arb_points.T[2][parb > 0]/constants.parsec, c = np.log10(parb[parb > 0]), s=0, alpha=0.25, edgecolor='none')
+[qrst.scatter(points.T[1][particle_type == 1]/constants.parsec, points.T[2][particle_type == 1]/constants.parsec, c = 'black', s=(mass[particle_type == 1]/solar_mass) * 2, alpha=1) for qrst in ax.flatten()]
+
+[qrst.set_xlabel(r'Position (parsec)') for qrst in ax]
+ax[0].set_ylabel(r'Position (parsec)')
+
+c0 = plt.colorbar(ax0, ax = ax[0])
+c1 = plt.colorbar(ax1, ax = ax[1])
+c0.set_label(r'$\log{(T / K)}$')
+c1.set_label(r'$\log{f_{diss}}$')
+[qrst.set(aspect='equal') for qrst in ax]
+ax[0].set_title(r'Temperature in H II region')
+ax[1].set_title(r'Photodissociation fraction in H II region')
+plt.suptitle(r'H II region surrounding 28.72 $M_\odot$ star')
 '''
