@@ -46,8 +46,8 @@ mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN 
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1.e6 * AU
-N_PARTICLES = 2100
+DIAMETER = 1.1e6 * AU
+N_PARTICLES = 2500
 N_INT_PER_PARTICLE = 300
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -507,7 +507,7 @@ plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
 #INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 40, 3) - 0.5) * max_dist**0.5 * 10./9. * 2
+arb_points = (np.random.rand(N_PARTICLES * 100, 3) - 0.5) * max_dist**0.5 * 10./9. * 2.5
 narb = nsc.neighbors_arb(points, arb_points)
 darb = nsc.density_arb(points, arb_points, mass, particle_type, narb)
 ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes, narb)
@@ -549,5 +549,5 @@ c11.set_label(r'$\log{(T / K)}$')
 [ax[1][0].set_title(r'Gas temperature in H II region')]
 [ax[0][1].set_title(r'Dust density in H II region')]
 [ax[1][1].set_title(r'Dust temperature in H II region')]
-plt.suptitle(r'Fragmentation of collapsing molecular cloud')
+plt.suptitle(r'Fragmentation of collapsing molecular cloud at $t = 0.992 t_{ff}$')
 '''

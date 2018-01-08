@@ -280,7 +280,7 @@ def grav_force_calculation(mass, points, sizes):
 		total_mass.append(np.sum(mass[xkz]))
 		center_of_mass.append(np.sum((points[xkz].T * mass[xkz]), axis=1)/np.sum(mass[xkz]))
 		squared_distance_com.append(np.sum((points[xkz].T**2 * mass[xkz]), axis=1)/np.sum(mass[xkz]))
-		mean_size.append(np.average(sizes[xkz]**3)**(1./3.))
+		mean_size.append(np.median(sizes[xkz]**3)**(1./3.))
 
 	squared_distance_com = np.array(squared_distance_com)
 	center_of_mass = np.array(center_of_mass)
@@ -289,29 +289,27 @@ def grav_force_calculation(mass, points, sizes):
 	
 	#use square_distance_com to evaluate smoothing length scale
 	#smoothing_scale = (np.sum(squared_distance_com - center_of_mass**2, axis=1)**2 + mean_size**4)**0.25
-	smoothing_scale = mean_size * n_parts**(1./3.)
-	
-	indices = np.arange(len(center_of_mass))
-	indices_pairs = itertools.product(indices, indices)
-	indices_assign = np.array([np.array([a, b]) for a, b in indices_pairs])
-	grav_forces_indices = np.nan_to_num([G * (center_of_mass[qv[1]] - center_of_mass[qv[0]])/(np.sum((center_of_mass[qv[1]] - center_of_mass[qv[0]])**2) + smoothing_scale[qv[1]])**(3./2.) for qv in indices_assign])
-	mass_array_indices = total_mass[indices_assign.T]
+	smoothing_scale = mean_size # * n_parts**(1./3.)
 	
 	grav_accels_clusters = np.zeros(shape=(3, len(smoothing_scale)))
-	grav_accels_clusters.T[indices_assign.T[0]] += (grav_forces_indices.T * mass_array_indices[1]).T
-	grav_accels_clusters.T[indices_assign.T[1]] += -(grav_forces_indices.T * mass_array_indices[0]).T
-	
+	for element in range(len(clusters)):
+		dist_norm = (center_of_mass - center_of_mass[element]).T/(np.sum((center_of_mass - center_of_mass[element])**2, axis=1) + np.average(smoothing_scale**0.25)**8)**(3./2.)
+		grav_accels_clusters += -G * dist_norm * total_mass[element]
+		grav_accels_clusters.T[element] += np.sum((G * dist_norm * total_mass).T, axis=0)
+		
 	grav_accels = np.zeros(shape=(len(points), 3))
+	grav_accels_local = np.zeros(shape=(len(points), 3))
 	for int_cluster in np.arange(len(clusters)):
 		cluster_el = clusters[int_cluster]
 		grav_accels[cluster_el] += grav_accels_clusters.T[int_cluster]
 		#print grav_accels[cluster_el]
 		#for simplicity, assume basic central potential within clusters. Nothing too fancy needed
 		dist_to_center = points[cluster_el] - center_of_mass[int_cluster]
-		grav_accel_internal = -G * total_mass[int_cluster] * dist_to_center.T/(np.sum(dist_to_center**2, axis=1) + mean_size[int_cluster]**2)**(3./2.)
-		grav_accels[cluster_el] += grav_accel_internal.T
+		grav_accel_internal = -G * total_mass[int_cluster] * dist_to_center.T/(np.sum(dist_to_center**2, axis=1) + smoothing_scale[int_cluster]**2)**(3./2.)
+		grav_accels_local[cluster_el] += grav_accel_internal.T
 	
-	return grav_accels, center_of_mass, grav_accels_clusters.T
+	grav_accels += grav_accels_local
+	return grav_accels, center_of_mass, grav_accels_clusters.T, grav_accels_local
 	
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]
