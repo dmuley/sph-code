@@ -10,6 +10,7 @@ from scipy import spatial, stats
 import copy
 from time import sleep
 import navier_stokes_cleaned as nsc
+import os
 
 G = constants.G
 k = constants.Boltzmann
@@ -33,13 +34,15 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
+
 cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 6.65e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
+
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
 f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
-supernova_base_release = np.array([.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
 W6_constant = (3 * np.pi/80)
 
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
@@ -60,18 +63,26 @@ nsc.dt = dt
 nsc.dt_0 = dt_0
 DUST_MASS = 0.05 #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
-MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae
-#relative abundance for species in each SPH particle,  (H2, H, H+,He,He+Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3) in that order
+MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
+
+'''
+WHAT NEEDS TO BE DONE HERE: IMPORT COMPOSITION AND DUST FRACTION FROM FILE, IF SUCH A FILE EXISTS
+THIS CODE WILL WRITE TO FILE, HELPER CODE WILL CREATE FILE
+'''
+#specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
+#supernova_base_release = np.array([.86 * (1. - 0.19),.14 + 0.19 * 0.86/2.,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
+
 #import from file if it exists--refractory species survive between runs!
-specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
+
+
+specie_fraction_array = np.array([.86,.14,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.])
 #import dust_base_frac from file for future calculations, if the file exists
 dust_base_frac = supernova_base_release
 dust_base_frac[:2] = 0
 ###
 #Take this from file as well if it exists. Dust mass fraction.
-DUST_FRAC = 0.005
+DUST_FRAC = 0.000
 dust_base = dust_base_frac/np.sum(dust_base_frac)
-cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
 
 base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)
 d_base_imf = np.append(base_imf[0], np.diff(base_imf))
@@ -145,8 +156,8 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass == max(mass)] = 1
-star_ages[mass == max(mass)] = 3.31e6 * year
+'''particle_type[mass == max(mass)] = 1
+star_ages[mass == max(mass)] = 3.31e6 * year'''
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
@@ -386,7 +397,7 @@ while (age < MAX_AGE):
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    
+    '''
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
@@ -403,11 +414,11 @@ while (age < MAX_AGE):
     col_dust = np.log10(T[particle_type == 2])
     
     plt.clf()
-    plt.axis('equal')
+    plt.axis('equal')'''
     
     max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
-    
+    '''
     #BEGIN PLOTTING
     
     plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,np.log10(t_max)]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
@@ -422,7 +433,7 @@ while (age < MAX_AGE):
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
-    #END PLOTTING
+    #END PLOTTING'''
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
@@ -457,7 +468,11 @@ while (age < MAX_AGE):
 4. Dust produced by type of source? (AGB, supernovae, nucleation)
 5. Find some way to calculate dilution based on mass fraction in GMCs at any given time.
 '''
-    
+
+gas_mass_by_species = np.sum((((f_un * mu_specie)[particle_type == 0].T/np.sum((f_un * mu_specie)[particle_type == 0], axis=1)) * mass[particle_type == 0]).T, axis=0)
+star_mass_by_species = np.sum((((f_un * mu_specie)[particle_type == 1].T/np.sum((f_un * mu_specie)[particle_type == 1], axis=1)) * mass[particle_type == 1]).T, axis=0)
+dust_mass_by_species = np.sum((((f_un * mu_specie)[particle_type == 2].T/np.sum((f_un * mu_specie)[particle_type == 2], axis=1)) * mass[particle_type == 2]).T, axis=0)
+
 '''
 utime = np.unique(time_coord)
 dustt = np.array([np.average(dust_temps[time_coord == med]) for med in np.unique(time_coord)])
