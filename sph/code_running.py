@@ -575,5 +575,5 @@ c1.set_label(r'$\log{f_{diss}}$')
 [qrst.set(aspect='equal') for qrst in ax]
 ax[0].set_title(r'Temperature in H II region')
 ax[1].set_title(r'Photodissociation fraction in H II region')
-plt.suptitle(r'H II region surrounding 28.72 $M_\odot$ star')
+plt.suptitle(r'H II region surrounding 20.01 $M_\odot$ star')
 '''

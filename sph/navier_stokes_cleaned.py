@@ -729,7 +729,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			#print H_effect_energy, He_effect_energy
 			
 			frac_rec_e = (H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt
-			frac_rec_e = min(1. - np.exp(-np.nan_to_num(frac_rec_e)), 0.999)
+			frac_rec_e = min(frac_rec_e, 0.999)
 			#print frac_rec_e
 			frac_rec_H = frac_rec_e * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec))
 			frac_rec_He = frac_rec_e * np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec))
@@ -750,9 +750,9 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	rec_array /= (rel_array + 1e-90)
 	energy_array /= (rel_array + 1e-90)
-	rec_array /= np.sum(rec_array/0.999, axis=0)/2
+	#rec_array /= np.sum(rec_array/0.999, axis=0)/2
 	rec_array = np.nan_to_num(rec_array)
-	print np.min(rec_array), np.max(rec_array)
+	#print np.min(rec_array), np.max(rec_array)
 	
 	H_plus_frac = f_un.T[5] * rec_array[3]
 	He_plus_frac = f_un.T[5] * rec_array[4]
