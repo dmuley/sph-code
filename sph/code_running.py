@@ -31,15 +31,15 @@ nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
-#properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
-species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3'])
-mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
-cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 6.65e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
-destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
-mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250.])
-sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137])
-f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
-gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.])#the polytropes of species in each SPH, an array of arrays
+#properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
+species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
+mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
+cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 6.65e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
+mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
+sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
+f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
+gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.,10.])#the polytropes of species in each SPH, an array of arrays
 
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
@@ -68,8 +68,8 @@ MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inad
 WHAT NEEDS TO BE DONE HERE: IMPORT COMPOSITION AND DUST FRACTION FROM FILE, IF SUCH A FILE EXISTS
 THIS CODE WILL WRITE TO FILE, HELPER CODE WILL CREATE FILE
 '''
-specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0])
-dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
+specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
+dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
 DUST_FRAC = 0.000
 OVERALL_AGE = 0. #age of the galaxy
 
@@ -424,11 +424,11 @@ while (age < MAX_AGE):
     col_dust = np.log10(T[particle_type == 2])
     
     plt.clf()
-    plt.axis('equal')'''
+    plt.axis('equal')
     
     max_val = max(max(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), max(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
     min_val = min(min(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]), min(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)]))
-    '''
+    
     #BEGIN PLOTTING
     
     plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,np.log10(t_max)]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
@@ -483,7 +483,7 @@ gas_mass_by_species = np.sum((((f_un * mu_specie)[particle_type == 0].T/np.sum((
 star_mass_by_species = np.sum((((f_un * mu_specie)[particle_type == 1].T/np.sum((f_un * mu_specie)[particle_type == 1], axis=1)) * mass[particle_type == 1]).T, axis=0)
 dust_mass_by_species = np.sum((((f_un * mu_specie)[particle_type == 2].T/np.sum((f_un * mu_specie)[particle_type == 2], axis=1)) * mass[particle_type == 2]).T, axis=0)
 #assume even split between C, S, and M stars because there is no other assumption to make from observation
-AGB_condition = ((particle_type == 1) & (mass/solar_mass > 1.) & (mass/solar_mass < 8.))
+AGB_condition = ((particle_type == 1) & (mass/solar_mass > 1.) & (mass/solar_mass < 7.))
 AGB_list = mass[AGB_condition]
 AGB_time_until = nsc.luminosity_relation(mass[AGB_condition]/solar_mass, np.ones(len(mass[AGB_condition])), 1) * 1e10 * year - star_ages[AGB_condition] + OVERALL_AGE #time of formation of AGB
 

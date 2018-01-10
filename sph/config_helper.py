@@ -924,12 +924,3 @@ def interpolate_M_star_iron():
         for j in range(len(z_interp)):
             interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
 
-#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
-#ax2.set_title("Interpolated function.")
-#plt.ylim(0.001, 0.04)
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_title("Interpolation for iron M star")
-    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
-    plt.show()
-
