@@ -9,18 +9,9 @@ import navier_stokes_cleaned as nsc
 import os
 from scipy.interpolate import RectBivariateSpline
 import numpy as np
-#import astropy as ap
-#from cmath import exp
 from scipy import interpolate
 import itertools
-#from matplotlib.mlab import griddata
 from mpl_toolkits.mplot3d import Axes3D
-import math
-import sys
-import linecache
-import os.path 
-from astropy.constants.si import alpha
-
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
@@ -103,7 +94,7 @@ OVERALL_AGE = latest_file['OVERALL_AGE']
 #increment OVERALL_AGE by TIMESTEP and write everything to the next output file
 #AGB interpolations
 
-def interpolate_amounts(mass, metallicity, absolute_path_to_nsc):
+def interpolate_amounts(absolute_path_to_nsc):
 	#assume equal fractions of C, S, and M stars, or rather, assume each star is 1/3 each
 	#AGB star types, in order:(C                                                   )(S                )(M           )
 	#AGB labels, in order:    (forsterite, fayalite, enstatite, ferrosilite, quartz, iron, quartz, SiC, carbon, iron)
@@ -111,11 +102,27 @@ def interpolate_amounts(mass, metallicity, absolute_path_to_nsc):
 	#AGB indices, in order:   (0,          1,        2,         3,           4,      5,    6,      7,   8,      9)
 	#Corresponding indices:   (6,          6,        11,        12,          7,      10,   7,      13,  8,      10)
 	
+	#return interpolation function which is then evaluated
+	
+	AGB_masses = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+	metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+	#in solar masses
 	absolute_path_to_AGB = absolute_path_to_NSC + '/../agb_interp'
 	AGB_files = np.array(os.listdir(absolute_path_to_AGB))
+	by_metallicity = 0
 	for agbdata in AGB_files[AGB_files != '.DS_Store']:
 		array_file = np.load(unicode(absolute_path_to_NSC + '/' + agbdata));
-		
+		#each file represents a different metallicity.
+		#stack these up on one another into a rank 3 tensor, then take slices by the desired species
+		#axes in order (metallicity, mass, species)
+		species = array_file.T[1:]
+		if by_metallicity == 0:
+			by_metallicity = species
+		else:
+			by_metallicity = np.vstack([by_metallicity, species])
+			
+		#we want: (species, metallicity, mass)
+			
 
 
 
