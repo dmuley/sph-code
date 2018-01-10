@@ -83,7 +83,7 @@ conf_number = np.array([am[7:-4] for am in config_files]).astype('int')
 max_conf_file = (conf_number == max(conf_number))
 
 conf_filename_selected = np.array(config_files)[max_conf_file][0]
-latest_file = np.load(absolute_path_to_config + '/' + conf_filename_selected)
+latest_file = np.load(unicode(absolute_path_to_config + '/' + conf_filename_selected))
 
 #obtains DUST_FRAC, specie_fraction_array, and dust_base_frac from loaded file
 specie_fraction_array = latest_file['specie_fraction_array']
@@ -488,9 +488,9 @@ AGB_list = mass[AGB_condition]
 AGB_time_until = nsc.luminosity_relation(mass[AGB_condition]/solar_mass, np.ones(len(mass[AGB_condition])), 1) * 1e10 * year - star_ages[AGB_condition] + OVERALL_AGE #time of formation of AGB
 
 absolute_path_to_outputs = absolute_path_to_nsc + '/../savefiles/outputs'
-list_of_outputs = os.listdir(absolute_path_to_outputs)
+list_of_outputs = os.listdir(unicode(absolute_path_to_outputs))
 output_number = np.max(np.array([bm[:-4] for bm in list_of_outputs]).astype('int'))
-np.save(str(output_number + 1), gas_mass_by_species, star_mass_by_species, dust_mass_by_species, AGB_condition, AGB_list, AGB_time_until)
+np.save(unicode(str(output_number + 1)), gas_mass_by_species, star_mass_by_species, dust_mass_by_species, AGB_condition, AGB_list, AGB_time_until)
 #save all the above to a Numpy binary which will then be read in by config_helper.py to create a new single config file
 
 '''

@@ -24,8 +24,8 @@ from astropy.constants.si import alpha
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
-species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3'])
-mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93])
+species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
+mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
 
 TIMESTEP = 3e7 * year
 MOLECULAR_CLOUD_DURATION = 3e7 * year
@@ -72,7 +72,7 @@ timestep_star_mass_by_species = copy.deepcopy(destruction_energies) * 0
 timestep_dust_mass_by_species = copy.deepcopy(destruction_energies) * 0
 
 for savefile_name in os.listdir(absolute_path_to_outputs):
-	array_file = np.load(savefile);
+	array_file = np.load(unicode(absolute_path_to_outputs + '/' + savefile_name));
 	AGB_list = array_file['AGB_list']
 	AGB_time_until = array_file['AGB_time_until']
 	
@@ -102,6 +102,24 @@ OVERALL_AGE = latest_file['OVERALL_AGE']
 
 #increment OVERALL_AGE by TIMESTEP and write everything to the next output file
 #AGB interpolations
+
+def interpolate_amounts(mass, metallicity, absolute_path_to_nsc):
+	#assume equal fractions of C, S, and M stars, or rather, assume each star is 1/3 each
+	#AGB star types, in order:(C                                                   )(S                )(M           )
+	#AGB labels, in order:    (forsterite, fayalite, enstatite, ferrosilite, quartz, iron, quartz, SiC, carbon, iron)
+	#Corresponding formulae:  (Mg2SiO4,    Mg2SiO4,  MgSiO3,    FeSiO3,      SiO2,   Fe,   SiO2,   SiC, C,      Fe)
+	#AGB indices, in order:   (0,          1,        2,         3,           4,      5,    6,      7,   8,      9)
+	#Corresponding indices:   (6,          6,        11,        12,          7,      10,   7,      13,  8,      10)
+	
+	absolute_path_to_AGB = absolute_path_to_NSC + '/../agb_interp'
+	AGB_files = np.array(os.listdir(absolute_path_to_AGB))
+	for agbdata in AGB_files[AGB_files != '.DS_Store']:
+		array_file = np.load(unicode(absolute_path_to_NSC + '/' + agbdata));
+		
+
+
+
+
 def get_line_number(fname):
     f = open(fname,'r')
     line_num = 0
