@@ -7,6 +7,19 @@ import copy
 from time import sleep
 import navier_stokes_cleaned as nsc
 import os
+from scipy.interpolate import RectBivariateSpline
+import numpy as np
+#import astropy as ap
+#from cmath import exp
+from scipy import interpolate
+import itertools
+#from matplotlib.mlab import griddata
+from mpl_toolkits.mplot3d import Axes3D
+import math
+import sys
+import linecache
+import os.path 
+from astropy.constants.si import alpha
 
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
@@ -88,5 +101,835 @@ OVERALL_AGE = latest_file['OVERALL_AGE']
 #math is properly done there.
 
 #increment OVERALL_AGE by TIMESTEP and write everything to the next output file
+#AGB interpolations
+def get_line_number(fname):
+    f = open(fname,'r')
+    line_num = 0
+    search_phrase = '//Star Mass:'
+    for line in f.readlines():
+        line_num += 1
+        if line.find(search_phrase) >= 0:
+            return(line_num)
+        
+def read_file(specie_no,fname): 
+    if os.path.isfile(fname) == False:
+        print('no such file or directory') #'C:\Users\umbut\OneDrive\Documents\Z_0.001'
+    elif os.path.isfile(fname) == True:
+        f = open(fname,'r')
+        dust_yield = []
+        for line in f.readlines():
+            lne = line.split(" ")
+            val = float(lne[specie_no])
+            dust_yield.append(val)
+        return(dust_yield)
+            
+            
 
+def correct_zeros(array):      #converts zeros to 10^-21 to help tjhe code run
+    for i in  range(len(array)):
+        if array[i]==0:
+            array[i] = 10e-21
+    return array
+        
+        
+def interpolate_C_SiC():
+    SiC_z1 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    SiC_z2 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    SiC_z3 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    SiC_z4 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    SiC_z5 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    SiC_z6 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    SiC_z7 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    SiC_z8 = read_file(9,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_SiC_m0 = correct_zeros(np.array([SiC_z1[0],SiC_z2[0],SiC_z3[0],SiC_z4[0],SiC_z5[0],SiC_z6[0],SiC_z7[0],SiC_z8[0]]))
+    y_SiC_m1 = correct_zeros(np.array([SiC_z1[1],SiC_z2[1],SiC_z3[1],SiC_z4[1],SiC_z5[1],SiC_z6[1],SiC_z7[1],SiC_z8[1]]))
+    y_SiC_m2 = correct_zeros(np.array([SiC_z1[2],SiC_z2[2],SiC_z3[2],SiC_z4[2],SiC_z5[2],SiC_z6[2],SiC_z7[2],SiC_z8[2]]))
+    y_SiC_m3 = correct_zeros(np.array([SiC_z1[3],SiC_z2[3],SiC_z3[3],SiC_z4[3],SiC_z5[3],SiC_z6[3],SiC_z7[3],SiC_z8[3]]))
+    y_SiC_m4 = correct_zeros(np.array([SiC_z1[4],SiC_z2[4],SiC_z3[4],SiC_z4[4],SiC_z5[4],SiC_z6[4],SiC_z7[4],SiC_z8[4]]))
+    y_SiC_m5 = correct_zeros(np.array([SiC_z1[5],SiC_z2[5],SiC_z3[5],SiC_z4[5],SiC_z5[5],SiC_z6[5],SiC_z7[5],SiC_z8[5]]))
+    y_SiC_m6 = correct_zeros(np.array([SiC_z1[6],SiC_z2[6],SiC_z3[6],SiC_z4[6],SiC_z5[6],SiC_z6[6],SiC_z7[6],SiC_z8[6]]))
+    y_SiC_m7 = correct_zeros(np.array([SiC_z1[7],SiC_z2[7],SiC_z3[7],SiC_z4[7],SiC_z5[7],SiC_z6[7],SiC_z7[7],SiC_z8[7]]))
+    y_SiC_m8 = correct_zeros(np.array([SiC_z1[8],SiC_z2[8],SiC_z3[8],SiC_z4[8],SiC_z5[8],SiC_z6[8],SiC_z7[8],SiC_z8[8]]))
+    y_SiC_m9 = correct_zeros(np.array([SiC_z1[9],SiC_z2[9],SiC_z3[9],SiC_z4[9],SiC_z5[9],SiC_z6[9],SiC_z7[9],SiC_z8[9]]))
+    y_SiC_m10 = correct_zeros(np.array([SiC_z1[10],SiC_z2[10],SiC_z3[10],SiC_z4[10],SiC_z5[10],SiC_z6[10],SiC_z7[10],SiC_z8[10]]))
+    y_SiC_m11 = correct_zeros(np.array([SiC_z1[11],SiC_z2[11],SiC_z3[11],SiC_z4[11],SiC_z5[11],SiC_z6[11],SiC_z7[11],SiC_z8[11]]))
+    y_SiC_m12 = correct_zeros(np.array([SiC_z1[12],SiC_z2[12],SiC_z3[12],SiC_z4[12],SiC_z5[12],SiC_z6[12],SiC_z7[12],SiC_z8[12]]))
+    y_SiC_m13 = correct_zeros(np.array([SiC_z1[13],SiC_z2[13],SiC_z3[13],SiC_z4[13],SiC_z5[13],SiC_z6[13],SiC_z7[13],SiC_z8[13]]))
+    y_SiC_m14 = correct_zeros(np.array([SiC_z1[14],SiC_z2[14],SiC_z3[14],SiC_z4[14],SiC_z5[14],SiC_z6[14],SiC_z7[14],SiC_z8[14]]))
+    y_SiC_m15 = correct_zeros(np.array([SiC_z1[15],SiC_z2[15],SiC_z3[15],SiC_z4[15],SiC_z5[15],SiC_z6[15],SiC_z7[15],SiC_z8[15]]))
+    y_SiC_m16 = correct_zeros(np.array([SiC_z1[16],SiC_z2[16],SiC_z3[16],SiC_z4[16],SiC_z5[16],SiC_z6[16],SiC_z7[16],SiC_z8[16]]))
+    y_SiC_m17 = correct_zeros(np.array([SiC_z1[17],SiC_z2[17],SiC_z3[17],SiC_z4[17],SiC_z5[17],SiC_z6[17],SiC_z7[17],SiC_z8[17]]))
+    y_SiC_m18 = correct_zeros(np.array([SiC_z1[18],SiC_z2[18],SiC_z3[18],SiC_z4[18],SiC_z5[18],SiC_z6[18],SiC_z7[18],SiC_z8[18]]))
+    y_SiC_m19 = correct_zeros(np.array([SiC_z1[19],SiC_z2[19],SiC_z3[19],SiC_z4[19],SiC_z5[19],SiC_z6[19],SiC_z7[19],SiC_z8[19]]))
+    y_SiC_m20 = correct_zeros(np.array([SiC_z1[20],SiC_z2[20],SiC_z3[20],SiC_z4[20],SiC_z5[20],SiC_z6[20],SiC_z7[20],SiC_z8[20]]))
+    y_SiC_m21 = correct_zeros(np.array([SiC_z1[21],SiC_z2[21],SiC_z3[21],SiC_z4[21],SiC_z5[21],SiC_z6[21],SiC_z7[21],SiC_z8[21]]))
+    y_SiC_m22 = correct_zeros(np.array([SiC_z1[22],SiC_z2[22],SiC_z3[22],SiC_z4[22],SiC_z5[22],SiC_z6[22],SiC_z7[22],SiC_z8[22]]))
+    y_SiC_m23 = correct_zeros(np.array([SiC_z1[23],SiC_z2[23],SiC_z3[23],SiC_z4[23],SiC_z5[23],SiC_z6[23],SiC_z7[23],SiC_z8[23]]))
+    y_SiC_m24 = correct_zeros(np.array([SiC_z1[24],SiC_z2[24],SiC_z3[24],SiC_z4[24],SiC_z5[24],SiC_z6[24],SiC_z7[24],SiC_z8[24]]))
+    y_SiC_m25 = correct_zeros(np.array([SiC_z1[25],SiC_z2[25],SiC_z3[25],SiC_z4[25],SiC_z5[25],SiC_z6[25],SiC_z7[25],SiC_z8[25]]))
+    y_SiC_m26 = correct_zeros(np.array([SiC_z1[26],SiC_z2[26],SiC_z3[26],SiC_z4[26],SiC_z5[26],SiC_z6[26],SiC_z7[26],SiC_z8[26]]))
+    
+    log_SiC = np.log10(np.array([y_SiC_m0,y_SiC_m1,y_SiC_m2,y_SiC_m3,y_SiC_m4,y_SiC_m5,y_SiC_m6,y_SiC_m7,y_SiC_m8,y_SiC_m9,y_SiC_m10,y_SiC_m11,y_SiC_m12,y_SiC_m13,y_SiC_m14,y_SiC_m15,y_SiC_m16,y_SiC_m17,y_SiC_m18,y_SiC_m19,y_SiC_m20,y_SiC_m21,y_SiC_m22,y_SiC_m23,y_SiC_m24,y_SiC_m25,y_SiC_m26]))
+#print(10**(log_SiC))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_SiC,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_SiC, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_SiC.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for SiC C star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated,antialiased = True)
+    plt.show()
+
+
+def interpolate_C_Carbon():
+    Carbon_z1 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    Carbon_z2 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    Carbon_z3 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    Carbon_z4 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    Carbon_z5 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    Carbon_z6 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    Carbon_z7 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    Carbon_z8 = read_file(10,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_Carbon_m0 = correct_zeros(np.array([Carbon_z1[0],Carbon_z2[0],Carbon_z3[0],Carbon_z4[0],Carbon_z5[0],Carbon_z6[0],Carbon_z7[0],Carbon_z8[0]]))
+    y_Carbon_m1 = correct_zeros(np.array([Carbon_z1[1],Carbon_z2[1],Carbon_z3[1],Carbon_z4[1],Carbon_z5[1],Carbon_z6[1],Carbon_z7[1],Carbon_z8[1]]))
+    y_Carbon_m2 = correct_zeros(np.array([Carbon_z1[2],Carbon_z2[2],Carbon_z3[2],Carbon_z4[2],Carbon_z5[2],Carbon_z6[2],Carbon_z7[2],Carbon_z8[2]]))
+    y_Carbon_m3 = correct_zeros(np.array([Carbon_z1[3],Carbon_z2[3],Carbon_z3[3],Carbon_z4[3],Carbon_z5[3],Carbon_z6[3],Carbon_z7[3],Carbon_z8[3]]))
+    y_Carbon_m4 = correct_zeros(np.array([Carbon_z1[4],Carbon_z2[4],Carbon_z3[4],Carbon_z4[4],Carbon_z5[4],Carbon_z6[4],Carbon_z7[4],Carbon_z8[4]]))
+    y_Carbon_m5 = correct_zeros(np.array([Carbon_z1[5],Carbon_z2[5],Carbon_z3[5],Carbon_z4[5],Carbon_z5[5],Carbon_z6[5],Carbon_z7[5],Carbon_z8[5]]))
+    y_Carbon_m6 = correct_zeros(np.array([Carbon_z1[6],Carbon_z2[6],Carbon_z3[6],Carbon_z4[6],Carbon_z5[6],Carbon_z6[6],Carbon_z7[6],Carbon_z8[6]]))
+    y_Carbon_m7 = correct_zeros(np.array([Carbon_z1[7],Carbon_z2[7],Carbon_z3[7],Carbon_z4[7],Carbon_z5[7],Carbon_z6[7],Carbon_z7[7],Carbon_z8[7]]))
+    y_Carbon_m8 = correct_zeros(np.array([Carbon_z1[8],Carbon_z2[8],Carbon_z3[8],Carbon_z4[8],Carbon_z5[8],Carbon_z6[8],Carbon_z7[8],Carbon_z8[8]]))
+    y_Carbon_m9 = correct_zeros(np.array([Carbon_z1[9],Carbon_z2[9],Carbon_z3[9],Carbon_z4[9],Carbon_z5[9],Carbon_z6[9],Carbon_z7[9],Carbon_z8[9]]))
+    y_Carbon_m10 = correct_zeros(np.array([Carbon_z1[10],Carbon_z2[10],Carbon_z3[10],Carbon_z4[10],Carbon_z5[10],Carbon_z6[10],Carbon_z7[10],Carbon_z8[10]]))
+    y_Carbon_m11 = correct_zeros(np.array([Carbon_z1[11],Carbon_z2[11],Carbon_z3[11],Carbon_z4[11],Carbon_z5[11],Carbon_z6[11],Carbon_z7[11],Carbon_z8[11]]))
+    y_Carbon_m12 = correct_zeros(np.array([Carbon_z1[12],Carbon_z2[12],Carbon_z3[12],Carbon_z4[12],Carbon_z5[12],Carbon_z6[12],Carbon_z7[12],Carbon_z8[12]]))
+    y_Carbon_m13 = correct_zeros(np.array([Carbon_z1[13],Carbon_z2[13],Carbon_z3[13],Carbon_z4[13],Carbon_z5[13],Carbon_z6[13],Carbon_z7[13],Carbon_z8[13]]))
+    y_Carbon_m14 = correct_zeros(np.array([Carbon_z1[14],Carbon_z2[14],Carbon_z3[14],Carbon_z4[14],Carbon_z5[14],Carbon_z6[14],Carbon_z7[14],Carbon_z8[14]]))
+    y_Carbon_m15 = correct_zeros(np.array([Carbon_z1[15],Carbon_z2[15],Carbon_z3[15],Carbon_z4[15],Carbon_z5[15],Carbon_z6[15],Carbon_z7[15],Carbon_z8[15]]))
+    y_Carbon_m16 = correct_zeros(np.array([Carbon_z1[16],Carbon_z2[16],Carbon_z3[16],Carbon_z4[16],Carbon_z5[16],Carbon_z6[16],Carbon_z7[16],Carbon_z8[16]]))
+    y_Carbon_m17 = correct_zeros(np.array([Carbon_z1[17],Carbon_z2[17],Carbon_z3[17],Carbon_z4[17],Carbon_z5[17],Carbon_z6[17],Carbon_z7[17],Carbon_z8[17]]))
+    y_Carbon_m18 = correct_zeros(np.array([Carbon_z1[18],Carbon_z2[18],Carbon_z3[18],Carbon_z4[18],Carbon_z5[18],Carbon_z6[18],Carbon_z7[18],Carbon_z8[18]]))
+    y_Carbon_m19 = correct_zeros(np.array([Carbon_z1[19],Carbon_z2[19],Carbon_z3[19],Carbon_z4[19],Carbon_z5[19],Carbon_z6[19],Carbon_z7[19],Carbon_z8[19]]))
+    y_Carbon_m20 = correct_zeros(np.array([Carbon_z1[20],Carbon_z2[20],Carbon_z3[20],Carbon_z4[20],Carbon_z5[20],Carbon_z6[20],Carbon_z7[20],Carbon_z8[20]]))
+    y_Carbon_m21 = correct_zeros(np.array([Carbon_z1[21],Carbon_z2[21],Carbon_z3[21],Carbon_z4[21],Carbon_z5[21],Carbon_z6[21],Carbon_z7[21],Carbon_z8[21]]))
+    y_Carbon_m22 = correct_zeros(np.array([Carbon_z1[22],Carbon_z2[22],Carbon_z3[22],Carbon_z4[22],Carbon_z5[22],Carbon_z6[22],Carbon_z7[22],Carbon_z8[22]]))
+    y_Carbon_m23 = correct_zeros(np.array([Carbon_z1[23],Carbon_z2[23],Carbon_z3[23],Carbon_z4[23],Carbon_z5[23],Carbon_z6[23],Carbon_z7[23],Carbon_z8[23]]))
+    y_Carbon_m24 = correct_zeros(np.array([Carbon_z1[24],Carbon_z2[24],Carbon_z3[24],Carbon_z4[24],Carbon_z5[24],Carbon_z6[24],Carbon_z7[24],Carbon_z8[24]]))
+    y_Carbon_m25 = correct_zeros(np.array([Carbon_z1[25],Carbon_z2[25],Carbon_z3[25],Carbon_z4[25],Carbon_z5[25],Carbon_z6[25],Carbon_z7[25],Carbon_z8[25]]))
+    y_Carbon_m26 = correct_zeros(np.array([Carbon_z1[26],Carbon_z2[26],Carbon_z3[26],Carbon_z4[26],Carbon_z5[26],Carbon_z6[26],Carbon_z7[26],Carbon_z8[26]]))
+    
+    log_Carbon = np.log10(np.array([y_Carbon_m0,y_Carbon_m1,y_Carbon_m2,y_Carbon_m3,y_Carbon_m4,y_Carbon_m5,y_Carbon_m6,y_Carbon_m7,y_Carbon_m8,y_Carbon_m9,y_Carbon_m10,y_Carbon_m11,y_Carbon_m12,y_Carbon_m13,y_Carbon_m14,y_Carbon_m15,y_Carbon_m16,y_Carbon_m17,y_Carbon_m18,y_Carbon_m19,y_Carbon_m20,y_Carbon_m21,y_Carbon_m22,y_Carbon_m23,y_Carbon_m24,y_Carbon_m25,y_Carbon_m26]))
+#print(10**(log_Carbon))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_Carbon,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_Carbon, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_Carbon.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+            
+
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for Carbon C star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+
+def interpolate_C_Iron():#when ratios close to unity, where carbon dust is formed only in small quantities, is iron an abundant dust species
+    Iron_z1 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    Iron_z2 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    Iron_z3 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    Iron_z4 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    Iron_z5 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    Iron_z6 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    Iron_z7 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    Iron_z8 = read_file(11,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_Iron_m0 = correct_zeros(np.array([Iron_z1[0],Iron_z2[0],Iron_z3[0],Iron_z4[0],Iron_z5[0],Iron_z6[0],Iron_z7[0],Iron_z8[0]]))
+    y_Iron_m1 = correct_zeros(np.array([Iron_z1[1],Iron_z2[1],Iron_z3[1],Iron_z4[1],Iron_z5[1],Iron_z6[1],Iron_z7[1],Iron_z8[1]]))
+    y_Iron_m2 = correct_zeros(np.array([Iron_z1[2],Iron_z2[2],Iron_z3[2],Iron_z4[2],Iron_z5[2],Iron_z6[2],Iron_z7[2],Iron_z8[2]]))
+    y_Iron_m3 = correct_zeros(np.array([Iron_z1[3],Iron_z2[3],Iron_z3[3],Iron_z4[3],Iron_z5[3],Iron_z6[3],Iron_z7[3],Iron_z8[3]]))
+    y_Iron_m4 = correct_zeros(np.array([Iron_z1[4],Iron_z2[4],Iron_z3[4],Iron_z4[4],Iron_z5[4],Iron_z6[4],Iron_z7[4],Iron_z8[4]]))
+    y_Iron_m5 = correct_zeros(np.array([Iron_z1[5],Iron_z2[5],Iron_z3[5],Iron_z4[5],Iron_z5[5],Iron_z6[5],Iron_z7[5],Iron_z8[5]]))
+    y_Iron_m6 = correct_zeros(np.array([Iron_z1[6],Iron_z2[6],Iron_z3[6],Iron_z4[6],Iron_z5[6],Iron_z6[6],Iron_z7[6],Iron_z8[6]]))
+    y_Iron_m7 = correct_zeros(np.array([Iron_z1[7],Iron_z2[7],Iron_z3[7],Iron_z4[7],Iron_z5[7],Iron_z6[7],Iron_z7[7],Iron_z8[7]]))
+    y_Iron_m8 = correct_zeros(np.array([Iron_z1[8],Iron_z2[8],Iron_z3[8],Iron_z4[8],Iron_z5[8],Iron_z6[8],Iron_z7[8],Iron_z8[8]]))
+    y_Iron_m9 = correct_zeros(np.array([Iron_z1[9],Iron_z2[9],Iron_z3[9],Iron_z4[9],Iron_z5[9],Iron_z6[9],Iron_z7[9],Iron_z8[9]]))
+    y_Iron_m10 = correct_zeros(np.array([Iron_z1[10],Iron_z2[10],Iron_z3[10],Iron_z4[10],Iron_z5[10],Iron_z6[10],Iron_z7[10],Iron_z8[10]]))
+    y_Iron_m11 = correct_zeros(np.array([Iron_z1[11],Iron_z2[11],Iron_z3[11],Iron_z4[11],Iron_z5[11],Iron_z6[11],Iron_z7[11],Iron_z8[11]]))
+    y_Iron_m12 = correct_zeros(np.array([Iron_z1[12],Iron_z2[12],Iron_z3[12],Iron_z4[12],Iron_z5[12],Iron_z6[12],Iron_z7[12],Iron_z8[12]]))
+    y_Iron_m13 = correct_zeros(np.array([Iron_z1[13],Iron_z2[13],Iron_z3[13],Iron_z4[13],Iron_z5[13],Iron_z6[13],Iron_z7[13],Iron_z8[13]]))
+    y_Iron_m14 = correct_zeros(np.array([Iron_z1[14],Iron_z2[14],Iron_z3[14],Iron_z4[14],Iron_z5[14],Iron_z6[14],Iron_z7[14],Iron_z8[14]]))
+    y_Iron_m15 = correct_zeros(np.array([Iron_z1[15],Iron_z2[15],Iron_z3[15],Iron_z4[15],Iron_z5[15],Iron_z6[15],Iron_z7[15],Iron_z8[15]]))
+    y_Iron_m16 = correct_zeros(np.array([Iron_z1[16],Iron_z2[16],Iron_z3[16],Iron_z4[16],Iron_z5[16],Iron_z6[16],Iron_z7[16],Iron_z8[16]]))
+    y_Iron_m17 = correct_zeros(np.array([Iron_z1[17],Iron_z2[17],Iron_z3[17],Iron_z4[17],Iron_z5[17],Iron_z6[17],Iron_z7[17],Iron_z8[17]]))
+    y_Iron_m18 = correct_zeros(np.array([Iron_z1[18],Iron_z2[18],Iron_z3[18],Iron_z4[18],Iron_z5[18],Iron_z6[18],Iron_z7[18],Iron_z8[18]]))
+    y_Iron_m19 = correct_zeros(np.array([Iron_z1[19],Iron_z2[19],Iron_z3[19],Iron_z4[19],Iron_z5[19],Iron_z6[19],Iron_z7[19],Iron_z8[19]]))
+    y_Iron_m20 = correct_zeros(np.array([Iron_z1[20],Iron_z2[20],Iron_z3[20],Iron_z4[20],Iron_z5[20],Iron_z6[20],Iron_z7[20],Iron_z8[20]]))
+    y_Iron_m21 = correct_zeros(np.array([Iron_z1[21],Iron_z2[21],Iron_z3[21],Iron_z4[21],Iron_z5[21],Iron_z6[21],Iron_z7[21],Iron_z8[21]]))
+    y_Iron_m22 = correct_zeros(np.array([Iron_z1[22],Iron_z2[22],Iron_z3[22],Iron_z4[22],Iron_z5[22],Iron_z6[22],Iron_z7[22],Iron_z8[22]]))
+    y_Iron_m23 = correct_zeros(np.array([Iron_z1[23],Iron_z2[23],Iron_z3[23],Iron_z4[23],Iron_z5[23],Iron_z6[23],Iron_z7[23],Iron_z8[23]]))
+    y_Iron_m24 = correct_zeros(np.array([Iron_z1[24],Iron_z2[24],Iron_z3[24],Iron_z4[24],Iron_z5[24],Iron_z6[24],Iron_z7[24],Iron_z8[24]]))
+    y_Iron_m25 = correct_zeros(np.array([Iron_z1[25],Iron_z2[25],Iron_z3[25],Iron_z4[25],Iron_z5[25],Iron_z6[25],Iron_z7[25],Iron_z8[25]]))
+    y_Iron_m26 = correct_zeros(np.array([Iron_z1[26],Iron_z2[26],Iron_z3[26],Iron_z4[26],Iron_z5[26],Iron_z6[26],Iron_z7[26],Iron_z8[26]]))
+    
+    log_Iron = np.log10(np.array([y_Iron_m0,y_Iron_m1,y_Iron_m2,y_Iron_m3,y_Iron_m4,y_Iron_m5,y_Iron_m6,y_Iron_m7,y_Iron_m8,y_Iron_m9,y_Iron_m10,y_Iron_m11,y_Iron_m12,y_Iron_m13,y_Iron_m14,y_Iron_m15,y_Iron_m16,y_Iron_m17,y_Iron_m18,y_Iron_m19,y_Iron_m20,y_Iron_m21,y_Iron_m22,y_Iron_m23,y_Iron_m24,y_Iron_m25,y_Iron_m26]))
+#print(10**(log_Iron))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_Iron,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_Iron, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_Iron.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for Iron C star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+        
+def interpolate_S_quartz():
+    quartz_z1 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    quartz_z2 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    quartz_z3 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    quartz_z4 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    quartz_z5 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    quartz_z6 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    quartz_z7 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    quartz_z8 = read_file(7,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_quartz_m0 = correct_zeros(np.array([quartz_z1[0],quartz_z2[0],quartz_z3[0],quartz_z4[0],quartz_z5[0],quartz_z6[0],quartz_z7[0],quartz_z8[0]]))
+    y_quartz_m1 = correct_zeros(np.array([quartz_z1[1],quartz_z2[1],quartz_z3[1],quartz_z4[1],quartz_z5[1],quartz_z6[1],quartz_z7[1],quartz_z8[1]]))
+    y_quartz_m2 = correct_zeros(np.array([quartz_z1[2],quartz_z2[2],quartz_z3[2],quartz_z4[2],quartz_z5[2],quartz_z6[2],quartz_z7[2],quartz_z8[2]]))
+    y_quartz_m3 = correct_zeros(np.array([quartz_z1[3],quartz_z2[3],quartz_z3[3],quartz_z4[3],quartz_z5[3],quartz_z6[3],quartz_z7[3],quartz_z8[3]]))
+    y_quartz_m4 = correct_zeros(np.array([quartz_z1[4],quartz_z2[4],quartz_z3[4],quartz_z4[4],quartz_z5[4],quartz_z6[4],quartz_z7[4],quartz_z8[4]]))
+    y_quartz_m5 = correct_zeros(np.array([quartz_z1[5],quartz_z2[5],quartz_z3[5],quartz_z4[5],quartz_z5[5],quartz_z6[5],quartz_z7[5],quartz_z8[5]]))
+    y_quartz_m6 = correct_zeros(np.array([quartz_z1[6],quartz_z2[6],quartz_z3[6],quartz_z4[6],quartz_z5[6],quartz_z6[6],quartz_z7[6],quartz_z8[6]]))
+    y_quartz_m7 = correct_zeros(np.array([quartz_z1[7],quartz_z2[7],quartz_z3[7],quartz_z4[7],quartz_z5[7],quartz_z6[7],quartz_z7[7],quartz_z8[7]]))
+    y_quartz_m8 = correct_zeros(np.array([quartz_z1[8],quartz_z2[8],quartz_z3[8],quartz_z4[8],quartz_z5[8],quartz_z6[8],quartz_z7[8],quartz_z8[8]]))
+    y_quartz_m9 = correct_zeros(np.array([quartz_z1[9],quartz_z2[9],quartz_z3[9],quartz_z4[9],quartz_z5[9],quartz_z6[9],quartz_z7[9],quartz_z8[9]]))
+    y_quartz_m10 = correct_zeros(np.array([quartz_z1[10],quartz_z2[10],quartz_z3[10],quartz_z4[10],quartz_z5[10],quartz_z6[10],quartz_z7[10],quartz_z8[10]]))
+    y_quartz_m11 = correct_zeros(np.array([quartz_z1[11],quartz_z2[11],quartz_z3[11],quartz_z4[11],quartz_z5[11],quartz_z6[11],quartz_z7[11],quartz_z8[11]]))
+    y_quartz_m12 = correct_zeros(np.array([quartz_z1[12],quartz_z2[12],quartz_z3[12],quartz_z4[12],quartz_z5[12],quartz_z6[12],quartz_z7[12],quartz_z8[12]]))
+    y_quartz_m13 = correct_zeros(np.array([quartz_z1[13],quartz_z2[13],quartz_z3[13],quartz_z4[13],quartz_z5[13],quartz_z6[13],quartz_z7[13],quartz_z8[13]]))
+    y_quartz_m14 = correct_zeros(np.array([quartz_z1[14],quartz_z2[14],quartz_z3[14],quartz_z4[14],quartz_z5[14],quartz_z6[14],quartz_z7[14],quartz_z8[14]]))
+    y_quartz_m15 = correct_zeros(np.array([quartz_z1[15],quartz_z2[15],quartz_z3[15],quartz_z4[15],quartz_z5[15],quartz_z6[15],quartz_z7[15],quartz_z8[15]]))
+    y_quartz_m16 = correct_zeros(np.array([quartz_z1[16],quartz_z2[16],quartz_z3[16],quartz_z4[16],quartz_z5[16],quartz_z6[16],quartz_z7[16],quartz_z8[16]]))
+    y_quartz_m17 = correct_zeros(np.array([quartz_z1[17],quartz_z2[17],quartz_z3[17],quartz_z4[17],quartz_z5[17],quartz_z6[17],quartz_z7[17],quartz_z8[17]]))
+    y_quartz_m18 = correct_zeros(np.array([quartz_z1[18],quartz_z2[18],quartz_z3[18],quartz_z4[18],quartz_z5[18],quartz_z6[18],quartz_z7[18],quartz_z8[18]]))
+    y_quartz_m19 = correct_zeros(np.array([quartz_z1[19],quartz_z2[19],quartz_z3[19],quartz_z4[19],quartz_z5[19],quartz_z6[19],quartz_z7[19],quartz_z8[19]]))
+    y_quartz_m20 = correct_zeros(np.array([quartz_z1[20],quartz_z2[20],quartz_z3[20],quartz_z4[20],quartz_z5[20],quartz_z6[20],quartz_z7[20],quartz_z8[20]]))
+    y_quartz_m21 = correct_zeros(np.array([quartz_z1[21],quartz_z2[21],quartz_z3[21],quartz_z4[21],quartz_z5[21],quartz_z6[21],quartz_z7[21],quartz_z8[21]]))
+    y_quartz_m22 = correct_zeros(np.array([quartz_z1[22],quartz_z2[22],quartz_z3[22],quartz_z4[22],quartz_z5[22],quartz_z6[22],quartz_z7[22],quartz_z8[22]]))
+    y_quartz_m23 = correct_zeros(np.array([quartz_z1[23],quartz_z2[23],quartz_z3[23],quartz_z4[23],quartz_z5[23],quartz_z6[23],quartz_z7[23],quartz_z8[23]]))
+    y_quartz_m24 = correct_zeros(np.array([quartz_z1[24],quartz_z2[24],quartz_z3[24],quartz_z4[24],quartz_z5[24],quartz_z6[24],quartz_z7[24],quartz_z8[24]]))
+    y_quartz_m25 = correct_zeros(np.array([quartz_z1[25],quartz_z2[25],quartz_z3[25],quartz_z4[25],quartz_z5[25],quartz_z6[25],quartz_z7[25],quartz_z8[25]]))
+    y_quartz_m26 = correct_zeros(np.array([quartz_z1[26],quartz_z2[26],quartz_z3[26],quartz_z4[26],quartz_z5[26],quartz_z6[26],quartz_z7[26],quartz_z8[26]]))
+    
+    log_quartz = np.log10(np.array([y_quartz_m0,y_quartz_m1,y_quartz_m2,y_quartz_m3,y_quartz_m4,y_quartz_m5,y_quartz_m6,y_quartz_m7,y_quartz_m8,y_quartz_m9,y_quartz_m10,y_quartz_m11,y_quartz_m12,y_quartz_m13,y_quartz_m14,y_quartz_m15,y_quartz_m16,y_quartz_m17,y_quartz_m18,y_quartz_m19,y_quartz_m20,y_quartz_m21,y_quartz_m22,y_quartz_m23,y_quartz_m24,y_quartz_m25,y_quartz_m26]))
+#print(10**(log_quartz))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_quartz,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_quartz, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_quartz.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for quartz S star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+    
+def interpolate_S_iron():
+    iron_z1 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    iron_z2 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    iron_z3 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    iron_z4 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    iron_z5 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    iron_z6 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    iron_z7 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    iron_z8 = read_file(8,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_iron_m0 = correct_zeros(np.array([iron_z1[0],iron_z2[0],iron_z3[0],iron_z4[0],iron_z5[0],iron_z6[0],iron_z7[0],iron_z8[0]]))
+    y_iron_m1 = correct_zeros(np.array([iron_z1[1],iron_z2[1],iron_z3[1],iron_z4[1],iron_z5[1],iron_z6[1],iron_z7[1],iron_z8[1]]))
+    y_iron_m2 = correct_zeros(np.array([iron_z1[2],iron_z2[2],iron_z3[2],iron_z4[2],iron_z5[2],iron_z6[2],iron_z7[2],iron_z8[2]]))
+    y_iron_m3 = correct_zeros(np.array([iron_z1[3],iron_z2[3],iron_z3[3],iron_z4[3],iron_z5[3],iron_z6[3],iron_z7[3],iron_z8[3]]))
+    y_iron_m4 = correct_zeros(np.array([iron_z1[4],iron_z2[4],iron_z3[4],iron_z4[4],iron_z5[4],iron_z6[4],iron_z7[4],iron_z8[4]]))
+    y_iron_m5 = correct_zeros(np.array([iron_z1[5],iron_z2[5],iron_z3[5],iron_z4[5],iron_z5[5],iron_z6[5],iron_z7[5],iron_z8[5]]))
+    y_iron_m6 = correct_zeros(np.array([iron_z1[6],iron_z2[6],iron_z3[6],iron_z4[6],iron_z5[6],iron_z6[6],iron_z7[6],iron_z8[6]]))
+    y_iron_m7 = correct_zeros(np.array([iron_z1[7],iron_z2[7],iron_z3[7],iron_z4[7],iron_z5[7],iron_z6[7],iron_z7[7],iron_z8[7]]))
+    y_iron_m8 = correct_zeros(np.array([iron_z1[8],iron_z2[8],iron_z3[8],iron_z4[8],iron_z5[8],iron_z6[8],iron_z7[8],iron_z8[8]]))
+    y_iron_m9 = correct_zeros(np.array([iron_z1[9],iron_z2[9],iron_z3[9],iron_z4[9],iron_z5[9],iron_z6[9],iron_z7[9],iron_z8[9]]))
+    y_iron_m10 = correct_zeros(np.array([iron_z1[10],iron_z2[10],iron_z3[10],iron_z4[10],iron_z5[10],iron_z6[10],iron_z7[10],iron_z8[10]]))
+    y_iron_m11 = correct_zeros(np.array([iron_z1[11],iron_z2[11],iron_z3[11],iron_z4[11],iron_z5[11],iron_z6[11],iron_z7[11],iron_z8[11]]))
+    y_iron_m12 = correct_zeros(np.array([iron_z1[12],iron_z2[12],iron_z3[12],iron_z4[12],iron_z5[12],iron_z6[12],iron_z7[12],iron_z8[12]]))
+    y_iron_m13 = correct_zeros(np.array([iron_z1[13],iron_z2[13],iron_z3[13],iron_z4[13],iron_z5[13],iron_z6[13],iron_z7[13],iron_z8[13]]))
+    y_iron_m14 = correct_zeros(np.array([iron_z1[14],iron_z2[14],iron_z3[14],iron_z4[14],iron_z5[14],iron_z6[14],iron_z7[14],iron_z8[14]]))
+    y_iron_m15 = correct_zeros(np.array([iron_z1[15],iron_z2[15],iron_z3[15],iron_z4[15],iron_z5[15],iron_z6[15],iron_z7[15],iron_z8[15]]))
+    y_iron_m16 = correct_zeros(np.array([iron_z1[16],iron_z2[16],iron_z3[16],iron_z4[16],iron_z5[16],iron_z6[16],iron_z7[16],iron_z8[16]]))
+    y_iron_m17 = correct_zeros(np.array([iron_z1[17],iron_z2[17],iron_z3[17],iron_z4[17],iron_z5[17],iron_z6[17],iron_z7[17],iron_z8[17]]))
+    y_iron_m18 = correct_zeros(np.array([iron_z1[18],iron_z2[18],iron_z3[18],iron_z4[18],iron_z5[18],iron_z6[18],iron_z7[18],iron_z8[18]]))
+    y_iron_m19 = correct_zeros(np.array([iron_z1[19],iron_z2[19],iron_z3[19],iron_z4[19],iron_z5[19],iron_z6[19],iron_z7[19],iron_z8[19]]))
+    y_iron_m20 = correct_zeros(np.array([iron_z1[20],iron_z2[20],iron_z3[20],iron_z4[20],iron_z5[20],iron_z6[20],iron_z7[20],iron_z8[20]]))
+    y_iron_m21 = correct_zeros(np.array([iron_z1[21],iron_z2[21],iron_z3[21],iron_z4[21],iron_z5[21],iron_z6[21],iron_z7[21],iron_z8[21]]))
+    y_iron_m22 = correct_zeros(np.array([iron_z1[22],iron_z2[22],iron_z3[22],iron_z4[22],iron_z5[22],iron_z6[22],iron_z7[22],iron_z8[22]]))
+    y_iron_m23 = correct_zeros(np.array([iron_z1[23],iron_z2[23],iron_z3[23],iron_z4[23],iron_z5[23],iron_z6[23],iron_z7[23],iron_z8[23]]))
+    y_iron_m24 = correct_zeros(np.array([iron_z1[24],iron_z2[24],iron_z3[24],iron_z4[24],iron_z5[24],iron_z6[24],iron_z7[24],iron_z8[24]]))
+    y_iron_m25 = correct_zeros(np.array([iron_z1[25],iron_z2[25],iron_z3[25],iron_z4[25],iron_z5[25],iron_z6[25],iron_z7[25],iron_z8[25]]))
+    y_iron_m26 = correct_zeros(np.array([iron_z1[26],iron_z2[26],iron_z3[26],iron_z4[26],iron_z5[26],iron_z6[26],iron_z7[26],iron_z8[26]]))
+    
+    log_iron = np.log10(np.array([y_iron_m0,y_iron_m1,y_iron_m2,y_iron_m3,y_iron_m4,y_iron_m5,y_iron_m6,y_iron_m7,y_iron_m8,y_iron_m9,y_iron_m10,y_iron_m11,y_iron_m12,y_iron_m13,y_iron_m14,y_iron_m15,y_iron_m16,y_iron_m17,y_iron_m18,y_iron_m19,y_iron_m20,y_iron_m21,y_iron_m22,y_iron_m23,y_iron_m24,y_iron_m25,y_iron_m26]))
+#print(10**(log_iron))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_iron,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_iron, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_iron.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for iron S star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+  
+def interpolate_M_star_forsterite():
+    forsterite_z1 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    forsterite_z2 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    forsterite_z3 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    forsterite_z4 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    forsterite_z5 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    forsterite_z6 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    forsterite_z7 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    forsterite_z8 = read_file(1,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_forsterite_m0 = correct_zeros(np.array([forsterite_z1[0],forsterite_z2[0],forsterite_z3[0],forsterite_z4[0],forsterite_z5[0],forsterite_z6[0],forsterite_z7[0],forsterite_z8[0]]))
+    y_forsterite_m1 = correct_zeros(np.array([forsterite_z1[1],forsterite_z2[1],forsterite_z3[1],forsterite_z4[1],forsterite_z5[1],forsterite_z6[1],forsterite_z7[1],forsterite_z8[1]]))
+    y_forsterite_m2 = correct_zeros(np.array([forsterite_z1[2],forsterite_z2[2],forsterite_z3[2],forsterite_z4[2],forsterite_z5[2],forsterite_z6[2],forsterite_z7[2],forsterite_z8[2]]))
+    y_forsterite_m3 = correct_zeros(np.array([forsterite_z1[3],forsterite_z2[3],forsterite_z3[3],forsterite_z4[3],forsterite_z5[3],forsterite_z6[3],forsterite_z7[3],forsterite_z8[3]]))
+    y_forsterite_m4 = correct_zeros(np.array([forsterite_z1[4],forsterite_z2[4],forsterite_z3[4],forsterite_z4[4],forsterite_z5[4],forsterite_z6[4],forsterite_z7[4],forsterite_z8[4]]))
+    y_forsterite_m5 = correct_zeros(np.array([forsterite_z1[5],forsterite_z2[5],forsterite_z3[5],forsterite_z4[5],forsterite_z5[5],forsterite_z6[5],forsterite_z7[5],forsterite_z8[5]]))
+    y_forsterite_m6 = correct_zeros(np.array([forsterite_z1[6],forsterite_z2[6],forsterite_z3[6],forsterite_z4[6],forsterite_z5[6],forsterite_z6[6],forsterite_z7[6],forsterite_z8[6]]))
+    y_forsterite_m7 = correct_zeros(np.array([forsterite_z1[7],forsterite_z2[7],forsterite_z3[7],forsterite_z4[7],forsterite_z5[7],forsterite_z6[7],forsterite_z7[7],forsterite_z8[7]]))
+    y_forsterite_m8 = correct_zeros(np.array([forsterite_z1[8],forsterite_z2[8],forsterite_z3[8],forsterite_z4[8],forsterite_z5[8],forsterite_z6[8],forsterite_z7[8],forsterite_z8[8]]))
+    y_forsterite_m9 = correct_zeros(np.array([forsterite_z1[9],forsterite_z2[9],forsterite_z3[9],forsterite_z4[9],forsterite_z5[9],forsterite_z6[9],forsterite_z7[9],forsterite_z8[9]]))
+    y_forsterite_m10 = correct_zeros(np.array([forsterite_z1[10],forsterite_z2[10],forsterite_z3[10],forsterite_z4[10],forsterite_z5[10],forsterite_z6[10],forsterite_z7[10],forsterite_z8[10]]))
+    y_forsterite_m11 = correct_zeros(np.array([forsterite_z1[11],forsterite_z2[11],forsterite_z3[11],forsterite_z4[11],forsterite_z5[11],forsterite_z6[11],forsterite_z7[11],forsterite_z8[11]]))
+    y_forsterite_m12 = correct_zeros(np.array([forsterite_z1[12],forsterite_z2[12],forsterite_z3[12],forsterite_z4[12],forsterite_z5[12],forsterite_z6[12],forsterite_z7[12],forsterite_z8[12]]))
+    y_forsterite_m13 = correct_zeros(np.array([forsterite_z1[13],forsterite_z2[13],forsterite_z3[13],forsterite_z4[13],forsterite_z5[13],forsterite_z6[13],forsterite_z7[13],forsterite_z8[13]]))
+    y_forsterite_m14 = correct_zeros(np.array([forsterite_z1[14],forsterite_z2[14],forsterite_z3[14],forsterite_z4[14],forsterite_z5[14],forsterite_z6[14],forsterite_z7[14],forsterite_z8[14]]))
+    y_forsterite_m15 = correct_zeros(np.array([forsterite_z1[15],forsterite_z2[15],forsterite_z3[15],forsterite_z4[15],forsterite_z5[15],forsterite_z6[15],forsterite_z7[15],forsterite_z8[15]]))
+    y_forsterite_m16 = correct_zeros(np.array([forsterite_z1[16],forsterite_z2[16],forsterite_z3[16],forsterite_z4[16],forsterite_z5[16],forsterite_z6[16],forsterite_z7[16],forsterite_z8[16]]))
+    y_forsterite_m17 = correct_zeros(np.array([forsterite_z1[17],forsterite_z2[17],forsterite_z3[17],forsterite_z4[17],forsterite_z5[17],forsterite_z6[17],forsterite_z7[17],forsterite_z8[17]]))
+    y_forsterite_m18 = correct_zeros(np.array([forsterite_z1[18],forsterite_z2[18],forsterite_z3[18],forsterite_z4[18],forsterite_z5[18],forsterite_z6[18],forsterite_z7[18],forsterite_z8[18]]))
+    y_forsterite_m19 = correct_zeros(np.array([forsterite_z1[19],forsterite_z2[19],forsterite_z3[19],forsterite_z4[19],forsterite_z5[19],forsterite_z6[19],forsterite_z7[19],forsterite_z8[19]]))
+    y_forsterite_m20 = correct_zeros(np.array([forsterite_z1[20],forsterite_z2[20],forsterite_z3[20],forsterite_z4[20],forsterite_z5[20],forsterite_z6[20],forsterite_z7[20],forsterite_z8[20]]))
+    y_forsterite_m21 = correct_zeros(np.array([forsterite_z1[21],forsterite_z2[21],forsterite_z3[21],forsterite_z4[21],forsterite_z5[21],forsterite_z6[21],forsterite_z7[21],forsterite_z8[21]]))
+    y_forsterite_m22 = correct_zeros(np.array([forsterite_z1[22],forsterite_z2[22],forsterite_z3[22],forsterite_z4[22],forsterite_z5[22],forsterite_z6[22],forsterite_z7[22],forsterite_z8[22]]))
+    y_forsterite_m23 = correct_zeros(np.array([forsterite_z1[23],forsterite_z2[23],forsterite_z3[23],forsterite_z4[23],forsterite_z5[23],forsterite_z6[23],forsterite_z7[23],forsterite_z8[23]]))
+    y_forsterite_m24 = correct_zeros(np.array([forsterite_z1[24],forsterite_z2[24],forsterite_z3[24],forsterite_z4[24],forsterite_z5[24],forsterite_z6[24],forsterite_z7[24],forsterite_z8[24]]))
+    y_forsterite_m25 = correct_zeros(np.array([forsterite_z1[25],forsterite_z2[25],forsterite_z3[25],forsterite_z4[25],forsterite_z5[25],forsterite_z6[25],forsterite_z7[25],forsterite_z8[25]]))
+    y_forsterite_m26 = correct_zeros(np.array([forsterite_z1[26],forsterite_z2[26],forsterite_z3[26],forsterite_z4[26],forsterite_z5[26],forsterite_z6[26],forsterite_z7[26],forsterite_z8[26]]))
+    
+    log_forsterite = np.log10(np.array([y_forsterite_m0,y_forsterite_m1,y_forsterite_m2,y_forsterite_m3,y_forsterite_m4,y_forsterite_m5,y_forsterite_m6,y_forsterite_m7,y_forsterite_m8,y_forsterite_m9,y_forsterite_m10,y_forsterite_m11,y_forsterite_m12,y_forsterite_m13,y_forsterite_m14,y_forsterite_m15,y_forsterite_m16,y_forsterite_m17,y_forsterite_m18,y_forsterite_m19,y_forsterite_m20,y_forsterite_m21,y_forsterite_m22,y_forsterite_m23,y_forsterite_m24,y_forsterite_m25,y_forsterite_m26]))
+#print(10**(log_forsterite))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_forsterite,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_forsterite, kx=1, ky=1, s=0.9)
+    '''
+    raw_inputs = np.meshgrid(mass, metallicity)
+    fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+    ax.pcolor(raw_inputs[0], raw_inputs[1], log_forsterite.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+    ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+    ax2.set_title("Interpolated function for forsterite, M star.")
+    plt.ylim(0.001, 0.04)
+    plt.show()   
+    '''
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_forsterite.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for Forsterite M star")
+    ax.plot_wireframe(base_meshgrid[0],base_meshgrid[1],interpolated,rstride = 9, cstride = 10)
+    plt.show()
+
+
+def interpolate_M_star_fayalite():
+    fayalite_z1 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    fayalite_z2 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    fayalite_z3 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    fayalite_z4 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    fayalite_z5 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    fayalite_z6 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    fayalite_z7 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    fayalite_z8 = read_file(2,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_fayalite_m0 = correct_zeros(np.array([fayalite_z1[0],fayalite_z2[0],fayalite_z3[0],fayalite_z4[0],fayalite_z5[0],fayalite_z6[0],fayalite_z7[0],fayalite_z8[0]]))
+    y_fayalite_m1 = correct_zeros(np.array([fayalite_z1[1],fayalite_z2[1],fayalite_z3[1],fayalite_z4[1],fayalite_z5[1],fayalite_z6[1],fayalite_z7[1],fayalite_z8[1]]))
+    y_fayalite_m2 = correct_zeros(np.array([fayalite_z1[2],fayalite_z2[2],fayalite_z3[2],fayalite_z4[2],fayalite_z5[2],fayalite_z6[2],fayalite_z7[2],fayalite_z8[2]]))
+    y_fayalite_m3 = correct_zeros(np.array([fayalite_z1[3],fayalite_z2[3],fayalite_z3[3],fayalite_z4[3],fayalite_z5[3],fayalite_z6[3],fayalite_z7[3],fayalite_z8[3]]))
+    y_fayalite_m4 = correct_zeros(np.array([fayalite_z1[4],fayalite_z2[4],fayalite_z3[4],fayalite_z4[4],fayalite_z5[4],fayalite_z6[4],fayalite_z7[4],fayalite_z8[4]]))
+    y_fayalite_m5 = correct_zeros(np.array([fayalite_z1[5],fayalite_z2[5],fayalite_z3[5],fayalite_z4[5],fayalite_z5[5],fayalite_z6[5],fayalite_z7[5],fayalite_z8[5]]))
+    y_fayalite_m6 = correct_zeros(np.array([fayalite_z1[6],fayalite_z2[6],fayalite_z3[6],fayalite_z4[6],fayalite_z5[6],fayalite_z6[6],fayalite_z7[6],fayalite_z8[6]]))
+    y_fayalite_m7 = correct_zeros(np.array([fayalite_z1[7],fayalite_z2[7],fayalite_z3[7],fayalite_z4[7],fayalite_z5[7],fayalite_z6[7],fayalite_z7[7],fayalite_z8[7]]))
+    y_fayalite_m8 = correct_zeros(np.array([fayalite_z1[8],fayalite_z2[8],fayalite_z3[8],fayalite_z4[8],fayalite_z5[8],fayalite_z6[8],fayalite_z7[8],fayalite_z8[8]]))
+    y_fayalite_m9 = correct_zeros(np.array([fayalite_z1[9],fayalite_z2[9],fayalite_z3[9],fayalite_z4[9],fayalite_z5[9],fayalite_z6[9],fayalite_z7[9],fayalite_z8[9]]))
+    y_fayalite_m10 = correct_zeros(np.array([fayalite_z1[10],fayalite_z2[10],fayalite_z3[10],fayalite_z4[10],fayalite_z5[10],fayalite_z6[10],fayalite_z7[10],fayalite_z8[10]]))
+    y_fayalite_m11 = correct_zeros(np.array([fayalite_z1[11],fayalite_z2[11],fayalite_z3[11],fayalite_z4[11],fayalite_z5[11],fayalite_z6[11],fayalite_z7[11],fayalite_z8[11]]))
+    y_fayalite_m12 = correct_zeros(np.array([fayalite_z1[12],fayalite_z2[12],fayalite_z3[12],fayalite_z4[12],fayalite_z5[12],fayalite_z6[12],fayalite_z7[12],fayalite_z8[12]]))
+    y_fayalite_m13 = correct_zeros(np.array([fayalite_z1[13],fayalite_z2[13],fayalite_z3[13],fayalite_z4[13],fayalite_z5[13],fayalite_z6[13],fayalite_z7[13],fayalite_z8[13]]))
+    y_fayalite_m14 = correct_zeros(np.array([fayalite_z1[14],fayalite_z2[14],fayalite_z3[14],fayalite_z4[14],fayalite_z5[14],fayalite_z6[14],fayalite_z7[14],fayalite_z8[14]]))
+    y_fayalite_m15 = correct_zeros(np.array([fayalite_z1[15],fayalite_z2[15],fayalite_z3[15],fayalite_z4[15],fayalite_z5[15],fayalite_z6[15],fayalite_z7[15],fayalite_z8[15]]))
+    y_fayalite_m16 = correct_zeros(np.array([fayalite_z1[16],fayalite_z2[16],fayalite_z3[16],fayalite_z4[16],fayalite_z5[16],fayalite_z6[16],fayalite_z7[16],fayalite_z8[16]]))
+    y_fayalite_m17 = correct_zeros(np.array([fayalite_z1[17],fayalite_z2[17],fayalite_z3[17],fayalite_z4[17],fayalite_z5[17],fayalite_z6[17],fayalite_z7[17],fayalite_z8[17]]))
+    y_fayalite_m18 = correct_zeros(np.array([fayalite_z1[18],fayalite_z2[18],fayalite_z3[18],fayalite_z4[18],fayalite_z5[18],fayalite_z6[18],fayalite_z7[18],fayalite_z8[18]]))
+    y_fayalite_m19 = correct_zeros(np.array([fayalite_z1[19],fayalite_z2[19],fayalite_z3[19],fayalite_z4[19],fayalite_z5[19],fayalite_z6[19],fayalite_z7[19],fayalite_z8[19]]))
+    y_fayalite_m20 = correct_zeros(np.array([fayalite_z1[20],fayalite_z2[20],fayalite_z3[20],fayalite_z4[20],fayalite_z5[20],fayalite_z6[20],fayalite_z7[20],fayalite_z8[20]]))
+    y_fayalite_m21 = correct_zeros(np.array([fayalite_z1[21],fayalite_z2[21],fayalite_z3[21],fayalite_z4[21],fayalite_z5[21],fayalite_z6[21],fayalite_z7[21],fayalite_z8[21]]))
+    y_fayalite_m22 = correct_zeros(np.array([fayalite_z1[22],fayalite_z2[22],fayalite_z3[22],fayalite_z4[22],fayalite_z5[22],fayalite_z6[22],fayalite_z7[22],fayalite_z8[22]]))
+    y_fayalite_m23 = correct_zeros(np.array([fayalite_z1[23],fayalite_z2[23],fayalite_z3[23],fayalite_z4[23],fayalite_z5[23],fayalite_z6[23],fayalite_z7[23],fayalite_z8[23]]))
+    y_fayalite_m24 = correct_zeros(np.array([fayalite_z1[24],fayalite_z2[24],fayalite_z3[24],fayalite_z4[24],fayalite_z5[24],fayalite_z6[24],fayalite_z7[24],fayalite_z8[24]]))
+    y_fayalite_m25 = correct_zeros(np.array([fayalite_z1[25],fayalite_z2[25],fayalite_z3[25],fayalite_z4[25],fayalite_z5[25],fayalite_z6[25],fayalite_z7[25],fayalite_z8[25]]))
+    y_fayalite_m26 = correct_zeros(np.array([fayalite_z1[26],fayalite_z2[26],fayalite_z3[26],fayalite_z4[26],fayalite_z5[26],fayalite_z6[26],fayalite_z7[26],fayalite_z8[26]]))
+    
+    log_fayalite = np.log10(np.array([y_fayalite_m0,y_fayalite_m1,y_fayalite_m2,y_fayalite_m3,y_fayalite_m4,y_fayalite_m5,y_fayalite_m6,y_fayalite_m7,y_fayalite_m8,y_fayalite_m9,y_fayalite_m10,y_fayalite_m11,y_fayalite_m12,y_fayalite_m13,y_fayalite_m14,y_fayalite_m15,y_fayalite_m16,y_fayalite_m17,y_fayalite_m18,y_fayalite_m19,y_fayalite_m20,y_fayalite_m21,y_fayalite_m22,y_fayalite_m23,y_fayalite_m24,y_fayalite_m25,y_fayalite_m26]))
+#print(10**(log_fayalite))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_fayalite,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_fayalite, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_fayalite.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for fayalite M star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+    
+
+def interpolate_M_star_enstatite():
+    enstatite_z1 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    enstatite_z2 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    enstatite_z3 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    enstatite_z4 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    enstatite_z5 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    enstatite_z6 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    enstatite_z7 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    enstatite_z8 = read_file(3,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_enstatite_m0 = correct_zeros(np.array([enstatite_z1[0],enstatite_z2[0],enstatite_z3[0],enstatite_z4[0],enstatite_z5[0],enstatite_z6[0],enstatite_z7[0],enstatite_z8[0]]))
+    y_enstatite_m1 = correct_zeros(np.array([enstatite_z1[1],enstatite_z2[1],enstatite_z3[1],enstatite_z4[1],enstatite_z5[1],enstatite_z6[1],enstatite_z7[1],enstatite_z8[1]]))
+    y_enstatite_m2 = correct_zeros(np.array([enstatite_z1[2],enstatite_z2[2],enstatite_z3[2],enstatite_z4[2],enstatite_z5[2],enstatite_z6[2],enstatite_z7[2],enstatite_z8[2]]))
+    y_enstatite_m3 = correct_zeros(np.array([enstatite_z1[3],enstatite_z2[3],enstatite_z3[3],enstatite_z4[3],enstatite_z5[3],enstatite_z6[3],enstatite_z7[3],enstatite_z8[3]]))
+    y_enstatite_m4 = correct_zeros(np.array([enstatite_z1[4],enstatite_z2[4],enstatite_z3[4],enstatite_z4[4],enstatite_z5[4],enstatite_z6[4],enstatite_z7[4],enstatite_z8[4]]))
+    y_enstatite_m5 = correct_zeros(np.array([enstatite_z1[5],enstatite_z2[5],enstatite_z3[5],enstatite_z4[5],enstatite_z5[5],enstatite_z6[5],enstatite_z7[5],enstatite_z8[5]]))
+    y_enstatite_m6 = correct_zeros(np.array([enstatite_z1[6],enstatite_z2[6],enstatite_z3[6],enstatite_z4[6],enstatite_z5[6],enstatite_z6[6],enstatite_z7[6],enstatite_z8[6]]))
+    y_enstatite_m7 = correct_zeros(np.array([enstatite_z1[7],enstatite_z2[7],enstatite_z3[7],enstatite_z4[7],enstatite_z5[7],enstatite_z6[7],enstatite_z7[7],enstatite_z8[7]]))
+    y_enstatite_m8 = correct_zeros(np.array([enstatite_z1[8],enstatite_z2[8],enstatite_z3[8],enstatite_z4[8],enstatite_z5[8],enstatite_z6[8],enstatite_z7[8],enstatite_z8[8]]))
+    y_enstatite_m9 = correct_zeros(np.array([enstatite_z1[9],enstatite_z2[9],enstatite_z3[9],enstatite_z4[9],enstatite_z5[9],enstatite_z6[9],enstatite_z7[9],enstatite_z8[9]]))
+    y_enstatite_m10 = correct_zeros(np.array([enstatite_z1[10],enstatite_z2[10],enstatite_z3[10],enstatite_z4[10],enstatite_z5[10],enstatite_z6[10],enstatite_z7[10],enstatite_z8[10]]))
+    y_enstatite_m11 = correct_zeros(np.array([enstatite_z1[11],enstatite_z2[11],enstatite_z3[11],enstatite_z4[11],enstatite_z5[11],enstatite_z6[11],enstatite_z7[11],enstatite_z8[11]]))
+    y_enstatite_m12 = correct_zeros(np.array([enstatite_z1[12],enstatite_z2[12],enstatite_z3[12],enstatite_z4[12],enstatite_z5[12],enstatite_z6[12],enstatite_z7[12],enstatite_z8[12]]))
+    y_enstatite_m13 = correct_zeros(np.array([enstatite_z1[13],enstatite_z2[13],enstatite_z3[13],enstatite_z4[13],enstatite_z5[13],enstatite_z6[13],enstatite_z7[13],enstatite_z8[13]]))
+    y_enstatite_m14 = correct_zeros(np.array([enstatite_z1[14],enstatite_z2[14],enstatite_z3[14],enstatite_z4[14],enstatite_z5[14],enstatite_z6[14],enstatite_z7[14],enstatite_z8[14]]))
+    y_enstatite_m15 = correct_zeros(np.array([enstatite_z1[15],enstatite_z2[15],enstatite_z3[15],enstatite_z4[15],enstatite_z5[15],enstatite_z6[15],enstatite_z7[15],enstatite_z8[15]]))
+    y_enstatite_m16 = correct_zeros(np.array([enstatite_z1[16],enstatite_z2[16],enstatite_z3[16],enstatite_z4[16],enstatite_z5[16],enstatite_z6[16],enstatite_z7[16],enstatite_z8[16]]))
+    y_enstatite_m17 = correct_zeros(np.array([enstatite_z1[17],enstatite_z2[17],enstatite_z3[17],enstatite_z4[17],enstatite_z5[17],enstatite_z6[17],enstatite_z7[17],enstatite_z8[17]]))
+    y_enstatite_m18 = correct_zeros(np.array([enstatite_z1[18],enstatite_z2[18],enstatite_z3[18],enstatite_z4[18],enstatite_z5[18],enstatite_z6[18],enstatite_z7[18],enstatite_z8[18]]))
+    y_enstatite_m19 = correct_zeros(np.array([enstatite_z1[19],enstatite_z2[19],enstatite_z3[19],enstatite_z4[19],enstatite_z5[19],enstatite_z6[19],enstatite_z7[19],enstatite_z8[19]]))
+    y_enstatite_m20 = correct_zeros(np.array([enstatite_z1[20],enstatite_z2[20],enstatite_z3[20],enstatite_z4[20],enstatite_z5[20],enstatite_z6[20],enstatite_z7[20],enstatite_z8[20]]))
+    y_enstatite_m21 = correct_zeros(np.array([enstatite_z1[21],enstatite_z2[21],enstatite_z3[21],enstatite_z4[21],enstatite_z5[21],enstatite_z6[21],enstatite_z7[21],enstatite_z8[21]]))
+    y_enstatite_m22 = correct_zeros(np.array([enstatite_z1[22],enstatite_z2[22],enstatite_z3[22],enstatite_z4[22],enstatite_z5[22],enstatite_z6[22],enstatite_z7[22],enstatite_z8[22]]))
+    y_enstatite_m23 = correct_zeros(np.array([enstatite_z1[23],enstatite_z2[23],enstatite_z3[23],enstatite_z4[23],enstatite_z5[23],enstatite_z6[23],enstatite_z7[23],enstatite_z8[23]]))
+    y_enstatite_m24 = correct_zeros(np.array([enstatite_z1[24],enstatite_z2[24],enstatite_z3[24],enstatite_z4[24],enstatite_z5[24],enstatite_z6[24],enstatite_z7[24],enstatite_z8[24]]))
+    y_enstatite_m25 = correct_zeros(np.array([enstatite_z1[25],enstatite_z2[25],enstatite_z3[25],enstatite_z4[25],enstatite_z5[25],enstatite_z6[25],enstatite_z7[25],enstatite_z8[25]]))
+    y_enstatite_m26 = correct_zeros(np.array([enstatite_z1[26],enstatite_z2[26],enstatite_z3[26],enstatite_z4[26],enstatite_z5[26],enstatite_z6[26],enstatite_z7[26],enstatite_z8[26]]))
+    
+    log_enstatite = np.log10(np.array([y_enstatite_m0,y_enstatite_m1,y_enstatite_m2,y_enstatite_m3,y_enstatite_m4,y_enstatite_m5,y_enstatite_m6,y_enstatite_m7,y_enstatite_m8,y_enstatite_m9,y_enstatite_m10,y_enstatite_m11,y_enstatite_m12,y_enstatite_m13,y_enstatite_m14,y_enstatite_m15,y_enstatite_m16,y_enstatite_m17,y_enstatite_m18,y_enstatite_m19,y_enstatite_m20,y_enstatite_m21,y_enstatite_m22,y_enstatite_m23,y_enstatite_m24,y_enstatite_m25,y_enstatite_m26]))
+#print(10**(log_enstatite))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_enstatite,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_enstatite, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_enstatite.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for enstatite M star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+    
+def interpolate_M_star_ferrosilite():
+    ferrosilite_z1 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    ferrosilite_z2 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    ferrosilite_z3 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    ferrosilite_z4 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    ferrosilite_z5 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    ferrosilite_z6 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    ferrosilite_z7 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    ferrosilite_z8 = read_file(4,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_ferrosilite_m0 = correct_zeros(np.array([ferrosilite_z1[0],ferrosilite_z2[0],ferrosilite_z3[0],ferrosilite_z4[0],ferrosilite_z5[0],ferrosilite_z6[0],ferrosilite_z7[0],ferrosilite_z8[0]]))
+    y_ferrosilite_m1 = correct_zeros(np.array([ferrosilite_z1[1],ferrosilite_z2[1],ferrosilite_z3[1],ferrosilite_z4[1],ferrosilite_z5[1],ferrosilite_z6[1],ferrosilite_z7[1],ferrosilite_z8[1]]))
+    y_ferrosilite_m2 = correct_zeros(np.array([ferrosilite_z1[2],ferrosilite_z2[2],ferrosilite_z3[2],ferrosilite_z4[2],ferrosilite_z5[2],ferrosilite_z6[2],ferrosilite_z7[2],ferrosilite_z8[2]]))
+    y_ferrosilite_m3 = correct_zeros(np.array([ferrosilite_z1[3],ferrosilite_z2[3],ferrosilite_z3[3],ferrosilite_z4[3],ferrosilite_z5[3],ferrosilite_z6[3],ferrosilite_z7[3],ferrosilite_z8[3]]))
+    y_ferrosilite_m4 = correct_zeros(np.array([ferrosilite_z1[4],ferrosilite_z2[4],ferrosilite_z3[4],ferrosilite_z4[4],ferrosilite_z5[4],ferrosilite_z6[4],ferrosilite_z7[4],ferrosilite_z8[4]]))
+    y_ferrosilite_m5 = correct_zeros(np.array([ferrosilite_z1[5],ferrosilite_z2[5],ferrosilite_z3[5],ferrosilite_z4[5],ferrosilite_z5[5],ferrosilite_z6[5],ferrosilite_z7[5],ferrosilite_z8[5]]))
+    y_ferrosilite_m6 = correct_zeros(np.array([ferrosilite_z1[6],ferrosilite_z2[6],ferrosilite_z3[6],ferrosilite_z4[6],ferrosilite_z5[6],ferrosilite_z6[6],ferrosilite_z7[6],ferrosilite_z8[6]]))
+    y_ferrosilite_m7 = correct_zeros(np.array([ferrosilite_z1[7],ferrosilite_z2[7],ferrosilite_z3[7],ferrosilite_z4[7],ferrosilite_z5[7],ferrosilite_z6[7],ferrosilite_z7[7],ferrosilite_z8[7]]))
+    y_ferrosilite_m8 = correct_zeros(np.array([ferrosilite_z1[8],ferrosilite_z2[8],ferrosilite_z3[8],ferrosilite_z4[8],ferrosilite_z5[8],ferrosilite_z6[8],ferrosilite_z7[8],ferrosilite_z8[8]]))
+    y_ferrosilite_m9 = correct_zeros(np.array([ferrosilite_z1[9],ferrosilite_z2[9],ferrosilite_z3[9],ferrosilite_z4[9],ferrosilite_z5[9],ferrosilite_z6[9],ferrosilite_z7[9],ferrosilite_z8[9]]))
+    y_ferrosilite_m10 = correct_zeros(np.array([ferrosilite_z1[10],ferrosilite_z2[10],ferrosilite_z3[10],ferrosilite_z4[10],ferrosilite_z5[10],ferrosilite_z6[10],ferrosilite_z7[10],ferrosilite_z8[10]]))
+    y_ferrosilite_m11 = correct_zeros(np.array([ferrosilite_z1[11],ferrosilite_z2[11],ferrosilite_z3[11],ferrosilite_z4[11],ferrosilite_z5[11],ferrosilite_z6[11],ferrosilite_z7[11],ferrosilite_z8[11]]))
+    y_ferrosilite_m12 = correct_zeros(np.array([ferrosilite_z1[12],ferrosilite_z2[12],ferrosilite_z3[12],ferrosilite_z4[12],ferrosilite_z5[12],ferrosilite_z6[12],ferrosilite_z7[12],ferrosilite_z8[12]]))
+    y_ferrosilite_m13 = correct_zeros(np.array([ferrosilite_z1[13],ferrosilite_z2[13],ferrosilite_z3[13],ferrosilite_z4[13],ferrosilite_z5[13],ferrosilite_z6[13],ferrosilite_z7[13],ferrosilite_z8[13]]))
+    y_ferrosilite_m14 = correct_zeros(np.array([ferrosilite_z1[14],ferrosilite_z2[14],ferrosilite_z3[14],ferrosilite_z4[14],ferrosilite_z5[14],ferrosilite_z6[14],ferrosilite_z7[14],ferrosilite_z8[14]]))
+    y_ferrosilite_m15 = correct_zeros(np.array([ferrosilite_z1[15],ferrosilite_z2[15],ferrosilite_z3[15],ferrosilite_z4[15],ferrosilite_z5[15],ferrosilite_z6[15],ferrosilite_z7[15],ferrosilite_z8[15]]))
+    y_ferrosilite_m16 = correct_zeros(np.array([ferrosilite_z1[16],ferrosilite_z2[16],ferrosilite_z3[16],ferrosilite_z4[16],ferrosilite_z5[16],ferrosilite_z6[16],ferrosilite_z7[16],ferrosilite_z8[16]]))
+    y_ferrosilite_m17 = correct_zeros(np.array([ferrosilite_z1[17],ferrosilite_z2[17],ferrosilite_z3[17],ferrosilite_z4[17],ferrosilite_z5[17],ferrosilite_z6[17],ferrosilite_z7[17],ferrosilite_z8[17]]))
+    y_ferrosilite_m18 = correct_zeros(np.array([ferrosilite_z1[18],ferrosilite_z2[18],ferrosilite_z3[18],ferrosilite_z4[18],ferrosilite_z5[18],ferrosilite_z6[18],ferrosilite_z7[18],ferrosilite_z8[18]]))
+    y_ferrosilite_m19 = correct_zeros(np.array([ferrosilite_z1[19],ferrosilite_z2[19],ferrosilite_z3[19],ferrosilite_z4[19],ferrosilite_z5[19],ferrosilite_z6[19],ferrosilite_z7[19],ferrosilite_z8[19]]))
+    y_ferrosilite_m20 = correct_zeros(np.array([ferrosilite_z1[20],ferrosilite_z2[20],ferrosilite_z3[20],ferrosilite_z4[20],ferrosilite_z5[20],ferrosilite_z6[20],ferrosilite_z7[20],ferrosilite_z8[20]]))
+    y_ferrosilite_m21 = correct_zeros(np.array([ferrosilite_z1[21],ferrosilite_z2[21],ferrosilite_z3[21],ferrosilite_z4[21],ferrosilite_z5[21],ferrosilite_z6[21],ferrosilite_z7[21],ferrosilite_z8[21]]))
+    y_ferrosilite_m22 = correct_zeros(np.array([ferrosilite_z1[22],ferrosilite_z2[22],ferrosilite_z3[22],ferrosilite_z4[22],ferrosilite_z5[22],ferrosilite_z6[22],ferrosilite_z7[22],ferrosilite_z8[22]]))
+    y_ferrosilite_m23 = correct_zeros(np.array([ferrosilite_z1[23],ferrosilite_z2[23],ferrosilite_z3[23],ferrosilite_z4[23],ferrosilite_z5[23],ferrosilite_z6[23],ferrosilite_z7[23],ferrosilite_z8[23]]))
+    y_ferrosilite_m24 = correct_zeros(np.array([ferrosilite_z1[24],ferrosilite_z2[24],ferrosilite_z3[24],ferrosilite_z4[24],ferrosilite_z5[24],ferrosilite_z6[24],ferrosilite_z7[24],ferrosilite_z8[24]]))
+    y_ferrosilite_m25 = correct_zeros(np.array([ferrosilite_z1[25],ferrosilite_z2[25],ferrosilite_z3[25],ferrosilite_z4[25],ferrosilite_z5[25],ferrosilite_z6[25],ferrosilite_z7[25],ferrosilite_z8[25]]))
+    y_ferrosilite_m26 = correct_zeros(np.array([ferrosilite_z1[26],ferrosilite_z2[26],ferrosilite_z3[26],ferrosilite_z4[26],ferrosilite_z5[26],ferrosilite_z6[26],ferrosilite_z7[26],ferrosilite_z8[26]]))
+    
+    log_ferrosilite = np.log10(np.array([y_ferrosilite_m0,y_ferrosilite_m1,y_ferrosilite_m2,y_ferrosilite_m3,y_ferrosilite_m4,y_ferrosilite_m5,y_ferrosilite_m6,y_ferrosilite_m7,y_ferrosilite_m8,y_ferrosilite_m9,y_ferrosilite_m10,y_ferrosilite_m11,y_ferrosilite_m12,y_ferrosilite_m13,y_ferrosilite_m14,y_ferrosilite_m15,y_ferrosilite_m16,y_ferrosilite_m17,y_ferrosilite_m18,y_ferrosilite_m19,y_ferrosilite_m20,y_ferrosilite_m21,y_ferrosilite_m22,y_ferrosilite_m23,y_ferrosilite_m24,y_ferrosilite_m25,y_ferrosilite_m26]))
+#print(10**(log_ferrosilite))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_ferrosilite,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_ferrosilite, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_ferrosilite.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for ferrosilite M star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+
+def interpolate_M_star_quartz():
+    quartz_z1 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    quartz_z2 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    quartz_z3 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    quartz_z4 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    quartz_z5 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    quartz_z6 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    quartz_z7 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    quartz_z8 = read_file(5,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_quartz_m0 = correct_zeros(np.array([quartz_z1[0],quartz_z2[0],quartz_z3[0],quartz_z4[0],quartz_z5[0],quartz_z6[0],quartz_z7[0],quartz_z8[0]]))
+    y_quartz_m1 = correct_zeros(np.array([quartz_z1[1],quartz_z2[1],quartz_z3[1],quartz_z4[1],quartz_z5[1],quartz_z6[1],quartz_z7[1],quartz_z8[1]]))
+    y_quartz_m2 = correct_zeros(np.array([quartz_z1[2],quartz_z2[2],quartz_z3[2],quartz_z4[2],quartz_z5[2],quartz_z6[2],quartz_z7[2],quartz_z8[2]]))
+    y_quartz_m3 = correct_zeros(np.array([quartz_z1[3],quartz_z2[3],quartz_z3[3],quartz_z4[3],quartz_z5[3],quartz_z6[3],quartz_z7[3],quartz_z8[3]]))
+    y_quartz_m4 = correct_zeros(np.array([quartz_z1[4],quartz_z2[4],quartz_z3[4],quartz_z4[4],quartz_z5[4],quartz_z6[4],quartz_z7[4],quartz_z8[4]]))
+    y_quartz_m5 = correct_zeros(np.array([quartz_z1[5],quartz_z2[5],quartz_z3[5],quartz_z4[5],quartz_z5[5],quartz_z6[5],quartz_z7[5],quartz_z8[5]]))
+    y_quartz_m6 = correct_zeros(np.array([quartz_z1[6],quartz_z2[6],quartz_z3[6],quartz_z4[6],quartz_z5[6],quartz_z6[6],quartz_z7[6],quartz_z8[6]]))
+    y_quartz_m7 = correct_zeros(np.array([quartz_z1[7],quartz_z2[7],quartz_z3[7],quartz_z4[7],quartz_z5[7],quartz_z6[7],quartz_z7[7],quartz_z8[7]]))
+    y_quartz_m8 = correct_zeros(np.array([quartz_z1[8],quartz_z2[8],quartz_z3[8],quartz_z4[8],quartz_z5[8],quartz_z6[8],quartz_z7[8],quartz_z8[8]]))
+    y_quartz_m9 = correct_zeros(np.array([quartz_z1[9],quartz_z2[9],quartz_z3[9],quartz_z4[9],quartz_z5[9],quartz_z6[9],quartz_z7[9],quartz_z8[9]]))
+    y_quartz_m10 = correct_zeros(np.array([quartz_z1[10],quartz_z2[10],quartz_z3[10],quartz_z4[10],quartz_z5[10],quartz_z6[10],quartz_z7[10],quartz_z8[10]]))
+    y_quartz_m11 = correct_zeros(np.array([quartz_z1[11],quartz_z2[11],quartz_z3[11],quartz_z4[11],quartz_z5[11],quartz_z6[11],quartz_z7[11],quartz_z8[11]]))
+    y_quartz_m12 = correct_zeros(np.array([quartz_z1[12],quartz_z2[12],quartz_z3[12],quartz_z4[12],quartz_z5[12],quartz_z6[12],quartz_z7[12],quartz_z8[12]]))
+    y_quartz_m13 = correct_zeros(np.array([quartz_z1[13],quartz_z2[13],quartz_z3[13],quartz_z4[13],quartz_z5[13],quartz_z6[13],quartz_z7[13],quartz_z8[13]]))
+    y_quartz_m14 = correct_zeros(np.array([quartz_z1[14],quartz_z2[14],quartz_z3[14],quartz_z4[14],quartz_z5[14],quartz_z6[14],quartz_z7[14],quartz_z8[14]]))
+    y_quartz_m15 = correct_zeros(np.array([quartz_z1[15],quartz_z2[15],quartz_z3[15],quartz_z4[15],quartz_z5[15],quartz_z6[15],quartz_z7[15],quartz_z8[15]]))
+    y_quartz_m16 = correct_zeros(np.array([quartz_z1[16],quartz_z2[16],quartz_z3[16],quartz_z4[16],quartz_z5[16],quartz_z6[16],quartz_z7[16],quartz_z8[16]]))
+    y_quartz_m17 = correct_zeros(np.array([quartz_z1[17],quartz_z2[17],quartz_z3[17],quartz_z4[17],quartz_z5[17],quartz_z6[17],quartz_z7[17],quartz_z8[17]]))
+    y_quartz_m18 = correct_zeros(np.array([quartz_z1[18],quartz_z2[18],quartz_z3[18],quartz_z4[18],quartz_z5[18],quartz_z6[18],quartz_z7[18],quartz_z8[18]]))
+    y_quartz_m19 = correct_zeros(np.array([quartz_z1[19],quartz_z2[19],quartz_z3[19],quartz_z4[19],quartz_z5[19],quartz_z6[19],quartz_z7[19],quartz_z8[19]]))
+    y_quartz_m20 = correct_zeros(np.array([quartz_z1[20],quartz_z2[20],quartz_z3[20],quartz_z4[20],quartz_z5[20],quartz_z6[20],quartz_z7[20],quartz_z8[20]]))
+    y_quartz_m21 = correct_zeros(np.array([quartz_z1[21],quartz_z2[21],quartz_z3[21],quartz_z4[21],quartz_z5[21],quartz_z6[21],quartz_z7[21],quartz_z8[21]]))
+    y_quartz_m22 = correct_zeros(np.array([quartz_z1[22],quartz_z2[22],quartz_z3[22],quartz_z4[22],quartz_z5[22],quartz_z6[22],quartz_z7[22],quartz_z8[22]]))
+    y_quartz_m23 = correct_zeros(np.array([quartz_z1[23],quartz_z2[23],quartz_z3[23],quartz_z4[23],quartz_z5[23],quartz_z6[23],quartz_z7[23],quartz_z8[23]]))
+    y_quartz_m24 = correct_zeros(np.array([quartz_z1[24],quartz_z2[24],quartz_z3[24],quartz_z4[24],quartz_z5[24],quartz_z6[24],quartz_z7[24],quartz_z8[24]]))
+    y_quartz_m25 = correct_zeros(np.array([quartz_z1[25],quartz_z2[25],quartz_z3[25],quartz_z4[25],quartz_z5[25],quartz_z6[25],quartz_z7[25],quartz_z8[25]]))
+    y_quartz_m26 = correct_zeros(np.array([quartz_z1[26],quartz_z2[26],quartz_z3[26],quartz_z4[26],quartz_z5[26],quartz_z6[26],quartz_z7[26],quartz_z8[26]]))
+    
+    log_quartz = np.log10(np.array([y_quartz_m0,y_quartz_m1,y_quartz_m2,y_quartz_m3,y_quartz_m4,y_quartz_m5,y_quartz_m6,y_quartz_m7,y_quartz_m8,y_quartz_m9,y_quartz_m10,y_quartz_m11,y_quartz_m12,y_quartz_m13,y_quartz_m14,y_quartz_m15,y_quartz_m16,y_quartz_m17,y_quartz_m18,y_quartz_m19,y_quartz_m20,y_quartz_m21,y_quartz_m22,y_quartz_m23,y_quartz_m24,y_quartz_m25,y_quartz_m26]))
+#print(10**(log_quartz))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_quartz,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_quartz, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_quartz.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for quartz M star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
+
+def interpolate_M_star_iron():
+    iron_z1 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.001.txt')
+    iron_z2 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.002.txt')
+    iron_z3 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.003.txt')
+    iron_z4 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.004.txt')
+    iron_z5 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.005.txt')
+    iron_z6 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.006.txt')
+    iron_z7 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.007.txt')
+    iron_z8 = read_file(6,'C:/Users/umbut/OneDrive/Documents/Z_0.008.txt')
+    
+    y_iron_m0 = correct_zeros(np.array([iron_z1[0],iron_z2[0],iron_z3[0],iron_z4[0],iron_z5[0],iron_z6[0],iron_z7[0],iron_z8[0]]))
+    y_iron_m1 = correct_zeros(np.array([iron_z1[1],iron_z2[1],iron_z3[1],iron_z4[1],iron_z5[1],iron_z6[1],iron_z7[1],iron_z8[1]]))
+    y_iron_m2 = correct_zeros(np.array([iron_z1[2],iron_z2[2],iron_z3[2],iron_z4[2],iron_z5[2],iron_z6[2],iron_z7[2],iron_z8[2]]))
+    y_iron_m3 = correct_zeros(np.array([iron_z1[3],iron_z2[3],iron_z3[3],iron_z4[3],iron_z5[3],iron_z6[3],iron_z7[3],iron_z8[3]]))
+    y_iron_m4 = correct_zeros(np.array([iron_z1[4],iron_z2[4],iron_z3[4],iron_z4[4],iron_z5[4],iron_z6[4],iron_z7[4],iron_z8[4]]))
+    y_iron_m5 = correct_zeros(np.array([iron_z1[5],iron_z2[5],iron_z3[5],iron_z4[5],iron_z5[5],iron_z6[5],iron_z7[5],iron_z8[5]]))
+    y_iron_m6 = correct_zeros(np.array([iron_z1[6],iron_z2[6],iron_z3[6],iron_z4[6],iron_z5[6],iron_z6[6],iron_z7[6],iron_z8[6]]))
+    y_iron_m7 = correct_zeros(np.array([iron_z1[7],iron_z2[7],iron_z3[7],iron_z4[7],iron_z5[7],iron_z6[7],iron_z7[7],iron_z8[7]]))
+    y_iron_m8 = correct_zeros(np.array([iron_z1[8],iron_z2[8],iron_z3[8],iron_z4[8],iron_z5[8],iron_z6[8],iron_z7[8],iron_z8[8]]))
+    y_iron_m9 = correct_zeros(np.array([iron_z1[9],iron_z2[9],iron_z3[9],iron_z4[9],iron_z5[9],iron_z6[9],iron_z7[9],iron_z8[9]]))
+    y_iron_m10 = correct_zeros(np.array([iron_z1[10],iron_z2[10],iron_z3[10],iron_z4[10],iron_z5[10],iron_z6[10],iron_z7[10],iron_z8[10]]))
+    y_iron_m11 = correct_zeros(np.array([iron_z1[11],iron_z2[11],iron_z3[11],iron_z4[11],iron_z5[11],iron_z6[11],iron_z7[11],iron_z8[11]]))
+    y_iron_m12 = correct_zeros(np.array([iron_z1[12],iron_z2[12],iron_z3[12],iron_z4[12],iron_z5[12],iron_z6[12],iron_z7[12],iron_z8[12]]))
+    y_iron_m13 = correct_zeros(np.array([iron_z1[13],iron_z2[13],iron_z3[13],iron_z4[13],iron_z5[13],iron_z6[13],iron_z7[13],iron_z8[13]]))
+    y_iron_m14 = correct_zeros(np.array([iron_z1[14],iron_z2[14],iron_z3[14],iron_z4[14],iron_z5[14],iron_z6[14],iron_z7[14],iron_z8[14]]))
+    y_iron_m15 = correct_zeros(np.array([iron_z1[15],iron_z2[15],iron_z3[15],iron_z4[15],iron_z5[15],iron_z6[15],iron_z7[15],iron_z8[15]]))
+    y_iron_m16 = correct_zeros(np.array([iron_z1[16],iron_z2[16],iron_z3[16],iron_z4[16],iron_z5[16],iron_z6[16],iron_z7[16],iron_z8[16]]))
+    y_iron_m17 = correct_zeros(np.array([iron_z1[17],iron_z2[17],iron_z3[17],iron_z4[17],iron_z5[17],iron_z6[17],iron_z7[17],iron_z8[17]]))
+    y_iron_m18 = correct_zeros(np.array([iron_z1[18],iron_z2[18],iron_z3[18],iron_z4[18],iron_z5[18],iron_z6[18],iron_z7[18],iron_z8[18]]))
+    y_iron_m19 = correct_zeros(np.array([iron_z1[19],iron_z2[19],iron_z3[19],iron_z4[19],iron_z5[19],iron_z6[19],iron_z7[19],iron_z8[19]]))
+    y_iron_m20 = correct_zeros(np.array([iron_z1[20],iron_z2[20],iron_z3[20],iron_z4[20],iron_z5[20],iron_z6[20],iron_z7[20],iron_z8[20]]))
+    y_iron_m21 = correct_zeros(np.array([iron_z1[21],iron_z2[21],iron_z3[21],iron_z4[21],iron_z5[21],iron_z6[21],iron_z7[21],iron_z8[21]]))
+    y_iron_m22 = correct_zeros(np.array([iron_z1[22],iron_z2[22],iron_z3[22],iron_z4[22],iron_z5[22],iron_z6[22],iron_z7[22],iron_z8[22]]))
+    y_iron_m23 = correct_zeros(np.array([iron_z1[23],iron_z2[23],iron_z3[23],iron_z4[23],iron_z5[23],iron_z6[23],iron_z7[23],iron_z8[23]]))
+    y_iron_m24 = correct_zeros(np.array([iron_z1[24],iron_z2[24],iron_z3[24],iron_z4[24],iron_z5[24],iron_z6[24],iron_z7[24],iron_z8[24]]))
+    y_iron_m25 = correct_zeros(np.array([iron_z1[25],iron_z2[25],iron_z3[25],iron_z4[25],iron_z5[25],iron_z6[25],iron_z7[25],iron_z8[25]]))
+    y_iron_m26 = correct_zeros(np.array([iron_z1[26],iron_z2[26],iron_z3[26],iron_z4[26],iron_z5[26],iron_z6[26],iron_z7[26],iron_z8[26]]))
+    
+    log_iron = np.log10(np.array([y_iron_m0,y_iron_m1,y_iron_m2,y_iron_m3,y_iron_m4,y_iron_m5,y_iron_m6,y_iron_m7,y_iron_m8,y_iron_m9,y_iron_m10,y_iron_m11,y_iron_m12,y_iron_m13,y_iron_m14,y_iron_m15,y_iron_m16,y_iron_m17,y_iron_m18,y_iron_m19,y_iron_m20,y_iron_m21,y_iron_m22,y_iron_m23,y_iron_m24,y_iron_m25,y_iron_m26]))
+#print(10**(log_iron))
+
+    metallicity = np.array([0.001,0.002,0.004,0.008,0.015,0.02,0.03,0.04])
+    mass = np.array([1,1.1,1.2,1.25,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,3,3.5,4,4.01,4.5,5.0,5.5,6.0,6.5,7])
+#g1 = np.meshgrid(metallicity,mass)
+#new_grid = griddata(g1,log_iron,(grid_x,grid_y), method ='cubic')
+    new_grid = RectBivariateSpline(mass,metallicity,log_iron, kx=1, ky=1, s=0.9)
+
+
+    raw_inputs = np.meshgrid(mass, metallicity)
+    #fig, (ax, ax2) = plt.subplots(nrows=1, ncols=2)
+#ax.pcolor(raw_inputs[0], raw_inputs[1], log_iron.T)
+
+    masses_interp= np.linspace(1.001, 6.999, 200)
+    z_interp=  np.linspace(0.000101, 0.039999, 200)
+
+    base_meshgrid = np.meshgrid(masses_interp, z_interp)
+    interpolated = np.meshgrid(np.zeros(200), np.zeros(200))[0]
+
+    for i in range(len(masses_interp)):
+        for j in range(len(z_interp)):
+            interpolated[j][i] = new_grid(masses_interp[i], z_interp[j])
+
+#ax2.pcolor(base_meshgrid[0], base_meshgrid[1], interpolated)
+#ax2.set_title("Interpolated function.")
+#plt.ylim(0.001, 0.04)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("Interpolation for iron M star")
+    ax.plot_surface(base_meshgrid[0],base_meshgrid[1],interpolated)
+    plt.show()
 
