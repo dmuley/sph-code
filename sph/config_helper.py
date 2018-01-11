@@ -71,14 +71,14 @@ OVERALL_AGE = latest_file['OVERALL_AGE']
 overall_AGB_list = latest_file['overall_AGB_list']
 overall_AGB_time_until = latest_file['overall_AGB_time_until']
 overall_AGB_metallicity = latest_file['overall_AGB_metallicity']
-overall_AGB_dust_prod = latest_file['overall_AGB_dust_prod']
+#overall_AGB_dust_prod = latest_file['overall_AGB_dust_prod'] no need to store this
 
 #Create array of AGB stars, loading in each file one at a time. This is a bit slow, but is most accurate.
 #append to the end of this and compute later amount created
 timestep_AGB_list = np.array([])
 timestep_AGB_time_until = np.array([])
 timestep_AGB_metallicity = np.array([])
-timestep_AGB_dust_prod = np.array([])
+#timestep_AGB_dust_prod = np.array([])
 
 timestep_gas_mass_by_species = copy.deepcopy(destruction_energies) * 0
 timestep_star_mass_by_species = copy.deepcopy(destruction_energies) * 0
@@ -156,22 +156,23 @@ def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_d
 	number_created = mass_created/(mu_specie * amu)
 	
 	return mass_created, number_created
-	
-splines, mapto, AGB_divisor = interpolate_amounts(absolute_path_to_nsc)
-timestep_AGB_dust_prod, number_created = calculate_interpolation(timestep_AGB_list, timestep_AGB_metallicities, splines, mapto, AGB_divisor, mu_specie)
 
 overall_AGB_list = np.append(overall_AGB_list, timestep_AGB_list)
 overall_AGB_time_until = np.append(overall_AGB_time_until, timestep_AGB_time_until)
 overall_AGB_metallicity = np.append(overall_AGB_metallicity, timestep_AGB_metallicity)
-overall_AGB_dust_prod = np.append(overall_AGB_dust_prod, timestep_AGB_dust_prod * solar_mass, axis=0)
+#overall_AGB_dust_prod = np.append(overall_AGB_dust_prod, timestep_AGB_dust_prod * solar_mass, axis=0)
 
 #calculate how much dust is produced by AGBs during the NEXT timestep, and remove all AGBs that have passed already
+#compute dust production ONLY for those stars whose time has come, don't needlessly store for others
 overall_AGB_list = overall_AGB_list[overall_AGB_time_until >= OVERALL_AGE]
 overall_AGB_metallicity = overall_AGB_metallicity[overall_AGB_time_until >= OVERALL_AGE]
-overall_AGB_dust_prod = overall_AGB_dust_prod[overall_AGB_time_until >= OVERALL_AGE]
+#overall_AGB_dust_prod = overall_AGB_dust_prod[overall_AGB_time_until >= OVERALL_AGE]
 overall_AGB_time_until = overall_AGB_time_until[overall_AGB_time_until >= OVERALL_AGE]
 
-timestep_AGB_dust_mass_by_species = np.sum(overall_AGB_dust_prod[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP], axis=0)
+splines, mapto, AGB_divisor = interpolate_amounts(absolute_path_to_nsc)
+overall_AGB_dust_prod, number_created = calculate_interpolation(overall_AGB_list[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP] , overall_AGB_metallicities[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP], splines, mapto, AGB_divisor, mu_specie)
+
+timestep_AGB_dust_mass_by_species = np.sum(overall_AGB_dust_prod, axis=0)
 
 timestep_mass_composition = timestep_dust_mass_by_species + timestep_gas_mass_by_species + timestep_star_mass_by_species
 timestep_dust_by_mass_composition = timestep_AGB_dust_mass_by_species + timestep_dust_mass_by_species
@@ -196,14 +197,15 @@ overall_gas_mass_composition /= np.sum(overall_gas_mass_composition)
 
 overall_gas_number_composition = (overall_gas_mass_composition/mu_specie)/np.sum(overall_gas_mass_composition/mu_specie)
 
+#saving new config files
+
 #now just add these to output file and increment timestep number by 1
 #make sure to start from config_0.npz
-
 
 #assume changes in dust *during* each timestep are small, only total amounts matter. This is valid
 #because only 0.5% of the galaxy's mass is subject to "processing" at any given time.
 
-#rest of this is just handling dilution factors in mass vs. in number, need to make sure
-#math is properly done there.
-
 #increment OVERALL_AGE by TIMESTEP and write everything to the next output file
+np.save(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER + 1))), specie_fraction_array = overall_gas_number_composition, dust_base_frac = overall_dust_number_composition, DUST_FRAC = new_dustfrac, OVERALL_AGE = OVERALL_AGE + TIMESTEP, overall_AGB_list = overall_AGB_list, overall_AGB_time_until = overall_AGB_time_until, overall_AGB_metallicity = overall_AGB_metallicity)
+
+#This is it! The loop is now closed.

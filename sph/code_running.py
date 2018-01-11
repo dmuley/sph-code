@@ -487,12 +487,12 @@ dust_mass_by_species = np.sum((((f_un * mu_specie)[particle_type == 2].T/np.sum(
 AGB_condition = ((particle_type == 1) & (mass/solar_mass > 1.) & (mass/solar_mass < 7.))
 AGB_list = mass[AGB_condition]
 AGB_time_until = nsc.luminosity_relation(mass[AGB_condition]/solar_mass, np.ones(len(mass[AGB_condition])), 1) * 1e10 * year - star_ages[AGB_condition] + OVERALL_AGE #time of formation of AGB
-AGB_metallicity = AGB_metallicity = np.sum((f_un * mu_specie)[AGB_condition].T[6:], axis=0)/np.sum((f_un * mu_specie)[AGB_condition], axis=1)
+AGB_metallicity = np.sum((f_un * mu_specie)[AGB_condition].T[6:], axis=0)/np.sum((f_un * mu_specie)[AGB_condition], axis=1)
 
 absolute_path_to_outputs = absolute_path_to_nsc + '/../savefiles/outputs'
 list_of_outputs = os.listdir(unicode(absolute_path_to_outputs))
 output_number = np.max(np.array([bm[:-4] for bm in list_of_outputs]).astype('int'))
-np.save(unicode(str(output_number + 1)), gas_mass_by_species, star_mass_by_species, dust_mass_by_species, AGB_condition, AGB_list, AGB_time_until, AGB_metallicity)
+np.save(unicode(str(output_number + 1)), gas_mass_by_species = gas_mass_by_species, star_mass_by_species = star_mass_by_species, dust_mass_by_species = dust_mass_by_species, AGB_condition = AGB_condition, AGB_list = AGB_list, AGB_time_until = AGB_time_until, AGB_metallicity = AGB_metallicity)
 #save all the above to a Numpy binary which will then be read in by config_helper.py to create a new single config file
 
 '''
