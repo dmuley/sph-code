@@ -705,22 +705,28 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			n_H_plus *= (n_H_plus > 0)
 			
 			n_He_plus =  np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[4] * (particle_type[neighbor[j]] == 0))
-			n_He_plus *= (n_He_plus > 0)			
+			n_He_plus *= (n_He_plus > 0)
+			
+			n_H_neutral = np.nan_to_num(Weigh2(x, x_0, m, d)/(muloc * m_h) * comps.T[2] * (particle_type[neighbor[j]] == 0))
+			n_H_neutral *= (n_H_neutral > 0)		
 			
 			#tot_e = Weigh2(x, x_0, m, d)/(muloc * m_h) * (particle_type[neighbor[j]] == 0) #total number density
 			H_effect = np.nan_to_num(4.13e-19 * t4**(-0.7131 - 0.0115 * np.log(t4)) * (particle_type[neighbor[j]] == 0))
 			He_effect = np.nan_to_num(2.72e-19 * t4**(-0.789) * (particle_type[neighbor[j]] == 0))
+			H2_effect = np.nan_to_num(7.3e-23 * 0.5 * (temps/100)**0.5 * (particle_type[neighbor[j]] == 0)
 			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
 			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
 			#print energy_coeff_H, energy_coeff_He
 			num_e = np.sum(n_e[n_e > 0])
 			num_H_plus = np.sum(n_H_plus[n_H_plus > 0])
 			num_He_plus = np.sum(n_He_plus[n_He_plus > 0])
+			num_H_neut = np.sum(n_H_neutral[n_H_neutral > 0])
 			
 			#print num_e, num_H_plus, num_He_plus
 			
 			H_effect_rec = np.sum((H_effect * n_e)[n_e > 0])
 			He_effect_rec = np.sum((He_effect * n_e)[n_e > 0])
+			H_neut_effect_rec = np.sum((H2_effect * n_H_neutral)[n_H_neutral > 0])
 			
 			#print H_effect_rec, He_effect_rec
 			
@@ -730,10 +736,14 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			
 			frac_rec_e = (H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt
 			frac_rec_e = min(frac_rec_e, 0.999)
+			
 			#print frac_rec_e
 			frac_rec_H = frac_rec_e * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec))
 			frac_rec_He = frac_rec_e * np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec))
 			#print frac_rec_e, frac_rec_H, frac_rec_He
+			
+			frac_rec_H_neut = H_neut_effect_rec * num_H_neut/num_H_neut * dt
+			frac_rec_H_neut = np.min(frac_rec_H_neut, 0.999)
 			
 			energy_rec_H = np.nan_to_num(H_effect_energy * dt)
 			energy_rec_He = np.nan_to_num(He_effect_energy * dt)
@@ -741,6 +751,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			energy_array[3][neighbor[j]] += np.nan_to_num(energy_rec_H * rel_weights * (rel_weights > 0)/np.sum(rel_weights * (rel_weights > 0)))
 			energy_array[4][neighbor[j]] += np.nan_to_num(energy_rec_He * rel_weights * (rel_weights > 0)/np.sum(rel_weights * (rel_weights > 0)))
 						
+			rec_array[2][neighbor[j]] += np.nan_to_num(frac_rec_H_neut) * (n_H_neutral > 0) * rel_weights * (rel_weights > 0)
 			rec_array[3][neighbor[j]] += np.nan_to_num(frac_rec_H) * (n_e > 0) * rel_weights * (rel_weights > 0)
 			rec_array[4][neighbor[j]] += np.nan_to_num(frac_rec_He) * (n_e > 0) * rel_weights * (rel_weights > 0)
 			rec_array[5][neighbor[j]] += np.nan_to_num(frac_rec_e) * (n_e > 0) * rel_weights * (rel_weights > 0)
@@ -754,17 +765,19 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	rec_array = np.nan_to_num(rec_array)
 	#print np.min(rec_array), np.max(rec_array)
 	
+	H2_plus_frac = f_un.T[2] * rec_array[2]
 	H_plus_frac = f_un.T[5] * rec_array[3]
 	He_plus_frac = f_un.T[5] * rec_array[4]
 	elec_frac = f_un.T[5] * rec_array[5]
 	
 	energy = np.nan_to_num(np.sum(final_comp * energy_array, axis=0))
 	
+	final_comp[0] += H2_plus_frac/2.
 	final_comp[1] += He_plus_frac
-	final_comp[2] += H_plus_frac
-	final_comp[3] -= H_plus_frac
-	final_comp[4] -= He_plus_frac
-	final_comp[5] -= elec_frac
+	final_comp[2] += H_plus_frac - H2_plus_frac
+	final_comp[3] += -H_plus_frac
+	final_comp[4] += -He_plus_frac
+	final_comp[5] += -elec_frac
 	
 	final_comp /= np.sum(final_comp, axis=0)
 	
