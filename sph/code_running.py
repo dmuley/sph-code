@@ -64,14 +64,14 @@ N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
 
 
-'''
-WHAT NEEDS TO BE DONE HERE: IMPORT COMPOSITION AND DUST FRACTION FROM FILE, IF SUCH A FILE EXISTS
-THIS CODE WILL WRITE TO FILE, HELPER CODE WILL CREATE FILE
-'''
+
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
 dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
 DUST_FRAC = 0.000
 OVERALL_AGE = 0. #age of the galaxy
+'''
+WHAT NEEDS TO BE DONE HERE: IMPORT COMPOSITION AND DUST FRACTION FROM FILE, IF SUCH A FILE EXISTS
+THIS CODE WILL WRITE TO FILE, HELPER CODE WILL CREATE FILE
 
 #import dust_base_frac from file for future calculations, if the file exists
 #Returns last-numbered .npy file
@@ -89,9 +89,11 @@ latest_file = np.load(unicode(absolute_path_to_config + '/' + conf_filename_sele
 specie_fraction_array = latest_file['specie_fraction_array']
 dust_base_frac = latest_file['dust_base_frac']
 DUST_FRAC = latest_file['DUST_FRAC']
-OVERALL_AGE = latest_file['OVERALL_AGE']
+OVERALL_AGE = latest_file['OVERALL_AGE']'''
 
-#end uploading
+############################
+#END LOADING FROM FILE HERE#
+############################
 
 dust_base = dust_base_frac/np.sum(dust_base_frac)
 base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)

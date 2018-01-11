@@ -155,7 +155,7 @@ def interpolation_functions(): #interpolation of carbon and silicon destruction 
     	return np.zeros(len(v));
     
     #list of interpolation functions for each species
-    return (zero_function, zero_function, zero_function, zero_function, zero_function, zero_function, carb_interpolation, silicon_interpolation, carb_interpolation, silicon_interpolation, carb_interpolation, carb_interpolation, carb_interpolation)
+    return (zero_function, zero_function, zero_function, zero_function, zero_function, zero_function, carb_interpolation, silicon_interpolation, carb_interpolation, silicon_interpolation, carb_interpolation, carb_interpolation, carb_interpolation, zero_function)
 
 intf = interpolation_functions(); #calling this beforehand just so it's clear that it's set
 
@@ -290,26 +290,16 @@ def grav_force_calculation(mass, points, sizes):
 	#use square_distance_com to evaluate smoothing length scale
 	#smoothing_scale = (np.sum(squared_distance_com - center_of_mass**2, axis=1)**2 + mean_size**4)**0.25
 	smoothing_scale = mean_size # * n_parts**(1./3.)
-	
-	grav_accels_clusters = np.zeros(shape=(3, len(smoothing_scale)))
-	for element in range(len(clusters)):
-		dist_norm = (center_of_mass - center_of_mass[element]).T/(np.sum((center_of_mass - center_of_mass[element])**2, axis=1) + np.average(smoothing_scale**0.25)**8)**(3./2.)
-		grav_accels_clusters += -G * dist_norm * total_mass[element]
-		grav_accels_clusters.T[element] += np.sum((G * dist_norm * total_mass).T, axis=0)
 		
 	grav_accels = np.zeros(shape=(len(points), 3))
-	grav_accels_local = np.zeros(shape=(len(points), 3))
 	for int_cluster in np.arange(len(clusters)):
 		cluster_el = clusters[int_cluster]
-		grav_accels[cluster_el] += grav_accels_clusters.T[int_cluster]
-		#print grav_accels[cluster_el]
-		#for simplicity, assume basic central potential within clusters. Nothing too fancy needed
-		dist_to_center = points[cluster_el] - center_of_mass[int_cluster]
-		grav_accel_internal = -G * total_mass[int_cluster] * dist_to_center.T/(np.sum(dist_to_center**2, axis=1) + smoothing_scale[int_cluster]**2)**(3./2.)
-		grav_accels_local[cluster_el] += grav_accel_internal.T
+		dist_norm = (points - center_of_mass[int_cluster]).T/(np.sum((points - center_of_mass[int_cluster])**2, axis=1) + np.average(smoothing_scale**0.25)**8)**(3./2.)
+		grav_accels.T[:] += -G * dist_norm * total_mass[int_cluster]
+		grav_accels[cluster_el] += np.sum(G * dist_norm * mass, axis=1)
+		#handles internal acceleration as well as a harmonic oscillator potential
 	
-	grav_accels += grav_accels_local
-	return grav_accels, center_of_mass, grav_accels_clusters.T, grav_accels_local
+	return grav_accels, center_of_mass
 	
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]
