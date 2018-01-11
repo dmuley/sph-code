@@ -713,7 +713,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			#tot_e = Weigh2(x, x_0, m, d)/(muloc * m_h) * (particle_type[neighbor[j]] == 0) #total number density
 			H_effect = np.nan_to_num(4.13e-19 * t4**(-0.7131 - 0.0115 * np.log(t4)) * (particle_type[neighbor[j]] == 0))
 			He_effect = np.nan_to_num(2.72e-19 * t4**(-0.789) * (particle_type[neighbor[j]] == 0))
-			H2_effect = np.nan_to_num(7.3e-23 * 0.5 * (temps/100)**0.5 * (particle_type[neighbor[j]] == 0)
+			H2_effect = np.nan_to_num(7.3e-23 * 0.5 * (temps/100)**0.5 * (particle_type[neighbor[j]] == 0))
 			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
 			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
 			#print energy_coeff_H, energy_coeff_He

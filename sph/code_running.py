@@ -167,8 +167,8 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-'''particle_type[mass == max(mass)] = 1
-star_ages[mass == max(mass)] = 3.31e6 * year'''
+particle_type[mass == max(mass)] = 1
+star_ages[mass == max(mass)] = 3.31e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
