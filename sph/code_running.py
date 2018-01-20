@@ -11,11 +11,14 @@ import copy
 from time import sleep
 import navier_stokes_cleaned as nsc
 import os
+import time
 
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
+
+np.random.seed(rank*time.time())
 
 G = constants.G
 k = constants.Boltzmann
