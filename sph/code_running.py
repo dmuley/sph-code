@@ -69,8 +69,6 @@ DUST_MASS = 0.05 #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year/7. #don't want to see any AGB stars undergoing supernovae inadvertently
 
-
-
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
 dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
 DUST_FRAC = 0.000
@@ -83,6 +81,7 @@ THIS CODE WILL WRITE TO FILE, HELPER CODE WILL CREATE FILE
 #Returns last-numbered .npy file
 absolute_path_to_nsc = os.path.dirname(os.path.abspath(nsc.__file__))
 absolute_path_to_config = absolute_path_to_nsc + '/../savefiles/config'
+absolute_path_to_outputs = absolute_path_to_nsc + '/../savefiles/outputs'
 
 config_files = os.listdir(absolute_path_to_config)
 conf_number = np.array([am[7:-4] for am in config_files]).astype('int')
@@ -497,9 +496,8 @@ AGB_condition = ((particle_type == 1) & (mass/solar_mass > 1.) & (mass/solar_mas
 AGB_list = mass[AGB_condition]
 AGB_time_until = nsc.luminosity_relation(mass[AGB_condition]/solar_mass, np.ones(len(mass[AGB_condition])), 1) * 1e10 * year - star_ages[AGB_condition] + OVERALL_AGE #time of formation of AGB
 AGB_metallicity = np.sum((f_un * mu_specie)[AGB_condition].T[6:], axis=0)/np.sum((f_un * mu_specie)[AGB_condition], axis=1)
-AGB_composition = (f_un * mu_specie)[AGB_condition]/np.sum((f_un * mu_specie)[AGB_condition], axis=1)
+AGB_composition = (f_un * mu_specie)[AGB_condition]/np.sum((f_un * mu_specie)[AGB_condition], axis=0)
 
-absolute_path_to_outputs = absolute_path_to_nsc + '/../savefiles/outputs'
 list_of_outputs = np.append(os.listdir(unicode(absolute_path_to_outputs)), '-1.npz')
 output_number = np.max(np.array([bm[:-4] for bm in list_of_outputs]).astype('int'))
 np.savez(unicode(absolute_path_to_outputs + '/' + str(output_number + 1)), gas_mass_by_species = gas_mass_by_species, star_mass_by_species = star_mass_by_species, dust_mass_by_species = dust_mass_by_species, AGB_condition = AGB_condition, AGB_list = AGB_list, AGB_time_until = AGB_time_until, AGB_metallicity = AGB_metallicity, AGB_composition = AGB_composition)
