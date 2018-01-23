@@ -43,7 +43,7 @@ FRAC_CONSUMED = (1. - LOC_FRAC_CONSUMED)**np.arange(10000) * LOC_FRAC_CONSUMED #
    from each one).
    
 #### SOME WORDS OF WARNING ####
- - Make sure that a 'config_00.npz' file already exists (create this manually or the code won't work!
+ - Make sure that a 'config_0.npz' file already exists (create this manually or the code won't work!
  - Make sure that code forms a closed loop---i. e. code_running writes to small output files, and these
    small output files contain all the information asked for here, which in turn create config files, which
    in turn determine completely (up to randomness) the working of code_running.py. Code should be totally
@@ -57,6 +57,7 @@ absolute_path_to_config  = absolute_path_to_nsc + '/../savefiles/config'
 
 config_files = os.listdir(absolute_path_to_config)
 conf_number = np.array([am[7:-4] for am in config_files]).astype('int')
+conf_number = np.append(conf_number, -1)
 max_conf_file = (conf_number == max(conf_number))
 
 TIMESTEP_NUMBER = max(conf_number)
@@ -72,14 +73,14 @@ OVERALL_AGE = latest_file['OVERALL_AGE']
 overall_AGB_list = latest_file['overall_AGB_list']
 overall_AGB_time_until = latest_file['overall_AGB_time_until']
 overall_AGB_metallicity = latest_file['overall_AGB_metallicity']
-#overall_AGB_dust_prod = latest_file['overall_AGB_dust_prod'] no need to store this
+overall_AGB_composition = latest_file['overall_AGB_composition']
 
 #Create array of AGB stars, loading in each file one at a time. This is a bit slow, but is most accurate.
 #append to the end of this and compute later amount created
 timestep_AGB_list = np.array([])
 timestep_AGB_time_until = np.array([])
 timestep_AGB_metallicity = np.array([])
-#timestep_AGB_dust_prod = np.array([])
+timestep_AGB_composition = np.array([clean_gas_composition])
 
 timestep_gas_mass_by_species = copy.deepcopy(destruction_energies) * 0
 timestep_star_mass_by_species = copy.deepcopy(destruction_energies) * 0
@@ -90,17 +91,20 @@ for savefile_name in os.listdir(absolute_path_to_outputs):
 	AGB_list = array_file['AGB_list']
 	AGB_time_until = array_file['AGB_time_until']
 	AGB_metallicity = array_file['AGB_metallicity']
+	AGB_comp = array_file['AGB_composition']
 	
 	timestep_AGB_list = np.append(timestep_AGB_list, AGB_list)
 	timestep_AGB_time_until = np.append(timestep_AGB_time_until, AGB_time_until)
 	timestep_AGB_metallicity = np.append(timestep_AGB_metallicity, AGB_metallicity)
-	
+	timestep_AGB_composition = np.append(timestep_AGB_composition, [AGB_comp], axis=0)
+		
 	timestep_gas_mass_by_species += array_file['gas_mass_by_species']
 	timestep_star_mass_by_species += array_file['star_mass_by_species']
 	timestep_dust_mass_by_species += array_file['dust_mass_by_species']
 	
 	array_file.close()
 
+timestep_AGB_composition = timestep_AGB_composition[1:] #removing dummy element
 #append these to overall_lists, found in latest file in output folder
 
 def interpolate_amounts(absolute_path_to_nsc):
@@ -145,23 +149,40 @@ def interpolate_amounts(absolute_path_to_nsc):
 		
 	return splines, mapto, AGB_divisor
 	
-def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_divisor, mu_specie):
-	mass_created = np.array([mu_specie] * len(AGB_masses)) * 0.
+def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_divisor, mu_specie, AGB_composition):
+	dust_mass_created = np.array([mu_specie] * len(AGB_masses)) * 0.
+	mass_WD = (0.55 + (AGB_masses/solar_mass - 1.) * 0.45/(7. - 1.)) * solar_mass #based on Dominguez et al. 1999
 	
 	for pos in range(len(AGB_masses)):
 		mass_created[pos][mapto] = np.array([float(splines[obj](AGB_metallicities[pos], AGB_masses[pos])) for obj in range(len(splines))])
 		print pos
 		
-	mass_created /= AGB_divisor
-	mass_created[mass_created < 0.] = 0.
-	number_created = mass_created/(mu_specie * amu)
+	dust_mass_created /= AGB_divisor
+	dust_mass_created[mass_created < 0.] = 0.
 	
-	return mass_created, number_created
+	gas_mass_created = AGB_masses - np.sum(dust_mass_created, axis=1) - mass_WD
+	#move 10% of hydrogen to helium---fusion happens!
+	
+	AGB_gas_comp_number = (copy.deepcopy(AGB_composition)/(mu_specie)).T
+	
+	ionized_amount = copy.deepcopy(AGB_gas_comp_number[3] * 0.1)
+	neutral_H2 = copy.deepcopy(AGB_gas_comp_number[0] * 0.1)
+	neutral_H = copy.deepcopy(AGB_gas_comp_number[2] * 0.1)
+	
+	AGB_gas_comp_number[0] -= neutral_H2
+	AGB_gas_comp_number[1] += neutral_H/4. + neutral_H2/2. + ionized_amount/4.
+	AGB_gas_comp_number[2] -= neutral_H
+	AGB_gas_comp_number[3] -= ionized_amount
+	AGB_gas_comp_number[4] -= ionized_amount
+	
+	gas_mass_composition = (AGB_gas_comp_number.T * mu_specie)/np.sum(AGB_gas_comp_number.T * mu_specie, axis=1)
+	
+	return mass_created, (gas_mass_composition.T * gas_mass_created).T
 
 overall_AGB_list = np.append(overall_AGB_list, timestep_AGB_list)
 overall_AGB_time_until = np.append(overall_AGB_time_until, timestep_AGB_time_until)
 overall_AGB_metallicity = np.append(overall_AGB_metallicity, timestep_AGB_metallicity)
-#overall_AGB_dust_prod = np.append(overall_AGB_dust_prod, timestep_AGB_dust_prod * solar_mass, axis=0)
+overall_AGB_composition = np.append(overall_AGB_composition, timestep_AGB_composition)
 
 #calculate how much dust is produced by AGBs during the NEXT timestep, and remove all AGBs that have passed already
 #compute dust production ONLY for those stars whose time has come, don't needlessly store for others
@@ -172,15 +193,17 @@ overall_AGB_time_until = overall_AGB_time_until[overall_AGB_time_until >= OVERAL
 
 splines, mapto, AGB_divisor = interpolate_amounts(absolute_path_to_nsc)
 if len(overall_AGB_list[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP]) > 0:
-	overall_AGB_dust_prod, number_created = calculate_interpolation(overall_AGB_list[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP] , overall_AGB_metallicity[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP], splines, mapto, AGB_divisor, mu_specie)
+	overall_AGB_dust_prod, overall_AGB_gas_prod = calculate_interpolation(overall_AGB_list[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP] , overall_AGB_metallicity[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP], splines, mapto, AGB_divisor, mu_specie)
 else:
-	overall_AGB_dust_prod = mu_specie * 0
-	number_created = mu_specie * 0
+	overall_AGB_dust_prod = np.vstack([mu_specie * 0] * 2)
+	overall_AGB_gas_prod = np.vstack([mu_specie * 0 * 2])
 
 timestep_AGB_dust_mass_by_species = np.sum(overall_AGB_dust_prod, axis=0)
+timestep_AGB_gas_mass_by_species = np.sum(overall_AGB_gas_prod, axis=0)
 
-timestep_mass_composition = timestep_dust_mass_by_species + timestep_gas_mass_by_species + timestep_star_mass_by_species
+timestep_mass_composition = timestep_dust_mass_by_species + timestep_gas_mass_by_species + timestep_AGB_dust_mass_by_species + timestep_AGB_gas_mass_by_species
 timestep_dust_by_mass_composition = timestep_AGB_dust_mass_by_species + timestep_dust_mass_by_species
+timestep_gas_by_mass_composition = timestep_AGB_gas_mass_by_species + timestep_gas_mass_by_species
 timestep_dust_frac = np.sum(timestep_dust_by_mass_composition)/timestep_mass_composition
 
 ##################obtaining final composition of dust#################
@@ -195,7 +218,7 @@ new_dustfrac = DUST_FRAC * (1 - LOC_FRAC_CONSUMED) + timestep_dust_frac * FRAC_C
 
 ###################obtaining final composition of gas#################
 overall_gas_mass_composition_initial = specie_fraction_array * mu_specie/np.sum(specie_fraction_array * mu_specie)
-timestep_gas_mass_composition_initial = timestep_dust_mass_by_species/np.sum(timestep_dust_mass_by_species)
+timestep_gas_mass_composition_initial = timestep_gas_by_mass_composition/np.sum(timestep_gas_by_mass_composition)
 
 overall_gas_mass_composition = (1 - DUST_FRAC) * overall_gas_mass_composition_initial * (1 - FRAC_CONSUMED[TIMESTEP_NUMBER]) + (1 - timestep_dust_frac) * timestep_gas_mass_composition_initial * FRAC_CONSUMED[TIMESTEP_NUMBER]
 overall_gas_mass_composition /= np.sum(overall_gas_mass_composition)
@@ -211,14 +234,16 @@ overall_gas_number_composition = (overall_gas_mass_composition/mu_specie)/np.sum
 #because only 0.5% of the galaxy's mass is subject to "processing" at any given time.
 
 #increment OVERALL_AGE by TIMESTEP and write everything to the next output file
-np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER + 1))), specie_fraction_array = overall_gas_number_composition, dust_base_frac = overall_dust_number_composition, DUST_FRAC = new_dustfrac, OVERALL_AGE = OVERALL_AGE + TIMESTEP, overall_AGB_list = overall_AGB_list, overall_AGB_time_until = overall_AGB_time_until, overall_AGB_metallicity = overall_AGB_metallicity)
+np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER + 1))), specie_fraction_array = overall_gas_number_composition, dust_base_frac = overall_dust_number_composition, DUST_FRAC = new_dustfrac, OVERALL_AGE = OVERALL_AGE + TIMESTEP, overall_AGB_list = overall_AGB_list, overall_AGB_time_until = overall_AGB_time_until, overall_AGB_metallicity = overall_AGB_metallicity, overall_AGB_composition = overall_AGB_composition)
+
 #LIST OF VARIABLES IN config_## file:
-#specie_fraction_array
-#dust_base_frac
-#DUST_FRAC
-#OVERALL_AGE
-#overall_AGB_list
-#overall_AGB_time_until
-#overall_AGB_metallicity
+#specie_fraction_array = overall_gas_number_composition
+#dust_base_frac = overall_dust_number_composition
+#DUST_FRAC = new_dustfrac
+#OVERALL_AGE = OVERALL_AGE + TIMESTEP
+#overall_AGB_list = overall_AGB_list
+#overall_AGB_time_until = overall_AGB_time_until
+#overall_AGB_metallicity = overall_AGB_metallicity
+#overall_AGB_composition = overall_AGB_composition
 ##These need to be bootstrapped initially
 #This is it! The loop is now closed.
