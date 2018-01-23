@@ -56,8 +56,8 @@ absolute_path_to_outputs = absolute_path_to_nsc + '/../savefiles/outputs'
 absolute_path_to_config  = absolute_path_to_nsc + '/../savefiles/config'
 
 config_files = os.listdir(absolute_path_to_config)
+config_files.append('config_-1.npz')
 conf_number = np.array([am[7:-4] for am in config_files]).astype('int')
-conf_number = np.append(conf_number, -1)
 max_conf_file = (conf_number == max(conf_number))
 
 TIMESTEP_NUMBER = max(conf_number)
@@ -92,11 +92,12 @@ for savefile_name in os.listdir(absolute_path_to_outputs):
 	AGB_time_until = array_file['AGB_time_until']
 	AGB_metallicity = array_file['AGB_metallicity']
 	AGB_comp = array_file['AGB_composition']
+	#print AGB_comp
 	
 	timestep_AGB_list = np.append(timestep_AGB_list, AGB_list)
 	timestep_AGB_time_until = np.append(timestep_AGB_time_until, AGB_time_until)
 	timestep_AGB_metallicity = np.append(timestep_AGB_metallicity, AGB_metallicity)
-	timestep_AGB_composition = np.append(timestep_AGB_composition, [AGB_comp], axis=0)
+	timestep_AGB_composition = np.append(timestep_AGB_composition, AGB_comp, axis=0)
 		
 	timestep_gas_mass_by_species += array_file['gas_mass_by_species']
 	timestep_star_mass_by_species += array_file['star_mass_by_species']
@@ -173,7 +174,7 @@ def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_d
 	AGB_gas_comp_number[1] += neutral_H/4. + neutral_H2/2. + ionized_amount/4.
 	AGB_gas_comp_number[2] -= neutral_H
 	AGB_gas_comp_number[3] -= ionized_amount
-	AGB_gas_comp_number[4] -= ionized_amount
+	AGB_gas_comp_number[5] -= ionized_amount
 	
 	gas_mass_composition = (AGB_gas_comp_number.T * mu_specie)/np.sum(AGB_gas_comp_number.T * mu_specie, axis=1)
 	
@@ -193,7 +194,7 @@ overall_AGB_time_until = overall_AGB_time_until[overall_AGB_time_until >= OVERAL
 
 splines, mapto, AGB_divisor = interpolate_amounts(absolute_path_to_nsc)
 if len(overall_AGB_list[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP]) > 0:
-	overall_AGB_dust_prod, overall_AGB_gas_prod = calculate_interpolation(overall_AGB_list[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP] , overall_AGB_metallicity[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP], splines, mapto, AGB_divisor, mu_specie)
+	overall_AGB_dust_prod, overall_AGB_gas_prod = calculate_interpolation(overall_AGB_list[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP] , overall_AGB_metallicity[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP], splines, mapto, AGB_divisor, mu_specie, overall_AGB_composition[overall_AGB_time_until <= OVERALL_AGE + TIMESTEP])
 else:
 	overall_AGB_dust_prod = np.vstack([mu_specie * 0] * 2)
 	overall_AGB_gas_prod = np.vstack([mu_specie * 0 * 2])
@@ -204,7 +205,7 @@ timestep_AGB_gas_mass_by_species = np.sum(overall_AGB_gas_prod, axis=0)
 timestep_mass_composition = timestep_dust_mass_by_species + timestep_gas_mass_by_species + timestep_AGB_dust_mass_by_species + timestep_AGB_gas_mass_by_species
 timestep_dust_by_mass_composition = timestep_AGB_dust_mass_by_species + timestep_dust_mass_by_species
 timestep_gas_by_mass_composition = timestep_AGB_gas_mass_by_species + timestep_gas_mass_by_species
-timestep_dust_frac = np.sum(timestep_dust_by_mass_composition)/timestep_mass_composition
+timestep_dust_frac = np.sum(timestep_dust_by_mass_composition)/np.sum(timestep_mass_composition)
 
 ##################obtaining final composition of dust#################
 overall_dust_mass_composition_initial = dust_base_frac * mu_specie/(np.sum(dust_base_frac * mu_specie))
