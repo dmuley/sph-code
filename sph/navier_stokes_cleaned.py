@@ -42,7 +42,7 @@ cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 6.65e-23, 5e-60, 5e-60, 0.,
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
-f_u = np.array([[.86,.14,0,0,0,0,0,0,0,0,0,0,0,0]]) #relative abundance for species in each SPH particle, an array of arrays
+f_u = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0,0]) #relative abundance for species in each SPH particle, an array of arrays
 gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.,10.])#the polytropes of species in each SPH, an array of arrays
 W6_constant = (3 * np.pi/80)
 critical_density = 1000*amu*10**6 #critical density of star formation
@@ -95,7 +95,7 @@ def mixed_CCSN_interpolate():
         return np.zeros(len(v));
     #(H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)
     #list of interpolation functions for each species
-    return (zero_function, zero_function, zero_function, zero_function, zero_function, zero_function, f5, f6, zero_function, zero_function, f3, f4,zero_function)
+    return (zero_function, zero_function, zero_function, zero_function, zero_function, zero_function, f5, f6, zero_function, zero_function, f3, f4, zero_function, zero_function)
 
 int_supernova = mixed_CCSN_interpolate(); #calling this beforehand 
 
@@ -500,10 +500,10 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 	
 	return visc_accel, visc_heat
     
-def supernova_explosion(mass,points,velocities,E_internal,supernova_pos):
+def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
     #should make parametric later, and should include Nozawa 03 material
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
-    gas_release = f_u[0]
+    gas_release = f_un[supernova_pos]
     grsum = np.sum(gas_release)
     
     dust_release = np.array([u(mass[supernova_pos]/solar_mass) for u in int_supernova]).T #int_supernova is the already called supernova interpolation from Nozawa

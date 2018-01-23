@@ -12,13 +12,11 @@ from time import sleep
 import navier_stokes_cleaned as nsc
 import os
 import time
-
+'''
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
-size = comm.Get_size()
-
-np.random.seed(rank*time.time())
+size = comm.Get_size()'''
 
 G = constants.G
 k = constants.Boltzmann
@@ -55,9 +53,9 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1.1e6 * AU
-N_PARTICLES = 2500
-N_INT_PER_PARTICLE = 300
+DIAMETER = 2.2e5 * AU
+N_PARTICLES = 400
+N_INT_PER_PARTICLE = 50
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 nsc.d = d
@@ -69,7 +67,7 @@ nsc.dt = dt
 nsc.dt_0 = dt_0
 DUST_MASS = 0.05 #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
-MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
+MAX_AGE = 3e7 * year/7. #don't want to see any AGB stars undergoing supernovae inadvertently
 
 
 
@@ -80,7 +78,7 @@ OVERALL_AGE = 0. #age of the galaxy
 '''
 WHAT NEEDS TO BE DONE HERE: IMPORT COMPOSITION AND DUST FRACTION FROM FILE, IF SUCH A FILE EXISTS
 THIS CODE WILL WRITE TO FILE, HELPER CODE WILL CREATE FILE
-
+'''
 #import dust_base_frac from file for future calculations, if the file exists
 #Returns last-numbered .npy file
 absolute_path_to_nsc = os.path.dirname(os.path.abspath(nsc.__file__))
@@ -97,7 +95,7 @@ latest_file = np.load(unicode(absolute_path_to_config + '/' + conf_filename_sele
 specie_fraction_array = latest_file['specie_fraction_array']
 dust_base_frac = latest_file['dust_base_frac']
 DUST_FRAC = latest_file['DUST_FRAC']
-OVERALL_AGE = latest_file['OVERALL_AGE']'''
+OVERALL_AGE = latest_file['OVERALL_AGE']
 
 ############################
 #END LOADING FROM FILE HERE#
@@ -109,9 +107,10 @@ d_base_imf = np.append(base_imf[0], np.diff(base_imf))
 imf = nsc.kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
 
+#np.random.seed(rank*time.time())
 mass = np.random.choice(base_imf, N_PARTICLES, p = imf) * solar_mass
 
-N_DUST = int(DUST_FRAC/(1. - DUST_FRAC) * np.sum(mass)/(DUST_MASS * solar_mass))
+N_DUST = max(int(DUST_FRAC/(1. - DUST_FRAC) * np.sum(mass)/(DUST_MASS * solar_mass)), 1)
 particle_type = np.zeros([N_PARTICLES]) #0 for gas, 1 for stars, 2 for dust
 N_PARTICLES += N_DUST
 particle_type = np.append(particle_type, [2] * N_DUST)
@@ -284,7 +283,7 @@ while (age < MAX_AGE):
 			dt = min(dt_0/100., ct)
 			nsc.dt = dt
 			
-			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos)
+			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un)
 			particle_type = np.concatenate((particle_type, newdusttype, newgastype))
 			E_internal[supernova_pos] = new_eint_stars
 			f_un[supernova_pos] = star_comps
@@ -500,9 +499,9 @@ AGB_time_until = nsc.luminosity_relation(mass[AGB_condition]/solar_mass, np.ones
 AGB_metallicity = np.sum((f_un * mu_specie)[AGB_condition].T[6:], axis=0)/np.sum((f_un * mu_specie)[AGB_condition], axis=1)
 
 absolute_path_to_outputs = absolute_path_to_nsc + '/../savefiles/outputs'
-list_of_outputs = os.listdir(unicode(absolute_path_to_outputs))
+list_of_outputs = np.append(os.listdir(unicode(absolute_path_to_outputs)), '-1.npz')
 output_number = np.max(np.array([bm[:-4] for bm in list_of_outputs]).astype('int'))
-np.save(unicode(str(output_number + 1)), gas_mass_by_species = gas_mass_by_species, star_mass_by_species = star_mass_by_species, dust_mass_by_species = dust_mass_by_species, AGB_condition = AGB_condition, AGB_list = AGB_list, AGB_time_until = AGB_time_until, AGB_metallicity = AGB_metallicity)
+np.savez(unicode(absolute_path_to_outputs + '/' + str(output_number + 1)), gas_mass_by_species = gas_mass_by_species, star_mass_by_species = star_mass_by_species, dust_mass_by_species = dust_mass_by_species, AGB_condition = AGB_condition, AGB_list = AGB_list, AGB_time_until = AGB_time_until, AGB_metallicity = AGB_metallicity)
 #save all the above to a Numpy binary which will then be read in by config_helper.py to create a new single config file
 
 '''
