@@ -359,6 +359,18 @@ def neighbors(points, dist):
     qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
     
     return qbp
+    
+def nontrivial_neighbors(points, mass, particle_type, neighbor):
+	nontrivial_int = []
+	for j in range(len(neighbor)):
+		x_0 = points[j]
+		x = np.array(points[np.array(neighbor[j])])
+		m = np.array(mass[np.array(neighbor[j])])
+		
+		rho = Weigh2(x, x_0, m, d) # * (particle_type[np.array(neighbor[j])] == 0)
+		nontrivial_int.append(np.array(neighbor[j])[rho > 0])
+		
+	return nontrivial_int
 
 def Weigh2(x, x_0, m, d):
     norms_sq = np.sum((x - x_0)**2, axis=1)

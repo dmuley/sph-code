@@ -36,7 +36,7 @@ t_solar = 5776
 nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 year = 60. * 60. * 24. * 365.
-dt_0 = year * 250000.
+dt_0 = year * 25000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
@@ -53,9 +53,9 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 2.2e5 * AU
-N_PARTICLES = 400
-N_INT_PER_PARTICLE = 50
+DIAMETER = 7.5e5 * AU
+N_PARTICLES = 1000
+N_INT_PER_PARTICLE = 250
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 nsc.d = d
@@ -118,6 +118,10 @@ mass = np.append(mass, [DUST_MASS * solar_mass] * N_DUST)
 points = (np.random.rand(N_PARTICLES, 3) - 0.5) * DIAMETER
 points2 = copy.deepcopy(points)
 neighbor = nsc.neighbors(points, d)
+nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
+num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
+
 #print(nbrs)
 #print(points)
 velocities = np.random.normal(size=(N_PARTICLES, 3)) * 10.
@@ -304,6 +308,9 @@ while (age < MAX_AGE):
 			supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
 			neighbor = nsc.neighbors(points, d)
+			#NONTRIVIAL NEIGHBORS
+			neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+			
         mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
         gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
         cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
@@ -339,12 +346,19 @@ while (age < MAX_AGE):
     gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
     optical_depth = mass/(m_h * mu_array) * cross_array
-    sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
-    sizes[particle_type == 2] = d
-    print("Negative compositions after supernova sputtering: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
 
     neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
+    nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+    #IMPORTANT EFFICIENCY SAVINGS HERE
+    neighbor = nontrivial_int
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
+    num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
+    
+    #variable smoothing length in SPH    
+    #sizes[particle_type == 0] = ((new_smoothing + 1.)/2. * sizes)[particle_type == 0]
+    #sizes[particle_type == 2] = d
+    print("Negative compositions after supernova sputtering: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
+    
     age += dt
     gfcalc = nsc.grav_force_calculation(mass, points, sizes);
     grav_accel = gfcalc[0]
@@ -357,7 +371,7 @@ while (age < MAX_AGE):
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     #viscous force causing dust to accelerate/decelerate along with gas
     viscous_drag = nsc.net_impulse(points,mass,sizes,velocities,particle_type,neighbor,f_un)
-    delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
+    delp = -nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
     #artificial viscosity to ensure proper blast wave
     av = nsc.artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array)
     
@@ -409,14 +423,16 @@ while (age < MAX_AGE):
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
     d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2 
-    sizes[particle_type == 0] = (np.abs(mass[particle_type == 0])/m_0)**(1./3.) * d
+    new_smoothing = 0.5 * (1 + ((N_INT_PER_PARTICLE * (mass)/(mass + m_0) + 1)/(2 * num_neighbors * (mass)/(mass + m_0) + 1))**(1./3.))
+    #sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
+    sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
     sizes[particle_type == 2] = d
     
     dist_sq = np.sum(points**2,axis=1)
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    '''
+    
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
@@ -452,7 +468,7 @@ while (age < MAX_AGE):
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
-    #END PLOTTING'''
+    #END PLOTTING
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
