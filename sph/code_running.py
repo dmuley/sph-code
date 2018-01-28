@@ -37,6 +37,7 @@ nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 25000.
+
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
@@ -68,6 +69,7 @@ nsc.dt_0 = dt_0
 DUST_MASS = 0.05 #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
+crit_mass = 0.0001 * solar_mass #setting a minimum dust mass to help avoid numerical errors!
 
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
 dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
@@ -220,7 +222,9 @@ while (age < MAX_AGE):
 			optical_depth = mass/(m_h * mu_array) * cross_array
 		
 			#have to fix radiative cooling
+			radcool_premass = np.sum(mass)
 			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T, dt/N_RADIATIVE)
+			print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
 			#f_un = rc[0]
 		
 			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -325,17 +329,19 @@ while (age < MAX_AGE):
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     
+    prechems_mass = np.sum(mass)
     chems = nsc.chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
-    deltam_chems = (np.sum(mass) - np.sum(chems[0]))/solar_mass
+    deltam_chems = (np.sum(mass) - prechems_mass)/solar_mass
     print ("Mass error from chemisputtering: " + str(deltam_chems) + " solar masses")
     f_un = chems[1]; mass = chems[0]
     supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)    
     mass_reduction = -np.sum(np.sum((mass/(mu_array) * supd[0].T).T * mu_specie,axis=1))
     mass_increase = np.sum(np.sum((mass/(mu_array) * supd[1].T).T * mu_specie,axis=1))
-    print("Negative compositions after chemisputtering: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
+    print("Negative compositions after chemisputtering: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < len(cross_sections)])))
     #increase *= mass_reduction/mass_increase
-    delta_n = (np.nan_to_num(-supd[0] + supd[1]).astype('longdouble').T * (mass > 0.001 * solar_mass)).T
-    mass_change = np.nan_to_num(np.sum((mass/(mu_array) * delta_n.T).T * mu_specie,axis=1)) * (mass > 0.001 * solar_mass)
+    delta_n = np.nan_to_num(-supd[0] + supd[1]).astype('longdouble')
+    mass_change = np.nan_to_num(np.sum((mass/(mu_array) * delta_n.T).T * mu_specie,axis=1))
+    
     deltam_sup = np.sum(mass_change)/solar_mass
     print ("Mass error from supernova sputtering: " + str(deltam_sup) + " solar masses")
     f_un += delta_n
@@ -344,7 +350,7 @@ while (age < MAX_AGE):
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
     mass += mass_change
     #mass = np.nan_to_num(mass)
-    mass[mass < 0.001 * solar_mass] = 0.001 * solar_mass
+    mass[mass < crit_mass] = crit_mass/2.
     mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
     gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)

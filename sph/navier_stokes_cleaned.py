@@ -841,7 +841,7 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 			w2_max = Weigh2_dust(x, x, m, d, dustsize)
 			
 			#density of dust at the selected gas particle
-			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2);
+			rho = w2d * (w2d > 0) * (particle_type[neighbor[j]] == 2) * (m > crit_mass);
 			rho_base = w2_max
 			if np.sum(rho) > 0:
 				#Obtaining relative velocities between gas/dust, and destruction efficiency
@@ -887,11 +887,11 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 			rel_w2g = Weigh2(x, x_0, m, d)/Weigh2(x, x, m, d)
 			rel_w2d = Weigh2_dust(x, x_0, m, d, dustsize)/Weigh2_dust(x, x, m, d, dustsize)
 			
-			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
-			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
+			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0) * (m > crit_mass)
+			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2) * (m > crit_mass)
 			
-			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
-			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
+			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0) * (m > crit_mass)
+			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2) * (m > crit_mass)
 			if np.sum(w2g_num) > 0:
 				sph_indiv_composition = (w2g_num * comps.T).T * mu_specie
 				sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie #SPH density by composition of GAS
