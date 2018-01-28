@@ -532,20 +532,34 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
     dust_masses = (mass[supernova_pos] - 2. * solar_mass) * drsum/trsum
     gas_masses = (mass[supernova_pos] - 2. * solar_mass) * grsum/trsum
     
-    supernova_dust_len = int(np.sum(dust_masses)/(0.05 * solar_mass))
+    supernova_dust_len = (dust_masses/(0.05 * solar_mass))
+    if hasattr(supernova_dust_len, '__len__'):
+    	supernova_dust_len = np.array(supernova_dust_len).astype('int')
+    else:
+    	supernova_dust_len = np.array([supernova_dust_len]).astype('int')
     print supernova_dust_len
     
-    dust_comps = (np.vstack([dust_release] * supernova_dust_len).T).T
-    gas_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
-    star_comps = (np.vstack([gas_release] * len(supernova_pos)).T).T
+    dust_comps = (np.vstack([dust_release] * np.sum(supernova_dust_len)).T).T
+    gas_comps = gas_release
+    star_comps = gas_release
     
-    dust_mass = np.ones(supernova_dust_len) * np.sum(dust_masses)/supernova_dust_len
+    dust_mass = np.ones(int(np.sum(supernova_dust_len))) * np.sum(dust_masses)/int(np.sum(supernova_dust_len))
     gas_mass = gas_masses
     stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
     
-    dustpoints = np.vstack([points[supernova_pos][0]] * supernova_dust_len) + (np.random.normal(size = (supernova_dust_len,3))) * d_0
+    dustpoints = []
+    for position in range(len(supernova_pos)):
+    	dustpoints += [points[supernova_pos[position]]] * supernova_dust_len[position]
+    	
+    dustpoints = np.vstack(dustpoints) + (np.random.normal(size = (np.sum(supernova_dust_len),3))) * d_0
+    
+    dustvels = []
+    for vel in range(len(supernova_pos)):
+    	dustvels += [velocities[supernova_pos[position]]] * supernova_dust_len[position]
+    	
+    dustvels = np.vstack(dustvels)
+    
     newpoints = points[supernova_pos] + (np.random.normal(size = (len(points[supernova_pos]),3))) * d_0
-    dustvels = np.vstack([velocities[supernova_pos][0]] * supernova_dust_len)
     newvels = velocities[supernova_pos]
     #newaccel = accel[supernova_pos]
     

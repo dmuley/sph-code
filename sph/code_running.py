@@ -53,9 +53,9 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 7.5e5 * AU
-N_PARTICLES = 1000
-N_INT_PER_PARTICLE = 250
+DIAMETER = 1.e6 * AU
+N_PARTICLES = 2000
+N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 nsc.d = d
@@ -67,7 +67,7 @@ nsc.dt = dt
 nsc.dt_0 = dt_0
 DUST_MASS = 0.05 #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
-MAX_AGE = 3e7 * year/7. #don't want to see any AGB stars undergoing supernovae inadvertently
+MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
 
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
 dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
@@ -161,6 +161,7 @@ optical_depth = mass/(m_h * mu_array) * cross_array
 critical_density = 1000*amu*10**6 #critical density of star formation
 
 densities = nsc.density(points,mass,particle_type,neighbor)
+densities_0 = copy.deepcopy(densities)
 dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
 delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
 
@@ -179,8 +180,8 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass == max(mass)] = 1
-star_ages[mass == max(mass)] = 3.31e6 * year
+'''particle_type[mass == max(mass)] = 1
+star_ages[mass == max(mass)] = 3.55e6 * year'''
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
@@ -297,10 +298,12 @@ while (age < MAX_AGE):
 			velocities = np.concatenate((velocities, dustvels, newvels))
 			star_ages = np.concatenate((star_ages, np.ones(len(dustpoints))* (-2), np.ones(len(supernova_pos))* (-2)))
 			points = np.vstack([points, dustpoints, newpoints])
+			oldsizes = copy.deepcopy(sizes)
 			sizes = np.zeros(len(points))
-			sizes[particle_type == 0] = (mass[particle_type == 0]/m_0)**(1./3.) * d
-			sizes[particle_type == 1] = d/10000.
-			sizes[particle_type == 2] = d
+			sizes[:len(oldsizes)] = oldsizes
+			sizes[(particle_type == 0) & (sizes == 0)] = (mass[(particle_type == 0) & (sizes == 0)]/m_0)**(1./3.) * d
+			sizes[(particle_type == 1) & (sizes == 0)] = d/10000.
+			sizes[(particle_type == 2) & (sizes == 0)] = d
 			Tnew = np.zeros(len(sizes));
 			Tnew[:len(T)] += T
 			T = Tnew
@@ -420,19 +423,27 @@ while (age < MAX_AGE):
     
     #moreover, this gives us a greater dynamic range of possible densities
     #to work with, and helps avoid star formation at some arbitrary density floor
+    #working with density-based formula for SPH neighbors
     V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
     d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
-    d_sq = d**2 
-    new_smoothing = 0.5 * (1 + ((N_INT_PER_PARTICLE * (mass)/(mass + m_0) + 1)/(2 * num_neighbors * (mass)/(mass + m_0) + 1))**(1./3.))
-    #sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
-    sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
+    d_sq = d**2
+    
+    if len(densities_0) == len(densities):
+    	new_smoothing = np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities)))
+    else:
+    	new_smoothing = 1.
+    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
+    #sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
     sizes[particle_type == 2] = d
+    
+    densities_0 = copy.deepcopy(densities)
     
     dist_sq = np.sum(points**2,axis=1)
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     
+    '''
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
@@ -469,6 +480,7 @@ while (age < MAX_AGE):
     plt.pause(1)
     
     #END PLOTTING
+    '''
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
