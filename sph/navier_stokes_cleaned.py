@@ -848,13 +848,13 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				vels = np.sum((velocities[neighbor[j]] - velocities[j])**2, axis=1)**0.5 * (particle_type[np.array(neighbor[j])] == 2)
 				dest_fracs = (np.array([u(vels/1000.) for u in intf]) * np.nan_to_num(rho/rho_base)).T
 				#Distributing dust destruction over all intersecting dust particles
-				final_fracs = dens/critical_density * dest_fracs.T #fraction destroyed
+				final_fracs = (dens * (m > crit_mass))/critical_density * dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 0.99] = 0.99
 				
 				N_dust = mass[neighbor[j]]/(mu_array[neighbor[j]] * amu)
 				
 				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
-				#Conversely, how much dust is fractionally lost from each intersecting gas particle?
+				#Conversely, how much dust is fractionally lost to each intersecting gas particle?
 				dust_lost = (final_fracs * f_un[neighbor[j]].T * N_dust).T
 				refractory_fracs = np.sum(dust_lost,axis=0)
 				#print np.nan_to_num(dust_lost/refractory_fracs)

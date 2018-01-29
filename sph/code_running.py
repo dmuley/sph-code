@@ -592,8 +592,11 @@ plt.ylabel('Position (astronomical units)')
 plt.title('Density in H II region')
 
 #INTERPOLATED PLOTTING:
-arb_points = (np.random.rand(N_PARTICLES * 50, 3) - 0.5) * max_dist**0.5 * 10./9. * 2
+arb_points = (np.random.rand(N_PARTICLES * 10, 3) - 0.5) * max_dist**0.5 * 10./9. * 2
 narb = nsc.neighbors_arb(points, arb_points)
+print "neighbors"
+narb = nsc.nontrivial_neighbors(arb_points, np.ones(len(arb_points)), np.zeros(len(arb_points)), narb)
+print "nontrivial neighbors"
 darb = nsc.density_arb(points, arb_points, mass, particle_type, narb)
 ddarb = nsc.dust_density_arb(points, arb_points, mass, particle_type, sizes, narb)
 tarb = nsc.temperature_arb(points, arb_points, mass, particle_type, T, narb)
