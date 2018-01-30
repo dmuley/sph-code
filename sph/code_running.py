@@ -55,7 +55,7 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 1.4e6 * AU
-N_PARTICLES = 2000
+N_PARTICLES = 1000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -187,7 +187,9 @@ plt.ion()
 '''particle_type[mass == max(mass)] = 1
 star_ages[mass == max(mass)] = 3.55e6 * year'''
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
-while (age < MAX_AGE):
+while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
+    #Even if we've gone over, we still want to resolve any remaining possible supernovae here
+    #to ensure the right amount go to gas, dust, etc.
     #timestep reset here
     present_time = time.time()
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
@@ -519,7 +521,7 @@ while (age < MAX_AGE):
     total_time_consumed += timestep_duration
     
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
-    print ('Age:' + str(age/year))
+    print ("Age: " + str(age/year) + " years")
     #print (d/AU)
     print ('Stellar mass/nondust mass = ' + str(star_massfrac))
     print ('(stellar mass/nondust mass)/(Stellar number/nondust number) ' + str(star_massfrac/star_numfrac))

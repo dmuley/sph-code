@@ -856,11 +856,12 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
 				#Conversely, how much dust is fractionally lost to each intersecting gas particle?
 				dust_lost = (final_fracs * f_un[neighbor[j]].T * N_dust).T
+				dust_lost *= (frac_destruction[neighbor[j]] + dust_lost < 1.)
 				refractory_fracs = np.sum(dust_lost,axis=0)
 				#print np.nan_to_num(dust_lost/refractory_fracs)
 				#Dust lost in each dust particle, which is taken up as refractory gas by the gas particle
-				frac_destruction[neighbor[j]] += dust_lost * (mass[j] > crit_mass)
-				frac_reuptake[j] += refractory_fracs * (mass[j] > crit_mass)
+				frac_destruction[neighbor[j]] += dust_lost
+				frac_reuptake[j] += refractory_fracs
 				
 	frac_destruction = np.nan_to_num((frac_destruction.T/(mass/(mu_array * amu))).T)
 	frac_reuptake = np.nan_to_num((frac_reuptake.T/(mass/(mu_array * amu))).T)
@@ -917,6 +918,7 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				F_sput = K_u/L_u
 				F_sput *= np.exp(K_u * J_u * dt)
 				F_sput[np.isnan(F_sput)] = 1.
+				#F_sput[F_sput < -0.99] = -0.99
 				
 				#print F_sput - 1
 				#effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
