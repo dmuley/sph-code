@@ -922,10 +922,10 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				#effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
 				effective_mass = sph_indiv_composition
 						
-				reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
+				reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0) & (m > crit_mass))
 				reuptake_weight = effective_mass/np.sum(effective_mass,axis=0)
 				reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
-				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
+				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0) & (m > crit_mass))).T
 				
 				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
 				new_particles[new_particles < 0.] = 0.

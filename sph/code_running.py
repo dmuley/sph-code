@@ -54,8 +54,8 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1.e6 * AU
-N_PARTICLES = 2000
+DIAMETER = 1.4e6 * AU
+N_PARTICLES = 1250
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -177,6 +177,8 @@ imf_measure = np.array([])
 chems_error = np.array([])
 sup_error = np.array([])
 
+total_time_consumed = 0
+
 print("Simulation time: " + str(MAX_AGE/year) + " y")
 print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
@@ -187,11 +189,15 @@ star_ages[mass == max(mass)] = 3.55e6 * year'''
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while (age < MAX_AGE):
     #timestep reset here
+    present_time = time.time()
     ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
     if age == 0:
     	dt = dt_0/10
     else:
-    	dt = max(dt_0/5., min(dt_0, ct))
+    	dt = max(dt_0/5., min(dt_0 * 2., ct))
+    
+    if ct > MAX_AGE:
+    	dt = MAX_AGE/100. #if timestep grows too large, just speed up the simulation dramatically
     	
     nsc.dt = dt
     #stop points from going ridiculously far
@@ -202,6 +208,8 @@ while (age < MAX_AGE):
     points = np.nan_to_num(points)
     velocities = np.nan_to_num(velocities)
     print('=====================================================================')
+    print ("Calculated timestep: " + str(ct/year) + " years")
+    print ("Actual timestep: " + str(dt/year) + " years")
     #print("Negative compositions before radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
@@ -275,8 +283,8 @@ while (age < MAX_AGE):
         max_rel_age = np.max(star_ages/nsc.luminosity_relation(mass/nsc.solar_mass, np.ones(len(mass)), 1)/(year * 1e10))
         print ("Maximum relative stellar age: " + str(max_rel_age))
         print ("Maximum stellar mass: " + str(np.max(mass[particle_type == 1]/solar_mass)) + " solar masses")
-        print ("Calculated timestep: " + str(ct/year) + " years")
         print ("Number of supernovae: " + str(len(supernova_pos)))
+        print (" ")
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
         	#print('beginning supernova impulse')
@@ -349,8 +357,10 @@ while (age < MAX_AGE):
     f_un[(np.isnan(f_un))] = 1e-15
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
     mass += mass_change
+    print ("Number of negative masses: " + str(np.sum((mass < 0))))
+    
     #mass = np.nan_to_num(mass)
-    mass[mass < crit_mass] = crit_mass/2.
+    mass[mass < 0] = crit_mass/200.
     mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
     gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
@@ -367,14 +377,12 @@ while (age < MAX_AGE):
     #sizes[particle_type == 0] = ((new_smoothing + 1.)/2. * sizes)[particle_type == 0]
     #sizes[particle_type == 2] = d
     print("Negative compositions after supernova sputtering: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
+    print(" ")
     
     age += dt
     gfcalc = nsc.grav_force_calculation(mass, points, sizes);
     grav_accel = gfcalc[0]
-    '''bg = nsc.bin_generator(mass, points, [5, 4, 4]); age += dt
-    com = bg[0] #center of masses of each bin
-    grav_accel = nsc.compute_gravitational_force(points, bg[0], bg[1], np.median(sizes)).T #gravity is always acting, thus no cutoff distance introduced for gravity
-    '''
+    
     densities = nsc.density(points,mass,particle_type,neighbor)
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
@@ -492,7 +500,7 @@ while (age < MAX_AGE):
     #print star_ages[(particle_type == 1)]/year
     probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
     diceroll = np.random.rand(len(probability))
-    particle_type[(particle_type == 0) & (num_neighbors > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
+    particle_type[(particle_type == 0) & (num_nontrivial > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
     #this helps ensure that lone SPH particles don't form stars at late times in the simulation
     #ideally, there is an infinite number of SPH particles, each with infinitesimal density
     #that only has any real physical effects in conjunction with other particles
@@ -507,11 +515,18 @@ while (age < MAX_AGE):
     chems_error = np.append(chems_error, [deltam_chems] * len(T[particle_type == 2]))
     sup_error = np.append(sup_error, [deltam_sup] * len(T[particle_type == 2]))
     
+    timestep_duration = time.time() - present_time
+    total_time_consumed += timestep_duration
+    
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
-    print ('Age:', age/year)
+    print ('Age:' + str(age/year))
     #print (d/AU)
-    print ('Stellar mass/nondust mass = ', star_massfrac)
-    print ('(stellar mass/nondust mass)/(Stellar number/total number)' + str(star_massfrac/star_numfrac))
+    print ('Stellar mass/nondust mass = ' + str(star_massfrac))
+    print ('(stellar mass/nondust mass)/(Stellar number/nondust number) ' + str(star_massfrac/star_numfrac))
+    print ("")
+    print ('Timestep wall-clock time: ' + str(timestep_duration) + ' s')
+    print ('Total wall-clock time: ' + str(total_time_consumed) + ' s')
+    print ('Wall clock time per simulation year: ' + str((total_time_consumed/age) * MAX_AGE) + ' seconds per GMC lifespan')
     print ('=====================================================================')
 
 '''WE WANT SEVERAL OUTPUTS FROM THIS FILE
