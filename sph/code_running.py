@@ -500,9 +500,12 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
+    
+    T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
     probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
+    np.random.seed(time.time() + time.time() * present_time * (dt/year))
     diceroll = np.random.rand(len(probability))
-    particle_type[(particle_type == 0) & (num_nontrivial > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_neighbors > 1)]
+    particle_type[(particle_type == 0) & (num_nontrivial > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_nontrivial > 1)]
     #this helps ensure that lone SPH particles don't form stars at late times in the simulation
     #ideally, there is an infinite number of SPH particles, each with infinitesimal density
     #that only has any real physical effects in conjunction with other particles
