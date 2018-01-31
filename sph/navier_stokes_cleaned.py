@@ -38,7 +38,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 6.65e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-23/2., 1.25e-23/2., 1.25e-23/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -463,11 +463,14 @@ def del_pressure(points,mass,particle_type,neighbor,E_internal, gamma_array): #g
 			pt = np.array(particle_type[neighbor[i]])
 		
 			#symmetrizing pressure gradient
-			gw = (grad_weight(x, x_0, m, d, pt) + grad_weight(x, x_0, m[0], d, pt))/2.
+			gw = grad_weight(x, x_0, m, d, pt) # + grad_weight(x, x_0, m[0], d, pt))/2.
 			#print gw
+			
+			base_delpres = (0.5 * gw.T * (E_internal[np.array(neighbor[i])] + E_internal[i])/gamma_array[np.array(neighbor[i])]).T
 		
-			del_pres = np.sum((gw.T * E_internal[np.array(neighbor[i])]/gamma_array[np.array(neighbor[i])]).T, axis=0)
+			del_pres = np.sum(base_delpres, axis=0)
 			grad_pressure[i] += del_pres
+			#grad_pressure[neighbor[i]] -= base_delpres
 	#print grad_pressure
 	return grad_pressure
 
@@ -500,10 +503,11 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 			PI_ij = -1./2. * vsig_ij * w_ij/rho_ij
 			#symmetrizing pressure
 			gw0 = grad_weight(points[neighbor[j]], points[j], mass[j], d, particle_type[neighbor[j]])
-			gw1 = grad_weight(points[neighbor[j]], points[j], mass[neighbor[j]], d, particle_type[neighbor[j]])
-			gw = (gw0 + gw1)/2.
-			accel_ij = (mass[neighbor[j]] * PI_ij * gw.T).T
-			heat_ij = 0.5 * mass[neighbor[j]] * PI_ij * np.sum((velocities[neighbor[j]] - velocities[j]) * gw, axis=1)
+			#gw1 = grad_weight(points[neighbor[j]], points[j], mass[neighbor[j]], d, particle_type[neighbor[j]])
+			#gw = (gw0 + gw1)/2.
+			gw = gw0
+			accel_ij = ((mass[neighbor[j]] + mass[j])/2. * PI_ij * gw.T).T
+			heat_ij = 0.5 * (mass[neighbor[j]] + mass[j])/2. * PI_ij * np.sum((velocities[neighbor[j]] - velocities[j]) * gw, axis=1)
 		
 			accel_i = np.sum(accel_ij[(particle_type[neighbor[j]] == 0)],axis=0)
 			heat_i = np.sum(heat_ij[particle_type[neighbor[j]] == 0])
@@ -730,8 +734,14 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			H_effect = np.nan_to_num(4.13e-19 * t4**(-0.7131 - 0.0115 * np.log(t4)) * (particle_type[neighbor[j]] == 0))
 			He_effect = np.nan_to_num(2.72e-19 * t4**(-0.789) * (particle_type[neighbor[j]] == 0))
 			H2_effect = np.nan_to_num(7.3e-23 * 0.5 * (temps/100)**0.5 * (particle_type[neighbor[j]] == 0))
-			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
-			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
+			
+			#from Draine, but not self-consistent! Can lose more energy than you have this way for H (energy lost per electron is strictly greater)
+			#energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
+			#energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
+			
+			energy_coeff_H = k * temps * (particle_type[neighbor[j]] == 0)
+			energy_coeff_He = k * temps * (particle_type[neighbor[j]] == 0)
+			
 			#print energy_coeff_H, energy_coeff_He
 			num_e = np.sum(n_e[n_e > 0])
 			num_H_plus = np.sum(n_H_plus[n_H_plus > 0])

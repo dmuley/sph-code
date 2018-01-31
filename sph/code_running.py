@@ -41,7 +41,7 @@ dt_0 = year * 25000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([6.65e-24/5., 6.65e-24/5., 6.65e-23, 5e-60, 5e-60, 0., 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-23/2., 1.25e-23/2., 1.25e-23/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -54,7 +54,7 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1.4e6 * AU
+DIAMETER = 1.0e6 * AU
 N_PARTICLES = 1000
 N_INT_PER_PARTICLE = 100
 V = (DIAMETER)**3
@@ -126,7 +126,7 @@ num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
 #print(nbrs)
 #print(points)
-velocities = np.random.normal(size=(N_PARTICLES, 3)) * 10.
+velocities = np.random.normal(size=(N_PARTICLES, 3)) * 50.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 sizes = (mass/m_0)**(1./3.) * d
 
@@ -184,8 +184,8 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-'''particle_type[mass == max(mass)] = 1
-star_ages[mass == max(mass)] = 3.55e6 * year'''
+particle_type[mass == max(mass)] = 1
+star_ages[mass == max(mass)] = 3.0e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
@@ -216,7 +216,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     if np.sum(particle_type[particle_type == 1]) > 0:
         supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
         #N_RADIATIVE = int(10 + np.average(np.nan_to_num(T))**(1./3.)/10.)
-        #N_RADIATIVE = 1
+        N_RADIATIVE = 1
         area = (4 * np.pi * sizes**2)
         N_PART = mass/(m_h * mu_array)
         W6_integral = 9./area #evaluating integral of W6 kernel
@@ -234,14 +234,9 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			#have to fix radiative cooling
 			radcool_premass = np.sum(mass)
 			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T, dt/N_RADIATIVE)
-			print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
+			#print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
 			#f_un = rc[0]
-		
-			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
-			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
-			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-			optical_depth = mass/(m_h * mu_array) * cross_array
-				
+							
 			area = (4 * np.pi * sizes**2)
 			N_PART = mass/(m_h * mu_array)
 			W6_integral = 9./area #evaluating integral of W6 kernel
@@ -249,18 +244,29 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 
 			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
 			E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
-			E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] #- (rc[1] * N_PART)[particle_type == 0]
-			T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] #- (rc[1]/gamma_array/k)[particle_type == 0]
+			E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] - (rc[1] * N_PART)[particle_type == 0]
+			T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] - (rc[1]/gamma_array/k)[particle_type == 0]
 		
 			velocities[particle_type != 1] += rh[2]
 		
-			E_internal[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
-			T[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
+			#E_internal[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
+			#T[particle_type == 0] *= np.exp(-rc[1]/k/gamma_array/T)[particle_type == 0]
 
 			E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
 			E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
 			T[T < t_cmb] = t_cmb
 			T[T >= t_max] = t_max
+			
+			area = (4 * np.pi * sizes**2)
+			N_PART = mass/(m_h * mu_array)
+			W6_integral = 9./area #evaluating integral of W6 kernel
+			optd = 1. - np.exp(-optical_depth * W6_integral)
+			
+			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
+			optical_depth = mass/(m_h * mu_array) * cross_array
+
 			'''
 			#another plotting function
 			plt.rc('font', family='tex')
@@ -390,14 +396,20 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
     #viscous force causing dust to accelerate/decelerate along with gas
     viscous_drag = nsc.net_impulse(points,mass,sizes,velocities,particle_type,neighbor,f_un)
-    delp = -nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
+    delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
     #artificial viscosity to ensure proper blast wave
     av = nsc.artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities, velocities, T, gamma_array, mu_array)
     
-    pressure_accel = -np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
+    pressure_accel = np.nan_to_num((delp.T/densities * (particle_type == 0).astype('float')).T)
     #drag is a very small factor, only seems to matter at the solar-system scale
     drag_accel_gas = np.nan_to_num(((viscous_drag[0].T) * dust_densities/densities * (particle_type == 0).astype('float')).T)
     drag_accel_dust = np.nan_to_num(viscous_drag[1])
+    
+    print("Gravitational net acceleration: " + str(np.sum(grav_accel.T * mass, axis=1)/np.sum(mass)))
+    print("Viscous net acceleration: " + str(np.sum(av[0].T * mass, axis=1)/np.sum(mass)))
+    print("Pressure net acceleration: " + str(np.sum(pressure_accel.T * mass, axis=1)/np.sum(mass)))
+    print("Drag net acceleration: " + str(np.sum((drag_accel_gas + drag_accel_dust).T * mass, axis=1)/np.sum(mass)))
+    print(" ")
     
     #leapfrog integration
     old_accel = copy.deepcopy(total_accel)
@@ -415,6 +427,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     else:
     	dv = total_accel * dt
     velocities += dv
+    
+    
     
     E_internal = np.nan_to_num(E_internal) + np.nan_to_num(av[1] * dt)
     T = np.nan_to_num(E_internal * (mu_array * m_h)/(gamma_array * mass * k))
@@ -440,17 +454,16 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     #moreover, this gives us a greater dynamic range of possible densities
     #to work with, and helps avoid star formation at some arbitrary density floor
     #working with density-based formula for SPH neighbors
-    V_new = np.abs(x_dist * y_dist * z_dist) * AU**3
+    '''
+    V_new = np.abs((x_dist**2 + y_dist**2 + z_dist**2)**(3./2.))
     d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2
     
     if len(densities_0) == len(densities):
     	new_smoothing = np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities)))
     else:
-    	new_smoothing = 1.
-    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
-    #sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
-    sizes[particle_type == 2] = d
+    	new_smoothing = 1.'''
+    #sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
     
     densities_0 = copy.deepcopy(densities)
     
@@ -458,6 +471,22 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
+    
+    d_sq = max_dist
+    d = max_dist**0.5
+    
+    sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
+    sizes[particle_type == 2] = d
+    nsc.d = d
+    
+    photio = (f_un.T[3] + f_un.T[4] + f_un.T[2])/(f_un.T[2] + f_un.T[0] + f_un.T[3] + f_un.T[1] + f_un.T[4])
+    #density_color = np.nan_to_num(np.log10(densities/critical_density) + 2) * (np.nan_to_num(np.log10(densities/critical_density) + 2) > 0) + 0.001
+    
+    '''Another plotting function'''
+    plt.clf()
+    plt.scatter(np.log10(T[particle_type == 0]), np.log10(densities[particle_type == 0]/critical_density), alpha=0.1, marker='+')
+    plt.pause(1)
+    '''Another plotting function'''
     
     '''
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
@@ -495,8 +524,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
     plt.pause(1)
     
-    #END PLOTTING
-    '''
+    #END PLOTTING'''
+    
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
