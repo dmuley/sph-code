@@ -41,7 +41,7 @@ dt_0 = year * 25000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-25/2., 1.25e-25/2., 1.25e-25/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-23/2., 1.25e-23/2., 1.25e-23/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -54,9 +54,9 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1.0e6 * AU
-N_PARTICLES = 1000
-N_INT_PER_PARTICLE = 100
+DIAMETER = 1.25e6 * AU
+N_PARTICLES = 2000
+N_INT_PER_PARTICLE = 75
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
 nsc.d = d
@@ -243,6 +243,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			W6_integral = 9./area #evaluating integral of W6 kernel
 			optd = 1. - np.exp(-optical_depth * W6_integral)
 			
+			f_un = nsc.neutralize_cold(T, f_un, particle_type)
+			
 			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
 			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
 			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
@@ -250,8 +252,11 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 
 			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
 			E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
-			E_internal[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0] - (rc[1] * N_PART)[particle_type == 0]
-			T[particle_type == 0] += rh[0][particle_type[particle_type != 1] == 0]/(gamma_array * N_PART * k)[particle_type == 0] - (rc[1]/gamma_array/k)[particle_type == 0]
+			E_change_coeff_1 = (rh[0][particle_type[particle_type != 1] == 0]-(rc[1] * N_PART)[particle_type == 0])/E_internal[particle_type == 0]
+			E_change_coeff_1 = np.nan_to_num(E_change_coeff_1)
+			E_change_coeff_1[E_change_coeff_1 <= 0] = np.exp(-np.nan_to_num(E_change_coeff_1))[E_change_coeff_1 < 0]
+			E_internal[particle_type == 0] *= E_change_coeff_1
+			T[particle_type == 0] = E_internal[particle_type == 0]/(N_PART * gamma_array * k)[particle_type == 0]
 		
 			velocities[particle_type != 1] += rh[2]
 		
@@ -332,7 +337,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			T[T < t_cmb] = t_cmb
 			supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
-			neighbor = nsc.neighbors(points, d)
+			neighbor = nsc.neighbors(points, max(sizes))
 			#NONTRIVIAL NEIGHBORS
 			neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 			
@@ -376,7 +381,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
     optical_depth = mass/(m_h * mu_array) * cross_array
 
-    neighbor = nsc.neighbors(points, d)#find neighbors in each timestep
+    neighbor = nsc.neighbors(points, max(sizes))#find neighbors in each timestep
     nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
     #IMPORTANT EFFICIENCY SAVINGS HERE
     neighbor = nontrivial_int
@@ -457,45 +462,52 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     #to work with, and helps avoid star formation at some arbitrary density floor
     #working with density-based formula for SPH neighbors
     
-    V_new = np.abs((x_dist**2 + y_dist**2 + z_dist**2)**(3./2.))
-    d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
-    d_sq = d**2
-    
-    if len(densities_0) == len(densities):
-    	new_smoothing = (np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities))) + new_smoothing)/2. + (num_nontrivial < 2)
-    else:
-    	new_smoothing = 1.
-    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
-    
-    densities_0 = copy.deepcopy(densities)
-    
     dist_sq = np.sum(points**2,axis=1)
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    
-    d_sq = max_dist
-    d = max_dist**0.5
-    
-    sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
-    sizes[particle_type == 2] = d
+
+    V_new = max_dist**(3./2.)
+    d = (V_new/len(points[vel_condition < 80000**2])/0.9 * N_INT_PER_PARTICLE)**(1./3.)
+    #d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
+    d_sq = d**2
     nsc.d = d
+    print ("Length scale: " + str(d/constants.parsec))
+    
+    expansion_int = np.hstack(nontrivial_int)
+    expansion_un = np.unique(expansion_int)
+    
+    exp_neighbor_count = np.array([len(expansion_int[(expansion_int == a)]) for a in expansion_un])
+        
+    if len(densities_0) == len(densities):
+    	new_smoothing = (np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities))) * 2)/2. + (exp_neighbor_count + num_nontrivial - 1 < 2) * 0.1
+    else:
+    	new_smoothing = 1.
+    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
+    sizes[(particle_type == 0) & (sizes > d)] = d #set a maximum length scale here to avoid uncontrolled growth
+    
+    densities_0 = copy.deepcopy(densities)
+    
+    min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
+    max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
+    #sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
+    #izes[particle_type == 2] = d
     
     photio = (f_un.T[3] + f_un.T[4] + f_un.T[2])/(f_un.T[2] + f_un.T[0] + f_un.T[3] + f_un.T[1] + f_un.T[4])
     #density_color = np.nan_to_num(np.log10(densities/critical_density) + 2) * (np.nan_to_num(np.log10(densities/critical_density) + 2) > 0) + 0.001
     
     plt.clf()
-    plt.plot(np.sort(np.log10(mass/solar_mass)[particle_type == 2]), alpha=0.1, marker='+')
+    plt.plot(np.log10(np.arange(len(mass[particle_type == 2])) + 1), np.sort(np.log10(mass/solar_mass)[particle_type == 2]), alpha=0.1, marker='+')
     plt.pause(1)
     
     '''Another plotting function
     plt.clf()
     plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
     plt.pause(1)
-    Another plotting function
+    Another plotting function'''
     
     
-    #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
+    '''#PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
     
@@ -540,7 +552,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
     #np.random.seed(time.time() + time.time() * present_time * (dt/year))
     diceroll = np.random.rand(len(probability))
-    particle_type[(particle_type == 0) & (num_nontrivial > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (num_nontrivial > 1)]
+    particle_type[(particle_type == 0) & (exp_neighbor_count + num_nontrivial - 1 > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (exp_neighbor_count + num_nontrivial - 1 > 1)]
     #this helps ensure that lone SPH particles don't form stars at late times in the simulation
     #ideally, there is an infinite number of SPH particles, each with infinitesimal density
     #that only has any real physical effects in conjunction with other particles
@@ -624,15 +636,15 @@ ax = fig.add_subplot(111, projection='3d')
 [plt.show()]
 
 PROJECTION OF ALL 3 PAIRS OF COORDINATES ONTO A 2D COLOR PLOT:
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 0]/constants.parsec, points.T[1][particle_type == 0]/constants.parsec, c = np.log10(T)[particle_type == 0], s=(sizes/constants.parsec)**2 * 100, edgecolor='none', alpha=0.1)]
+#[plt.scatter(points.T[0][particle_type == 0]/constants.parsec, points.T[2][particle_type == 0]/constants.parsec, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+#[plt.scatter(points.T[1][particle_type == 0]/constants.parsec, points.T[2][particle_type == 0]/constants.parsec, c = np.log10(T)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
 [plt.colorbar()]
-[plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.01)]
-[plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
+[plt.scatter(points.T[0][particle_type == 2]/constants.parsec, points.T[1][particle_type == 2]/constants.parsec, c = 'black', s=30, edgecolor='face', alpha=0.01)]
+[plt.scatter(points.T[0][particle_type == 1]/constants.parsec, points.T[1][particle_type == 1]/constants.parsec, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]
 [plt.axis('equal'), plt.show()]
-plt.xlabel('Position (astronomical units)')
-plt.ylabel('Position (astronomical units)')
+plt.xlabel('Position (parsecs)')
+plt.ylabel('Position (parsecs)')
 plt.title('Temperature in H II region')
 
 [plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
