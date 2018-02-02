@@ -31,7 +31,7 @@ solar_mass = 1.989e30 #kilograms
 solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
-t_max = 2e4
+t_max = 3e4
 t_solar = 5776
 nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
@@ -41,7 +41,7 @@ dt_0 = year * 25000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-23/2., 1.25e-23/2., 1.25e-23/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-25/2., 1.25e-25/2., 1.25e-25/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -66,7 +66,7 @@ nsc.d_0 = 1e5 * AU
 dt = dt_0
 nsc.dt = dt
 nsc.dt_0 = dt_0
-DUST_MASS = 0.05 #mass of each dust SPH particle
+DUST_MASS = 0.05000000001 #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
 crit_mass = 0.0001 * solar_mass #setting a minimum dust mass to help avoid numerical errors!
@@ -166,6 +166,7 @@ densities = nsc.density(points,mass,particle_type,neighbor)
 densities_0 = copy.deepcopy(densities)
 dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
 delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
+new_smoothing = 1.
 
 star_ages = np.ones(len(points)) * -1.
 age = 0
@@ -241,6 +242,11 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			N_PART = mass/(m_h * mu_array)
 			W6_integral = 9./area #evaluating integral of W6 kernel
 			optd = 1. - np.exp(-optical_depth * W6_integral)
+			
+			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
+			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
+			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
+			optical_depth = mass/(m_h * mu_array) * cross_array
 
 			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
 			E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
@@ -262,10 +268,6 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			W6_integral = 9./area #evaluating integral of W6 kernel
 			optd = 1. - np.exp(-optical_depth * W6_integral)
 			
-			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
-			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
-			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
-			optical_depth = mass/(m_h * mu_array) * cross_array
 
 			'''
 			#another plotting function
@@ -347,9 +349,9 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     prechems_mass = np.sum(mass)
     chems = nsc.chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
+    f_un = chems[1]; mass = chems[0]
     deltam_chems = (np.sum(mass) - prechems_mass)/solar_mass
     print ("Mass error from chemisputtering: " + str(deltam_chems) + " solar masses")
-    f_un = chems[1]; mass = chems[0]
     supd = nsc.supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type)    
     mass_reduction = -np.sum(np.sum((mass/(mu_array) * supd[0].T).T * mu_specie,axis=1))
     mass_increase = np.sum(np.sum((mass/(mu_array) * supd[1].T).T * mu_specie,axis=1))
@@ -454,16 +456,16 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     #moreover, this gives us a greater dynamic range of possible densities
     #to work with, and helps avoid star formation at some arbitrary density floor
     #working with density-based formula for SPH neighbors
-    '''
+    
     V_new = np.abs((x_dist**2 + y_dist**2 + z_dist**2)**(3./2.))
     d = (V_new/len(points[vel_condition < 80000**2])/(0.9 - 0.1) * N_INT_PER_PARTICLE)**(1./3.)
     d_sq = d**2
     
     if len(densities_0) == len(densities):
-    	new_smoothing = np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities)))
+    	new_smoothing = (np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities))) + new_smoothing)/2. + (num_nontrivial < 2)
     else:
-    	new_smoothing = 1.'''
-    #sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
+    	new_smoothing = 1.
+    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
     
     densities_0 = copy.deepcopy(densities)
     
@@ -482,13 +484,17 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     photio = (f_un.T[3] + f_un.T[4] + f_un.T[2])/(f_un.T[2] + f_un.T[0] + f_un.T[3] + f_un.T[1] + f_un.T[4])
     #density_color = np.nan_to_num(np.log10(densities/critical_density) + 2) * (np.nan_to_num(np.log10(densities/critical_density) + 2) > 0) + 0.001
     
-    '''Another plotting function'''
     plt.clf()
-    plt.scatter(np.log10(T[particle_type == 0]), np.log10(densities[particle_type == 0]/critical_density), alpha=0.1, marker='+')
+    plt.plot(np.sort(np.log10(mass/solar_mass)[particle_type == 2]), alpha=0.1, marker='+')
     plt.pause(1)
-    '''Another plotting function'''
     
-    '''
+    '''Another plotting function
+    plt.clf()
+    plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
+    plt.pause(1)
+    Another plotting function
+    
+    
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec

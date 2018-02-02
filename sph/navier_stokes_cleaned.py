@@ -38,7 +38,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-23/2., 1.25e-23/2., 1.25e-23/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-25/2., 1.25e-25/2., 1.25e-25/2., 1e-60, 1e-60, 6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -439,7 +439,7 @@ def net_impulse(points,mass,sizes,velocities,particle_type,neighbor,f_un):
 		accel_net = weight_factor/mean_grainmass * mean_cross * np.sum((net_vels.T)**2, axis=0)**0.5 * net_vels.T * (particle_type[np.array(neighbor[j])] == 2) * (weight_factor > 0)
 		#need to account for relative weights over here!
 		accel_onto[j] += np.sum(accel_net.T,axis=0)
-		accel_reaction[neighbor[j]] += -accel_net.T
+		accel_reaction[neighbor[j]] += -(accel_net * (neighbor[j] != j)).T
 	return accel_onto, accel_reaction	
     
 def num_dens(mass, points, mu_array, neighbor):
@@ -736,11 +736,11 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			H2_effect = np.nan_to_num(7.3e-23 * 0.5 * (temps/100)**0.5 * (particle_type[neighbor[j]] == 0))
 			
 			#from Draine, but not self-consistent! Can lose more energy than you have this way for H (energy lost per electron is strictly greater)
-			#energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
-			#energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
+			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
+			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
 			
-			energy_coeff_H = k * temps * (particle_type[neighbor[j]] == 0)
-			energy_coeff_He = k * temps * (particle_type[neighbor[j]] == 0)
+			#energy_coeff_H = k * temps * (particle_type[neighbor[j]] == 0)
+			#energy_coeff_He = k * temps * (particle_type[neighbor[j]] == 0)
 			
 			#print energy_coeff_H, energy_coeff_He
 			num_e = np.sum(n_e[n_e > 0])
@@ -898,11 +898,11 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 			rel_w2g = Weigh2(x, x_0, m, d)/Weigh2(x, x, m, d)
 			rel_w2d = Weigh2_dust(x, x_0, m, d, dustsize)/Weigh2_dust(x, x, m, d, dustsize)
 			
-			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0) * (m > crit_mass)
-			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2) * (m > crit_mass)
+			w2g_num *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
+			w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
 			
-			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0) * (m > crit_mass)
-			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2) * (m > crit_mass)
+			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
+			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
 			if np.sum(w2g_num) > 0:
 				sph_indiv_composition = (w2g_num * comps.T).T * mu_specie
 				sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie #SPH density by composition of GAS
@@ -928,22 +928,24 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				F_sput = K_u/L_u
 				F_sput *= np.exp(K_u * J_u * dt)
 				F_sput[np.isnan(F_sput)] = 1.
-				#F_sput[F_sput < -0.99] = -0.99
+				F_sput[F_sput < 0.01] = 0.01 #should not sputter everything away regardless
+				F_sput[:6] = 0. #no chemisputtering of refractory species
 				
 				#print F_sput - 1
 				#effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
 				effective_mass = sph_indiv_composition
 						
-				reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0) & (m > crit_mass))
+				reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
 				reuptake_weight = effective_mass/np.sum(effective_mass,axis=0)
 				reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
-				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0) & (m > crit_mass))).T
+				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
 				
 				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
-				new_particles[new_particles < 0.] = 0.
+				#print new_particles
+				#new_particles[new_particles < 0.] = 0.
 				particle_loss = np.sum(new_particles, axis=0) * reuptake_weight
 				ploss = copy.deepcopy(particle_loss)
-				ploss[ploss > num_particles[neighbor[j]]] = num_particles[neighbor[j]][ploss > num_particles[neighbor[j]]]
+				ploss[0.99 * num_particles[neighbor[j]] < ploss] = (0.01 * num_particles[neighbor[j]])[0.99 * num_particles[neighbor[j]] < ploss]
 				
 				scale_f = np.sum(ploss, axis=0)/np.sum(new_particles, axis=0)
 				scale_f[np.isnan(scale_f)] = 1.
