@@ -542,11 +542,7 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
     else:
     	supernova_dust_len = np.array([supernova_dust_len]).astype('int')
     print supernova_dust_len
-    
-    dust_comps = (np.vstack([dust_release] * np.sum(supernova_dust_len)).T).T
-    gas_comps = gas_release
-    star_comps = gas_release
-    
+        
     dust_mass = np.ones(int(np.sum(supernova_dust_len))) * np.sum(dust_masses)/int(np.sum(supernova_dust_len))
     gas_mass = gas_masses
     stars_mass = (np.ones(len(supernova_pos)) * 2 * solar_mass)
@@ -562,6 +558,14 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
     	dustvels += [velocities[supernova_pos[position]]] * supernova_dust_len[position]
     	
     dustvels = np.vstack(dustvels)
+    
+    dust_comps = []
+    for position_2 in range(len(supernova_pos)):
+    	dust_comps.extend(np.vstack([dust_release[position_2]] * supernova_dust_len[position_2]))
+
+    dust_comps = np.array(dust_comps)
+    gas_comps = gas_release
+    star_comps = gas_release
     
     newpoints = points[supernova_pos] + (np.random.normal(size = (len(points[supernova_pos]),3))) * d_0
     newvels = velocities[supernova_pos]

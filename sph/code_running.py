@@ -187,7 +187,7 @@ plt.ion()
 #simulating supernova asap
 particle_type[mass >= np.sort(mass)[-3]] = 1
 mass[mass >= np.sort(mass)[-3]] = np.max(mass)
-star_ages[mass >= np.sort(mass)[-3]] = 3.5e6 * year
+star_ages[mass >= np.sort(mass)[-3]] = 3.55e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
@@ -315,34 +315,36 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
         		impulse, indices = nsc.supernova_impulse(points, mass, ku, particle_type)
         		velocities[indices] += impulse
 			#print('end supernova impulse')
-			print supernova_pos
+			#print supernova_pos
 			
 			#temporarily reducing timestep to allow AV to kick in
 			ct = nsc.crossing_time(neighbor, velocities, sizes, particle_type)
 			dt = min(dt_0/100., ct)
 			nsc.dt = dt
 			
-			dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un)
-			particle_type = np.concatenate((particle_type, newdusttype, newgastype))
-			E_internal[supernova_pos] = new_eint_stars
-			f_un[supernova_pos] = star_comps
-			mass[supernova_pos] = stars_mass
-			E_internal = np.concatenate((E_internal, new_eint_dust, new_eint_gas))
-			mass = np.concatenate((mass, dust_mass, gas_mass))
-			f_un = np.vstack([f_un, dust_comps, gas_comps])
-			velocities = np.concatenate((velocities, dustvels, newvels))
-			star_ages = np.concatenate((star_ages, np.ones(len(dustpoints))* (-2), np.ones(len(supernova_pos))* (-2)))
-			points = np.vstack([points, dustpoints, newpoints])
-			oldsizes = copy.deepcopy(sizes)
-			sizes = np.zeros(len(points))
-			sizes[:len(oldsizes)] = oldsizes
-			sizes[(particle_type == 0) & (sizes == 0)] = (mass[(particle_type == 0) & (sizes == 0)]/m_0)**(1./3.) * d
-			sizes[(particle_type == 1) & (sizes == 0)] = d/10000.
-			sizes[(particle_type == 2) & (sizes == 0)] = d
-			Tnew = np.zeros(len(sizes));
-			Tnew[:len(T)] += T
-			T = Tnew
-			T[T < t_cmb] = t_cmb
+			if len(supernova_pos) > 0:
+				dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos2, dustpoints, dustvels = nsc.supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un)
+				particle_type = np.concatenate((particle_type, newdusttype, newgastype))
+				E_internal[supernova_pos] = new_eint_stars
+				f_un[supernova_pos] = star_comps
+				mass[supernova_pos] = stars_mass
+				E_internal = np.concatenate((E_internal, new_eint_dust, new_eint_gas))
+				mass = np.concatenate((mass, dust_mass, gas_mass))
+				f_un = np.vstack([f_un, dust_comps, gas_comps])
+				velocities = np.concatenate((velocities, dustvels, newvels))
+				star_ages = np.concatenate((star_ages, np.ones(len(dustpoints))* (-2), np.ones(len(supernova_pos))* (-2)))
+				points = np.vstack([points, dustpoints, newpoints])
+				oldsizes = copy.deepcopy(sizes)
+				sizes = np.zeros(len(points))
+				sizes[:len(oldsizes)] = oldsizes
+				sizes[(particle_type == 0) & (sizes == 0)] = (mass[(particle_type == 0) & (sizes == 0)]/m_0)**(1./3.) * d
+				sizes[(particle_type == 1) & (sizes == 0)] = d/10000.
+				sizes[(particle_type == 2) & (sizes == 0)] = d
+				Tnew = np.zeros(len(sizes));
+				Tnew[:len(T)] += T
+				T = Tnew
+				T[T < t_cmb] = t_cmb
+				supernova_pos = []
 			#supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
 			neighbor = nsc.neighbors(points, max(sizes))
