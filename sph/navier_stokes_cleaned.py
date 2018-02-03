@@ -808,7 +808,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	final_comp /= np.sum(final_comp, axis=0)
 	
-	return final_comp.T, energy * dt, rec_array
+	return final_comp.T, energy * dt/100, rec_array #temporary fudge factor
 	
 def neutralize_cold(T, f_un, particle_type):
 	#neutralize all particles for which the temperature has fallen to <3 kelvins
