@@ -31,7 +31,7 @@ solar_mass = 1.989e30 #kilograms
 solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
-t_max = 3e4
+t_max = 5e4
 t_solar = 5776
 nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
@@ -54,7 +54,7 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1.5e6 * AU
+DIAMETER = 1.0e6 * AU
 N_PARTICLES = 1500
 N_INT_PER_PARTICLE = 75
 V = (DIAMETER)**3
@@ -231,37 +231,39 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
 			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
 			optical_depth = mass/(m_h * mu_array) * cross_array
+			
+			E_change_coeff_0 = np.nan_to_num((rh[0][particle_type[particle_type != 1] == 0])/E_internal[particle_type == 0])
+			E_change_coeff_0[E_change_coeff_0 >= 0] += 1.
+			E_change_coeff_0[E_change_coeff_0 < 0] = np.exp(E_change_coeff_0)[E_change_coeff_0 < 0]
+			E_internal[particle_type == 0] *= E_change_coeff_0
+			T[particle_type == 0] = E_internal[particle_type == 0]/(N_PART * gamma_array * k)[particle_type == 0]
 		
 			#have to fix radiative cooling
 			radcool_premass = np.sum(mass)
 			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T, dt/N_RADIATIVE)
-			#print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
-			#f_un = rc[0]
-							
-			area = (4 * np.pi * sizes**2)
-			N_PART = mass/(m_h * mu_array)
-			W6_integral = 9./area #evaluating integral of W6 kernel
-			optd = 1. - np.exp(-optical_depth * W6_integral)
+			print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
 			
+			f_un = rc[0]
 			f_un = nsc.neutralize_cold(T, f_un, particle_type)
 			
 			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
 			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
 			cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
 			optical_depth = mass/(m_h * mu_array) * cross_array
+			
+			area = (4 * np.pi * sizes**2)
+			N_PART = mass/(m_h * mu_array)
+			W6_integral = 9./area #evaluating integral of W6 kernel
+			optd = 1. - np.exp(-optical_depth * W6_integral)
+			
+			E_change_coeff_1 = np.nan_to_num((-(rc[1] * N_PART)[particle_type == 0])/E_internal[particle_type == 0])
+			E_change_coeff_1[E_change_coeff_1 >= 0] += 1.
+			E_change_coeff_1[E_change_coeff_1 < 0] = np.exp(E_change_coeff_1)[E_change_coeff_1 < 0]
+			E_internal[particle_type == 0] *= E_change_coeff_1
+			T[particle_type == 0] = E_internal[particle_type == 0]/(N_PART * gamma_array * k)[particle_type == 0]
 
 			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
 			E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
-			E_change_coeff_0 = np.nan_to_num((rh[0][particle_type[particle_type != 1] == 0]-(rc[1] * N_PART)[particle_type == 0]))
-			
-			E_base = np.abs(E_change_coeff_0) * (T[particle_type == 0] >= t_max * 0.95) * 0 + E_internal[particle_type == 0] #don't worry too much about temperature drops
-			
-			E_change_coeff_1 = np.nan_to_num(E_change_coeff_0/E_base)
-			
-			E_change_coeff_1[E_change_coeff_1 >= 0] += 1.
-			E_change_coeff_1[E_change_coeff_1 < 0] = np.exp(np.nan_to_num(E_change_coeff_1))[E_change_coeff_1 < 0]
-			E_internal[particle_type == 0] *= E_change_coeff_1
-			T[particle_type == 0] = E_internal[particle_type == 0]/(N_PART * gamma_array * k)[particle_type == 0]
 		
 			velocities[particle_type != 1] += rh[2]
 		
@@ -500,14 +502,14 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     photio = (f_un.T[3] + f_un.T[4] + f_un.T[2])/(f_un.T[2] + f_un.T[0] + f_un.T[3] + f_un.T[1] + f_un.T[4])
     #density_color = np.nan_to_num(np.log10(densities/critical_density) + 2) * (np.nan_to_num(np.log10(densities/critical_density) + 2) > 0) + 0.001
-    '''
-    plt.clf()
+    
+    '''plt.clf()
     plt.plot(np.log10(np.arange(len(mass[particle_type == 2])) + 1), np.sort(np.log10(mass/solar_mass)[particle_type == 2]), alpha=0.1, marker='+')
     plt.xlabel('Rank of dust mass')
     plt.ylabel('Mass of dust particle')
-    plt.pause(1)'''
+    plt.pause(1)
     
-    '''Another plotting function
+    Another plotting function
     plt.clf()
     plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
     plt.pause(1)
@@ -550,7 +552,12 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.pause(1)
     
     #END PLOTTING
-    
+    '''
+    plt.clf()
+    if len(T[particle_type == 0]) == len(E_change_coeff_1):
+    	plt.plot(np.log10(T[particle_type == 0]), np.log10(E_change_coeff_0 * E_change_coeff_1), '+')
+    plt.pause(1)
+    '''
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year

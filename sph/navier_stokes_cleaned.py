@@ -571,7 +571,7 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
     newdusttype = np.ones(np.sum(supernova_dust_len)) * 2
     
     new_eint_stars = np.zeros(len(supernova_pos))
-    new_eint_dust = np.zeros(supernova_dust_len)
+    new_eint_dust = np.zeros(np.sum(supernova_dust_len))
     new_eint_gas = E_internal[supernova_pos]/2.
     
     return dust_comps, gas_comps, star_comps, dust_mass, gas_mass, stars_mass, newpoints, newvels, newgastype, newdusttype, new_eint_stars, new_eint_dust, new_eint_gas, supernova_pos, dustpoints, dustvels
@@ -735,7 +735,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			He_effect = np.nan_to_num(2.72e-19 * t4**(-0.789) * (particle_type[neighbor[j]] == 0))
 			H2_effect = np.nan_to_num(7.3e-23 * 0.5 * (temps/100)**0.5 * (particle_type[neighbor[j]] == 0))
 			
-			#from Draine, but not self-consistent! Can lose more energy than you have this way for H (energy lost per electron is strictly greater)
+			#from Draine, but not self-consistent! Can lose less energy than you have this way for H (energy lost per electron is strictly less)
 			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
 			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
 			
@@ -768,7 +768,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			frac_rec_He = frac_rec_e * np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec))
 			#print frac_rec_e, frac_rec_H, frac_rec_He
 			
-			frac_rec_H_neut = H_neut_effect_rec * num_H_neut/num_H_neut * dt
+			frac_rec_H_neut = H_neut_effect_rec * dt
 			frac_rec_H_neut = np.min(frac_rec_H_neut, 0.999)
 			
 			energy_rec_H = np.nan_to_num(H_effect_energy * dt)
@@ -791,10 +791,12 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	rec_array = np.nan_to_num(rec_array)
 	#print np.min(rec_array), np.max(rec_array)
 	
-	H2_plus_frac = f_un.T[2] * rec_array[2]
-	H_plus_frac = f_un.T[5] * rec_array[3]
-	He_plus_frac = f_un.T[5] * rec_array[4]
-	elec_frac = f_un.T[5] * rec_array[5]
+	H2_plus_frac = final_comp[2] * rec_array[2]
+	H_plus_frac = final_comp[5] * rec_array[3]
+	He_plus_frac = final_comp[5] * rec_array[4]
+	elec_frac = final_comp[5] * rec_array[5]
+	
+	#print max(frac_rec)
 	
 	energy = np.nan_to_num(np.sum(final_comp * energy_array, axis=0))
 	
@@ -805,9 +807,13 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	final_comp[4] += -He_plus_frac
 	final_comp[5] += -elec_frac
 	
+	final_comp[final_comp < 0] = 0.
+	
+	#print "Frac rec max: " + str(np.max(rec_array))
+	
 	final_comp /= np.sum(final_comp, axis=0)
 	
-	return final_comp.T, energy
+	return final_comp.T, energy, rec_array
 	
 def neutralize_cold(T, f_un, particle_type):
 	#neutralize all particles for which the temperature has fallen to <3 kelvins
