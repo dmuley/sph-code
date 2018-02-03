@@ -185,8 +185,9 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass == max(mass)] = 1
-star_ages[mass == max(mass)] = 3.0e6 * year
+particle_type[mass >= np.sort(mass)[-3]] = 1
+mass[mass >= np.sort(mass)[-3]] = np.max(mass)
+star_ages[mass >= np.sort(mass)[-3]] = 3.5e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
@@ -342,7 +343,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			Tnew[:len(T)] += T
 			T = Tnew
 			T[T < t_cmb] = t_cmb
-			supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
+			#supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
 			neighbor = nsc.neighbors(points, max(sizes))
 			#NONTRIVIAL NEIGHBORS

@@ -765,7 +765,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			frac_rec_H_neut = np.min(H_neut_effect_rec * dt, 0.9999)
 			
 			H_effect_energy = np.sum((H_effect * energy_coeff_H * n_e * frac_rec_H)[n_e > 0])
-			He_effect_energy= np.sum((He_effect * n_e * energy_coeff_He * n_e * frac_rec_He)[n_e > 0])
+			He_effect_energy= np.sum((He_effect * energy_coeff_He * n_e * frac_rec_He)[n_e > 0])
 			#print H_effect_energy, He_effect_energy
 			
 			energy_array[3][neighbor[j]] += np.nan_to_num(H_effect_energy * rel_weights * (rel_weights > 0))
@@ -793,7 +793,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	#print max(frac_rec)
 	
-	energy = final_comp[5] * rec_array[5] * (energy_array[3] + energy_array[4])
+	energy = (energy_array[3] + energy_array[4]) * elec_frac
 	
 	final_comp[0] += H2_plus_frac/2.
 	final_comp[1] += He_plus_frac
@@ -808,7 +808,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	final_comp /= np.sum(final_comp, axis=0)
 	
-	return final_comp.T, energy * dt/100, rec_array #temporary fudge factor
+	return final_comp.T, energy, rec_array #temporary fudge factor
 	
 def neutralize_cold(T, f_un, particle_type):
 	#neutralize all particles for which the temperature has fallen to <3 kelvins
