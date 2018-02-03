@@ -38,7 +38,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-23/2., 1.25e-23/2., 1.25e-23/2., 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-23/5., 1.25e-23/5., 1.25e-23/5., 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -756,27 +756,21 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			
 			#print H_effect_rec, He_effect_rec
 			
-			H_effect_energy = np.sum((H_effect * n_e * energy_coeff_H)[n_e > 0])
-			He_effect_energy= np.sum((He_effect * n_e * energy_coeff_He)[n_e > 0])
-			#print H_effect_energy, He_effect_energy
-			
 			frac_rec_e = (H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt
-			frac_rec_e = min(frac_rec_e, 0.999)
+			frac_rec_e = min(frac_rec_e, 0.9999)
 			
-			#print frac_rec_e
 			frac_rec_H = frac_rec_e * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec))
 			frac_rec_He = frac_rec_e * np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec))
-			#print frac_rec_e, frac_rec_H, frac_rec_He
 			
-			frac_rec_H_neut = H_neut_effect_rec * dt
-			frac_rec_H_neut = np.min(frac_rec_H_neut, 0.999)
+			frac_rec_H_neut = np.min(H_neut_effect_rec * dt, 0.9999)
 			
-			energy_rec_H = np.nan_to_num(H_effect_energy * dt)
-			energy_rec_He = np.nan_to_num(He_effect_energy * dt)
+			H_effect_energy = np.sum((H_effect * energy_coeff_H * n_e * frac_rec_H)[n_e > 0])
+			He_effect_energy= np.sum((He_effect * n_e * energy_coeff_He * n_e * frac_rec_He)[n_e > 0])
+			#print H_effect_energy, He_effect_energy
 			
-			energy_array[3][neighbor[j]] += np.nan_to_num(energy_rec_H * rel_weights * (rel_weights > 0)/np.sum(rel_weights * (rel_weights > 0)))
-			energy_array[4][neighbor[j]] += np.nan_to_num(energy_rec_He * rel_weights * (rel_weights > 0)/np.sum(rel_weights * (rel_weights > 0)))
-						
+			energy_array[3][neighbor[j]] += np.nan_to_num(H_effect_energy * rel_weights * (rel_weights > 0))
+			energy_array[4][neighbor[j]] += np.nan_to_num(He_effect_energy * rel_weights * (rel_weights > 0))
+			
 			rec_array[2][neighbor[j]] += np.nan_to_num(frac_rec_H_neut) * (n_H_neutral > 0) * rel_weights * (rel_weights > 0)
 			rec_array[3][neighbor[j]] += np.nan_to_num(frac_rec_H) * (n_e > 0) * rel_weights * (rel_weights > 0)
 			rec_array[4][neighbor[j]] += np.nan_to_num(frac_rec_He) * (n_e > 0) * rel_weights * (rel_weights > 0)
@@ -784,12 +778,13 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			
 			rel_array[neighbor[j]] += rel_weights * (rel_weights > 0)
 	
-	
 	rec_array /= (rel_array + 1e-90)
 	energy_array /= (rel_array + 1e-90)
 	#rec_array /= np.sum(rec_array/0.999, axis=0)/2
 	rec_array = np.nan_to_num(rec_array)
 	#print np.min(rec_array), np.max(rec_array)
+	
+	print "Typical decay timescale: " + str(np.sum((rec_array/(dt/(60 * 60 * 24 * 365))))**(-1)) + "years"
 	
 	H2_plus_frac = final_comp[2] * rec_array[2]
 	H_plus_frac = final_comp[5] * rec_array[3]
@@ -798,7 +793,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	#print max(frac_rec)
 	
-	energy = np.nan_to_num(np.sum(final_comp * energy_array, axis=0))
+	energy = final_comp[5] * rec_array[5] * (energy_array[3] + energy_array[4])
 	
 	final_comp[0] += H2_plus_frac/2.
 	final_comp[1] += He_plus_frac
@@ -813,7 +808,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	final_comp /= np.sum(final_comp, axis=0)
 	
-	return final_comp.T, energy, rec_array
+	return final_comp.T, energy * dt, rec_array
 	
 def neutralize_cold(T, f_un, particle_type):
 	#neutralize all particles for which the temperature has fallen to <3 kelvins

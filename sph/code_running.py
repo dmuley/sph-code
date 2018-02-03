@@ -31,7 +31,7 @@ solar_mass = 1.989e30 #kilograms
 solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
-t_max = 5e4
+t_max = 3e4
 t_solar = 5776
 nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
@@ -41,7 +41,7 @@ dt_0 = year * 25000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-23/2., 1.25e-23/2., 1.25e-23/2., 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-23/5., 1.25e-23/5., 1.25e-23/5., 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -160,7 +160,7 @@ optical_depth = mass/(m_h * mu_array) * cross_array
 
 #copy of generate_mu_array
 
-critical_density = 1000*amu*10**6 #critical density of star formation
+critical_density = 1000 * amu * 10**6 #critical density of star formation
 
 densities = nsc.density(points,mass,particle_type,neighbor)
 densities_0 = copy.deepcopy(densities)
@@ -508,13 +508,11 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.xlabel('Rank of dust mass')
     plt.ylabel('Mass of dust particle')
     plt.pause(1)
-    
-    Another plotting function
+    '''
     plt.clf()
     plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
     plt.pause(1)
-    Another plotting function'''
-    
+    '''
     
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
@@ -549,7 +547,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.xlabel('Position (parsecs)')
     plt.ylabel('Position (parsecs)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)
+    plt.pause(1)'''
     
     #END PLOTTING
     '''
