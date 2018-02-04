@@ -31,7 +31,7 @@ solar_mass = 1.989e30 #kilograms
 solar_luminosity = 3.846e26 #watts
 solar_lifespan = 1e10 #years
 t_cmb = 2.732
-t_max = 3e4
+t_max = 4e4
 t_solar = 5776
 nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
@@ -234,12 +234,17 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			optical_depth = mass/(m_h * mu_array) * cross_array
 			
 			E_change_coeff_0 = np.nan_to_num((rh[0][particle_type[particle_type != 1] == 0])/E_internal[particle_type == 0])
+			
 			E_change_coeff_0[E_change_coeff_0 >= 0] += 1.
 			E_change_coeff_0[E_change_coeff_0 < 0] = np.exp(E_change_coeff_0)[E_change_coeff_0 < 0]
 			E_internal[particle_type == 0] *= E_change_coeff_0
 			T[particle_type == 0] = E_internal[particle_type == 0]/(N_PART * gamma_array * k)[particle_type == 0]
-		
-			#have to fix radiative cooling
+
+			E_internal[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)] = (t_cmb * (gamma_array * mass * k)/(mu_array * m_h))[E_internal < t_cmb * (gamma_array * mass * k)/(mu_array * m_h)]
+			E_internal[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)] = (t_max * (gamma_array * mass * k)/(mu_array * m_h))[E_internal > t_max * (gamma_array * mass * k)/(mu_array * m_h)]
+			T[T < t_cmb] = t_cmb
+			T[T >= t_max] = t_max
+			
 			radcool_premass = np.sum(mass)
 			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T, dt/N_RADIATIVE)
 			print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
@@ -302,6 +307,10 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 
         #print("Negative compositions after radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
         #on supernova event--- add new dust particle (particle_type == 2)
+        
+        plt.clf()
+        plt.plot(T[(particle_type == 0)], np.log10(E_change_coeff_0 * E_change_coeff_1), '+', alpha=0.5)
+        plt.pause(1)
         
         max_rel_age = np.max(star_ages/nsc.luminosity_relation(mass/nsc.solar_mass, np.ones(len(mass)), 1)/(year * 1e10))
         print ("Maximum relative stellar age: " + str(max_rel_age))
@@ -511,7 +520,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.xlabel('Rank of dust mass')
     plt.ylabel('Mass of dust particle')
     plt.pause(1)
-    '''
+    
     plt.clf()
     plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
     plt.title('Photoionization versus temperature')
@@ -519,7 +528,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.ylabel('Log (photoionization)')
     plt.pause(1)
     
-    '''
+    
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec

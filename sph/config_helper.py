@@ -224,8 +224,23 @@ timestep_gas_mass_composition_initial = timestep_gas_by_mass_composition/np.sum(
 overall_gas_mass_composition = (1 - DUST_FRAC) * overall_gas_mass_composition_initial * (1 - FRAC_CONSUMED[TIMESTEP_NUMBER]) + (1 - timestep_dust_frac) * timestep_gas_mass_composition_initial * FRAC_CONSUMED[TIMESTEP_NUMBER]
 overall_gas_mass_composition /= np.sum(overall_gas_mass_composition)
 
-overall_gas_number_composition = (overall_gas_mass_composition/mu_specie)/np.sum(overall_gas_mass_composition/mu_specie)
+overall_gas_number_composition = (overall_gas_mass_composition/mu_specie)
 
+### TIME TO NEUTRALIZE NUMBER COMPOSITION ###
+### IONS SHOULD NOT PERSIST ###
+
+overall_gas_number_composition[2] += overall_gas_number_composition[3]
+overall_gas_number_composition[1] += overall_gas_number_composition[4]
+overall_gas_number_composition[3:6] *= 0
+
+overall_gas_number_composition /= np.sum(overall_gas_number_composition)
+
+overall_AGB_composition_2 = copy.deepcopy(overall_AGB_composition).T
+overall_AGB_composition_2[2] += overall_AGB_composition_2[3]
+overall_AGB_composition_2[1] += overall_AGB_composition_2[4]
+overall_AGB_composition_2[3:6] *= 0
+
+overall_AGB_composition = (overall_AGB_composition_2/np.sum(overall_AGB_composition_2, axis=0)).T
 #saving new config files
 
 #now just add these to output file and increment timestep number by 1

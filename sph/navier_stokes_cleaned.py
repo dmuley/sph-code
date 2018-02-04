@@ -740,13 +740,14 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			H2_effect = np.nan_to_num(7.3e-23 * 0.5 * (temps/100)**0.5 * (particle_type[neighbor[j]] == 0))
 			
 			#from Draine, but not self-consistent! Can lose less energy than you have this way for H (energy lost per electron is strictly less)
-			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
-			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
+			# + t4 is a new arbitrary cooling function
+			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37) + t4) * k * temps * (particle_type[neighbor[j]] == 0))
+			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4) + t4) * k * temps * (particle_type[neighbor[j]] == 0))
 			
 			#print energy_coeff_H/k, energy_coeff_He/k
 						
-			#energy_coeff_H = k * temps * (particle_type[neighbor[j]] == 0)
-			#energy_coeff_He = k * temps * (particle_type[neighbor[j]] == 0)
+			#energy_coeff_H = (3./2. + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0)
+			#energy_coeff_He = (3./2.) * k * temps * (particle_type[neighbor[j]] == 0)
 			
 			#print energy_coeff_H, energy_coeff_He
 			num_e = np.sum(n_e[n_e > 0])
@@ -800,6 +801,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	#print max(frac_rec)
 	
 	energy = (energy_array[3] * final_comp[3] + energy_array[4] * final_comp[4])
+	#energy = final_comp[5] * rec_array[5] * k * T * (1.5)
 	
 	final_comp[0] += H2_plus_frac/2.
 	final_comp[1] += He_plus_frac
