@@ -186,9 +186,9 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass >= np.sort(mass)[-3]] = 1
+'''particle_type[mass >= np.sort(mass)[-3]] = 1
 mass[mass >= np.sort(mass)[-3]] = np.max(mass)
-star_ages[mass >= np.sort(mass)[-3]] = 3.55e6 * year
+star_ages[mass >= np.sort(mass)[-3]] = 3.55e6 * year'''
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
@@ -530,8 +530,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.plot(np.log10(np.arange(len(mass[particle_type == 2])) + 1), np.sort(np.log10(mass/solar_mass)[particle_type == 2]), alpha=0.1, marker='+')
     plt.xlabel('Rank of dust mass')
     plt.ylabel('Mass of dust particle')
-    plt.pause(1)'''
-    
+    plt.pause(1)
     plt.clf()
     plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
     plt.title('Photoionization versus temperature')
@@ -539,7 +538,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.ylabel('Log (photoionization)')
     plt.xlim(0, np.log10(t_max))
     plt.ylim(-6, 0)
-    plt.pause(1)
+    plt.pause(1)'''
     
     '''
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
