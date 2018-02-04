@@ -227,6 +227,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			rh = nsc.rad_heating(points, particle_type, mass, sizes, cross_array, f_un, supernova_pos, mu_array, T, dt/N_RADIATIVE)
 		
 			f_un = rh[1]
+			
+			
 		
 			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
 			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
@@ -246,11 +248,14 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			T[T >= t_max] = t_max
 			
 			radcool_premass = np.sum(mass)
-			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, rh[1], neighbor, mu_array, T, dt/N_RADIATIVE)
+			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, f_un, neighbor, mu_array, T, dt/N_RADIATIVE)
+			
+			
+			
 			print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
 			
 			f_un = rc[0]
-			f_un = nsc.neutralize_cold(T, f_un, particle_type)
+			#f_un = nsc.neutralize_cold(T, f_un, particle_type)
 			
 			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
 			gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
@@ -286,7 +291,6 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			W6_integral = 9./area #evaluating integral of W6 kernel
 			optd = 1. - np.exp(-optical_depth * W6_integral)
 			
-
 			'''
 			#another plotting function
 			plt.rc('font', family='tex')
@@ -308,15 +312,14 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
         #print("Negative compositions after radiative transfer: " + str(len(f_un[np.sum(f_un/np.abs(f_un),axis=1) < 13])))
         #on supernova event--- add new dust particle (particle_type == 2)
         
-        plt.clf()
-        plt.plot(T[(particle_type == 0)], np.log10(E_change_coeff_0 * E_change_coeff_1), '+', alpha=0.5)
-        plt.pause(1)
-        
         max_rel_age = np.max(star_ages/nsc.luminosity_relation(mass/nsc.solar_mass, np.ones(len(mass)), 1)/(year * 1e10))
         print ("Maximum relative stellar age: " + str(max_rel_age))
         print ("Maximum stellar mass: " + str(np.max(mass[particle_type == 1]/solar_mass)) + " solar masses")
         print ("Number of supernovae: " + str(len(supernova_pos)))
         print (" ")
+        
+        
+        
         #print (star_ages/luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10))[supernova_pos]
         if len(supernova_pos) > 0:
         	#print('beginning supernova impulse')
@@ -360,6 +363,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			#NONTRIVIAL NEIGHBORS
 			neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 			
+        
+        
         mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
         gamma_array = np.sum(f_un * gamma, axis=1)/np.sum(f_un, axis=1)
         cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
@@ -370,6 +375,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     densities = nsc.density(points,mass,particle_type,neighbor)
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
     num_densities = nsc.num_dens(mass, points, mu_array, neighbor)
+    
+    
     
     prechems_mass = np.sum(mass)
     chems = nsc.chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
@@ -392,6 +399,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     f_un = (f_un.T/np.sum(f_un, axis=1)).T #normalizing composition
     mass += mass_change
     print ("Number of negative masses: " + str(np.sum((mass < 0))))
+    
+    
     
     #mass = np.nan_to_num(mass)
     mass[mass < 0] = crit_mass/200.
@@ -519,7 +528,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.plot(np.log10(np.arange(len(mass[particle_type == 2])) + 1), np.sort(np.log10(mass/solar_mass)[particle_type == 2]), alpha=0.1, marker='+')
     plt.xlabel('Rank of dust mass')
     plt.ylabel('Mass of dust particle')
-    plt.pause(1)
+    plt.pause(1)'''
     
     plt.clf()
     plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
@@ -528,7 +537,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.ylabel('Log (photoionization)')
     plt.pause(1)
     
-    
+    '''
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
@@ -596,6 +605,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     timestep_duration = time.time() - present_time
     total_time_consumed += timestep_duration
+    
+    
     
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
     print ("Age: " + str(age/year) + " years")

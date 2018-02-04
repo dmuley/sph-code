@@ -676,16 +676,15 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     frac_destroyed_by_species = 1. - frac_destroyed_1
     #print frac_destroyed_by_species
     
-    new_fun = f_un.T
+    new_fun = copy.deepcopy(f_un.T)
     new_fun2 = copy.deepcopy(new_fun)
     
     #forward reactions
     new_fun2[2][ptypes != 1] += new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0] * 2.
+    
     new_fun2[3][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     new_fun2[4][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
-    
-    new_fun2[5][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
-    new_fun2[5][ptypes != 1] += new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
+    new_fun2[5][ptypes != 1] += new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2] + new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     
     new_fun2[0][ptypes != 1] -= new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0]
     new_fun2[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
@@ -741,8 +740,8 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			
 			#from Draine, but not self-consistent! Can lose less energy than you have this way for H (energy lost per electron is strictly less)
 			# + t4 is a new arbitrary cooling function
-			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37) + t4) * k * temps * (particle_type[neighbor[j]] == 0))
-			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4) + t4) * k * temps * (particle_type[neighbor[j]] == 0))
+			energy_coeff_H = np.nan_to_num((0.684 - 0.0416 * np.log(t4/1) + 0.54 * t4**(0.37)) * k * temps * (particle_type[neighbor[j]] == 0))
+			energy_coeff_He = np.nan_to_num((0.684 - 0.0416 * np.log(t4/4)) * k * temps * (particle_type[neighbor[j]] == 0))
 			
 			#print energy_coeff_H/k, energy_coeff_He/k
 						
@@ -764,7 +763,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			#print H_effect_rec, He_effect_rec
 			
 			frac_rec_e = (H_effect_rec * num_H_plus + He_effect_rec * num_He_plus)/num_e * dt
-			frac_rec_e = min(frac_rec_e, 0.9999)
+			frac_rec_e = np.min(frac_rec_e, 0.9999)
 			
 			frac_rec_H = frac_rec_e * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec))
 			frac_rec_He = frac_rec_e * np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec))
@@ -774,7 +773,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			H_effect_energy = np.sum((H_effect * n_e * energy_coeff_H * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec)) * dt)[n_e > 0])
 			He_effect_energy= np.sum((He_effect * n_e * energy_coeff_He *  np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec)) * dt)[n_e > 0])
 			
-			#print H_effect_energy/frac_rec_H/k			
+			print H_effect_energy/frac_rec_H/k			
 			#print H_effect_energy, He_effect_energy
 			
 			energy_array[3][neighbor[j]] += np.nan_to_num(H_effect_energy * rel_weights * (rel_weights > 0))
@@ -798,7 +797,11 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	He_plus_frac = final_comp[5] * rec_array[4]
 	elec_frac = final_comp[5] * rec_array[5]
 	
-	#print max(frac_rec)
+	print "===Final compensation==="
+	print(np.sum((final_comp[5] < elec_frac)))
+	print np.sort(final_comp[3] + final_comp[4] - final_comp[5])
+	print np.sort(H_plus_frac + He_plus_frac - elec_frac)
+	print "====="
 	
 	energy = (energy_array[3] * final_comp[3] + energy_array[4] * final_comp[4])
 	#energy = final_comp[5] * rec_array[5] * k * T * (1.5)
@@ -806,11 +809,14 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	final_comp[0] += H2_plus_frac/2.
 	final_comp[1] += He_plus_frac
 	final_comp[2] += H_plus_frac - H2_plus_frac
-	final_comp[3] += -H_plus_frac
-	final_comp[4] += -He_plus_frac
-	final_comp[5] += -elec_frac
 	
-	final_comp[final_comp < 0] = 0.
+	final_comp[3] -= H_plus_frac * (final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0)
+	final_comp[4] -= He_plus_frac * (final_comp[5] - elec_frac > 0) * (final_comp[3] - H_plus_frac > 0) * (final_comp[4] - He_plus_frac > 0)
+	final_comp[5] -= elec_frac * (final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0)
+	
+	final_comp[3][~((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))] *= 0
+	final_comp[4][~((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))] *= 0
+	final_comp[5][~((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))] *= 0
 	
 	#print "Frac rec max: " + str(np.max(rec_array))
 	
@@ -883,7 +889,7 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 				#Distributing dust destruction over all intersecting dust particles
 				final_fracs = (dens * (m > crit_mass))/critical_density * dest_fracs.T #fraction destroyed
 				final_fracs[final_fracs >= 0.99] = 0.99
-				
+								
 				N_dust = mass[neighbor[j]]/(mu_array[neighbor[j]] * amu)
 				
 				#what relative fraction of refractory species are created in gas particle j? Summed over because only one particle
