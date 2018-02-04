@@ -514,9 +514,12 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     '''
     plt.clf()
     plt.scatter(np.log10(T[particle_type == 0]), np.log10(photio[particle_type == 0] + 1e-20), alpha=0.1, marker='+')
+    plt.title('Photoionization versus temperature')
+    plt.xlabel('Log (T/K)')
+    plt.ylabel('Log (photoionization)')
     plt.pause(1)
-    '''
     
+    '''
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
