@@ -37,6 +37,7 @@ nsc.supernova_energy = 1e44 #in Joules
 m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 25000.
+cooling_timescale = year * 1e6
 
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
@@ -270,6 +271,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			E_change_coeff_1 = np.nan_to_num((-(rc[1] * N_PART)[particle_type == 0])/E_internal[particle_type == 0])
 			E_change_coeff_1[E_change_coeff_1 >= 0] += 1.
 			E_change_coeff_1[E_change_coeff_1 < 0] = np.exp(E_change_coeff_1)[E_change_coeff_1 < 0]
+			E_change_coeff_1 *= np.exp(-dt/(cooling_timescale) * np.sqrt(T[particle_type == 0]/1e4)) #effective-theory fudge factor!
 			E_internal[particle_type == 0] *= E_change_coeff_1
 			T[particle_type == 0] = E_internal[particle_type == 0]/(N_PART * gamma_array * k)[particle_type == 0]
 
@@ -535,6 +537,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.title('Photoionization versus temperature')
     plt.xlabel('Log (T/K)')
     plt.ylabel('Log (photoionization)')
+    plt.xlim(0, np.log10(t_max))
+    plt.ylim(-6, 0)
     plt.pause(1)
     
     '''

@@ -773,7 +773,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 			H_effect_energy = np.sum((H_effect * n_e * energy_coeff_H * np.nan_to_num((H_effect_rec)/(H_effect_rec + He_effect_rec)) * dt)[n_e > 0])
 			He_effect_energy= np.sum((He_effect * n_e * energy_coeff_He *  np.nan_to_num((He_effect_rec)/(H_effect_rec + He_effect_rec)) * dt)[n_e > 0])
 			
-			print H_effect_energy/frac_rec_H/k			
+			#print H_effect_energy/frac_rec_H/k			
 			#print H_effect_energy, He_effect_energy
 			
 			energy_array[3][neighbor[j]] += np.nan_to_num(H_effect_energy * rel_weights * (rel_weights > 0))
@@ -796,12 +796,12 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	H_plus_frac = final_comp[5] * rec_array[3]
 	He_plus_frac = final_comp[5] * rec_array[4]
 	elec_frac = final_comp[5] * rec_array[5]
-	
+	'''
 	print "===Final compensation==="
 	print(np.sum((final_comp[5] < elec_frac)))
 	print np.sort(final_comp[3] + final_comp[4] - final_comp[5])
 	print np.sort(H_plus_frac + He_plus_frac - elec_frac)
-	print "====="
+	print "====="'''
 	
 	energy = (energy_array[3] * final_comp[3] + energy_array[4] * final_comp[4])
 	#energy = final_comp[5] * rec_array[5] * k * T * (1.5)
