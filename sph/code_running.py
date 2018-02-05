@@ -504,7 +504,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     nsc.d = d
     print ("Length scale: " + str(d/constants.parsec))
     
-    expansion_int = np.hstack(nontrivial_int)
+    '''expansion_int = np.hstack(nontrivial_int)
     expansion_un = np.unique(expansion_int)
     
     exp_neighbor_count = np.array([len(expansion_int[(expansion_int == a)]) for a in expansion_un])
@@ -513,15 +513,15 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     	new_smoothing = (np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities))) * 2)/2. + (exp_neighbor_count + num_nontrivial - 1 < 2) * 0.1
     else:
     	new_smoothing = 1.
-    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
+    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]'''
     sizes[(particle_type == 0) & (sizes > d)] = d #set a maximum length scale here to avoid uncontrolled growth
     
     densities_0 = copy.deepcopy(densities)
     
     min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
     max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
-    #sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
-    #izes[particle_type == 2] = d
+    sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
+    sizes[particle_type == 2] = d
     
     photio = (f_un.T[3] + f_un.T[4] + f_un.T[2])/(f_un.T[2] + f_un.T[0] + f_un.T[3] + f_un.T[1] + f_un.T[4])
     #density_color = np.nan_to_num(np.log10(densities/critical_density) + 2) * (np.nan_to_num(np.log10(densities/critical_density) + 2) > 0) + 0.001
