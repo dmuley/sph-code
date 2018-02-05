@@ -38,7 +38,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.])/50. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -643,16 +643,18 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     
     lum_factor = []
     for ei in range(len(star_distance)):
-        lum_factor.append(np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + sizes[ptypes != 1]/2).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + sizes[ptypes != 1]/2)**-2, axis=0)))
+    	lum_0 = np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + 1.).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + 1.)**-2, axis=0))
+        lum_factor.append(lum_0)
+        print lum_0
     
     lum_factor = np.array(lum_factor)
     extinction = (W6_constant * masses[ptypes != 1]/(mu_array[ptypes != 1] * amu) * cross_array[ptypes != 1]) * sizes[ptypes != 1]**(-2)
     
     exponential = np.exp(-np.nan_to_num(lum_factor))
-    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.average(sizes[ptypes != 1])**2 * np.ones(np.shape(star_distance_2))) * 4. * np.pi
+    distance_factor = (np.nan_to_num(star_distance_2)**2 + np.min(sizes[ptypes == 0])**2 * np.ones(np.shape(star_distance_2))) * 4. * np.pi
     a_intercepted = (np.pi * sizes**2)[ptypes != 1]
     
-    lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * (np.ones(np.shape(extinction)) - np.exp(-extinction))
+    lum_factor_2 = ((exponential/distance_factor).T * luminosities).T * a_intercepted * extinction #see if this works in optically thick case
     lum_factor_2 = np.nan_to_num(lum_factor_2)
     
     lf2 = np.sum(lum_factor_2, axis=0) * dt * solar_luminosity
@@ -697,7 +699,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     
     new_fun2 /= np.sum(new_fun2,axis=0)    
     #energy, composition change, impulse
-    return lf2, new_fun2.T, momentum
+    return lf2, new_fun2.T, momentum, extinction
 
 def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neighbor, mu_array, T, dt):
 	#first, calculate an SPH density of electrons * temperature factor, then apply the model

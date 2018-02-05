@@ -42,7 +42,7 @@ cooling_timescale = year * 1e6
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.])/50. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -55,7 +55,7 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 2e6 * AU
+DIAMETER = 1e6 * AU
 N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 75
 V = (DIAMETER)**3
@@ -152,7 +152,7 @@ sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
-base_sfr = 0.1
+base_sfr = 0.03
 T_FF = (3./(2 * np.pi * G * critical_density))**0.5/year
 #base star formation per free fall rate
 
@@ -173,13 +173,13 @@ delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_arra
 #Introduce turbulence at the largest scales
 initial_clusters, grav_potential = nsc.grav_force_calculation(mass, points, sizes)[2:]
 #print np.sum(grav_potential)
-#apply the virial theorem that <V> + <E_internal> = -2<U>
+#apply the virial theorem that 2<V> + (2/3)<E_internal> = -<U>
 #mostly turbulent support
 
-gpot = np.sum(grav_potential) * (-2)
-total_turb_energy = gpot - np.sum(E_internal)
+gpot = np.sum(grav_potential)
+total_turb_energy = max(0,(-gpot - np.sum(E_internal/gamma_array)))/2.
 cluster_masses = np.array([np.sum(mass[ai]) for ai in initial_clusters])
-cluster_powers = cluster_masses * np.abs(np.random.normal(size = len(cluster_masses)))
+cluster_powers = np.abs(np.random.normal(size = len(cluster_masses)))
 
 #total_turb_energy = sum(1/2 mi * vi^2)
 absolute_turb_vels = (2 * total_turb_energy/np.sum(cluster_powers) * cluster_powers/cluster_masses)**(0.5)
