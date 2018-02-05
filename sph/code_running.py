@@ -55,8 +55,8 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1.0e6 * AU
-N_PARTICLES = 1500
+DIAMETER = 2e6 * AU
+N_PARTICLES = 2000
 N_INT_PER_PARTICLE = 75
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -71,6 +71,7 @@ DUST_MASS = 0.05000000001 #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
 crit_mass = 0.0001 * solar_mass #setting a minimum dust mass to help avoid numerical errors!
+critical_density = 1000 * amu * 10**6 #critical density of star formation
 
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
 dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
@@ -104,13 +105,16 @@ OVERALL_AGE = latest_file['OVERALL_AGE']
 ############################
 
 dust_base = dust_base_frac/np.sum(dust_base_frac)
-base_imf = np.logspace(np.log10(0.1),np.log10(40.), 200)
-d_base_imf = np.append(base_imf[0], np.diff(base_imf))
+base_imf = np.logspace(np.log10(0.10),np.log10(40.), 200)
+d_base_imf = np.append(np.diff(base_imf)[0], np.diff(base_imf))
 imf = nsc.kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
 
 #np.random.seed(rank*time.time())
-mass = np.random.choice(base_imf, N_PARTICLES, p = imf) * solar_mass
+mass_ind = np.random.choice(np.arange(len(base_imf)), N_PARTICLES, p = imf)
+mass = base_imf[mass_ind]
+diff_mass = np.random.rand(len(mass)) * d_base_imf[mass_ind]
+mass = (mass + diff_mass) * solar_mass
 
 N_DUST = max(int(DUST_FRAC/(1. - DUST_FRAC) * np.sum(mass)/(DUST_MASS * solar_mass)), 1)
 particle_type = np.zeros([N_PARTICLES]) #0 for gas, 1 for stars, 2 for dust
@@ -127,7 +131,7 @@ num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
 #print(nbrs)
 #print(points)
-velocities = np.random.normal(size=(N_PARTICLES, 3)) * 1.
+velocities = np.random.normal(size=(N_PARTICLES, 3)) * 0.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 sizes = (mass/m_0)**(1./3.) * d
 
@@ -148,8 +152,8 @@ sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
-base_sfr = 0.02
-T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
+base_sfr = 0.1
+T_FF = (3./(2 * np.pi * G * critical_density))**0.5/year
 #base star formation per free fall rate
 
 #f_un = np.array([specie_fraction_array] * N_PARTICLES)
@@ -185,6 +189,9 @@ for uvw in range(len(initial_clusters)):
 	unit_sphere = np.random.normal(size=(len(initial_clusters[uvw]), 3))
 	unit_sphere = (unit_sphere.T/np.sum(unit_sphere**2, axis=1)**0.5).T
 	velocities[initial_clusters[uvw]] += absolute_turb_vels[uvw] * unit_sphere
+	
+velocities[particle_type == 2] *= 0.
+velocities += np.random.normal(size=(N_PARTICLES, 3)) * 50.
 
 new_smoothing = 1.
 
@@ -534,10 +541,12 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     	new_smoothing = 1.
     sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
     sizes[(particle_type == 0) & (sizes > d)] = d #set a maximum length scale here to avoid uncontrolled growth
+    sizes[particle_type == 2] = d
     
     densities_0 = copy.deepcopy(densities)
+    '''
     sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
-    sizes[particle_type == 2] = d
+    sizes[particle_type == 2] = d'''
     
     photio = (f_un.T[3] + f_un.T[4] + f_un.T[2])/(f_un.T[2] + f_un.T[0] + f_un.T[3] + f_un.T[1] + f_un.T[4])
     #density_color = np.nan_to_num(np.log10(densities/critical_density) + 2) * (np.nan_to_num(np.log10(densities/critical_density) + 2) > 0) + 0.001
@@ -580,7 +589,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     #BEGIN PLOTTING
     
-    plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,np.log10(t_max)]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
+    plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,np.log10(t_max)]), s = np.append(100 * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])) * 4, [0.01, 0.01]), alpha=0.25)
     plt.scatter(np.append(xpts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ypts[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(colors[(dist_sq[particle_type == 0] < max_dist * 11./9.)],[0,np.log10(t_max)]),s=np.append((sizes[(dist_sq[particle_type == 0] < max_dist * 11./9.)]/d) * 100 * 4, [0.01, 0.01]), edgecolor='none', alpha=0.1)
     #plt.scatter([max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))],c=[1,0],s=0.01,alpha=0.1)
     #plt.scatter(np.append(xdust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), np.append(ydust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[max(max_val, np.abs(min_val)),-max(max_val, np.abs(min_val))]), c=np.append(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)],[0,7]), s = np.append((m_0/solar_mass) * np.ones(len(col_dust[(dist_sq[particle_type == 2] < max_dist * 11./9.)])), [0.01, 0.01]), alpha=0.25)
