@@ -42,7 +42,7 @@ cooling_timescale = year * 1e6
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-23/5., 1.25e-23/5., 1.25e-23/5., 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -127,7 +127,7 @@ num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
 #print(nbrs)
 #print(points)
-velocities = np.random.normal(size=(N_PARTICLES, 3)) * 50.
+velocities = np.random.normal(size=(N_PARTICLES, 3)) * 1.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 sizes = (mass/m_0)**(1./3.) * d
 
@@ -135,8 +135,7 @@ mu_array = np.zeros([N_PARTICLES])#array of all mu
 E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 #copy of generate_E_array
 #fills in E_internal array specified at the beginning
-T = 10 * (np.ones([N_PARTICLES]) + np.random.rand(N_PARTICLES)) #20 kelvins
-
+T = 10 * (np.ones([N_PARTICLES]) + np.random.rand(N_PARTICLES)) #20 kelvins max temperature
 
 #fills the f_u array
 #import these from previous as needed
@@ -149,8 +148,9 @@ sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
-base_sfr = 0.0057 
+base_sfr = 0.02
 T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
+#base star formation per free fall rate
 
 #f_un = np.array([specie_fraction_array] * N_PARTICLES)
 mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -159,14 +159,33 @@ cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
 E_internal = gamma_array * mass * k * T/(mu_array * m_h)
 optical_depth = mass/(m_h * mu_array) * cross_array
 
-#copy of generate_mu_array
-
 critical_density = 1000 * amu * 10**6 #critical density of star formation
 
 densities = nsc.density(points,mass,particle_type,neighbor)
 densities_0 = copy.deepcopy(densities)
 dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
 delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
+
+#Introduce turbulence at the largest scales
+initial_clusters, grav_potential = nsc.grav_force_calculation(mass, points, sizes)[2:]
+#print np.sum(grav_potential)
+#apply the virial theorem that <V> + <E_internal> = -2<U>
+#mostly turbulent support
+
+gpot = np.sum(grav_potential) * (-2)
+total_turb_energy = gpot - np.sum(E_internal)
+cluster_masses = np.array([np.sum(mass[ai]) for ai in initial_clusters])
+cluster_powers = cluster_masses * np.abs(np.random.normal(size = len(cluster_masses)))
+
+#total_turb_energy = sum(1/2 mi * vi^2)
+absolute_turb_vels = (2 * total_turb_energy/np.sum(cluster_powers) * cluster_powers/cluster_masses)**(0.5)
+print "Turbulent velocities: " + str(absolute_turb_vels)
+
+for uvw in range(len(initial_clusters)):
+	unit_sphere = np.random.normal(size=(len(initial_clusters[uvw]), 3))
+	unit_sphere = (unit_sphere.T/np.sum(unit_sphere**2, axis=1)**0.5).T
+	velocities[initial_clusters[uvw]] += absolute_turb_vels[uvw] * unit_sphere
+
 new_smoothing = 1.
 
 star_ages = np.ones(len(points)) * -1.
@@ -504,22 +523,19 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     nsc.d = d
     print ("Length scale: " + str(d/constants.parsec))
     
-    '''expansion_int = np.hstack(nontrivial_int)
+    expansion_int = np.hstack(nontrivial_int)
     expansion_un = np.unique(expansion_int)
     
     exp_neighbor_count = np.array([len(expansion_int[(expansion_int == a)]) for a in expansion_un])
-        
+    
     if len(densities_0) == len(densities):
     	new_smoothing = (np.exp(np.nan_to_num(-(densities - densities_0)/(3 * densities))) * 2)/2. + (exp_neighbor_count + num_nontrivial - 1 < 2) * 0.1
     else:
     	new_smoothing = 1.
-    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]'''
+    sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
     sizes[(particle_type == 0) & (sizes > d)] = d #set a maximum length scale here to avoid uncontrolled growth
     
     densities_0 = copy.deepcopy(densities)
-    
-    min_dist = np.percentile(dist_sq[vel_condition < 80000**2], 0)
-    max_dist = np.percentile(dist_sq[vel_condition < 80000**2], 90)
     sizes[particle_type == 0] = (np.abs(mass/m_0)**(1./3.) * d)[particle_type == 0]
     sizes[particle_type == 2] = d
     
@@ -540,7 +556,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.ylim(-6, 0)
     plt.pause(1)'''
     
-    '''
+    
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
@@ -574,7 +590,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.xlabel('Position (parsecs)')
     plt.ylabel('Position (parsecs)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)'''
+    plt.pause(1)
     
     #END PLOTTING
     '''
@@ -587,7 +603,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
     
-    T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
+    #T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
     probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
     #np.random.seed(time.time() + time.time() * present_time * (dt/year))
     diceroll = np.random.rand(len(probability))

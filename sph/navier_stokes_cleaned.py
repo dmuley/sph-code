@@ -38,7 +38,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-23/5., 1.25e-23/5., 1.25e-23/5., 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
+cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.]) + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -166,7 +166,7 @@ def kroupa_imf(base_imf):
     coeff_1 = 2.133403503
     imf_final[(base_imf >= 0.08) & (base_imf < 0.5)] = coeff_1 * (base_imf/0.08)[(base_imf >= 0.08) & (base_imf < 0.5)]**-1.3
     coeff_2 = 0.09233279398
-    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.3 #fattened tail from 2.3!
+    imf_final[(base_imf >= 0.5)] = coeff_2 * coeff_1 * (base_imf/0.5)[(base_imf >= 0.5)]**-2.2 #fattened tail from 2.3!
     
     return (imf_final)
         
@@ -292,14 +292,19 @@ def grav_force_calculation(mass, points, sizes):
 	smoothing_scale = mean_size # * n_parts**(1./3.)
 		
 	grav_accels = np.zeros(shape=(len(points), 3))
+	grav_potential = np.zeros(len(points))
 	for int_cluster in np.arange(len(clusters)):
 		cluster_el = clusters[int_cluster]
+		potential_dist = (np.sum((points - center_of_mass[int_cluster])**2, axis=1) + np.average(smoothing_scale**0.25)**8)**(1./2.)
 		dist_norm = (points - center_of_mass[int_cluster]).T/(np.sum((points - center_of_mass[int_cluster])**2, axis=1) + np.average(smoothing_scale**0.25)**8)**(3./2.)
 		grav_accels.T[:] += -G * dist_norm * total_mass[int_cluster]
 		grav_accels[cluster_el] += np.sum(G * dist_norm * mass, axis=1)
+		
+		grav_potential += (-G * potential_dist**-1 * total_mass[int_cluster] * mass)
+		grav_potential[cluster_el] += (G * potential_dist**-1 * total_mass[int_cluster] * mass)[cluster_el]
 		#handles internal acceleration as well as a harmonic oscillator potential
 	
-	return grav_accels, center_of_mass
+	return grav_accels, center_of_mass, clusters, grav_potential
 	
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]
