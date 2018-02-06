@@ -1,5 +1,4 @@
-#
-PySPH
+#PySPH
 
 PySPH is a lightweight Python smoothed-particle hydrodynamics code designed to simulate the evolution of dust in molecular clouds. While the code is still being fine-tuned to ensure a more accurate transition between molecular clouds and H II regions, the basic functionality (pressure-gradient acceleration, self-gravitation, ionization chemistry, and rudimentary radiative transfer for heating and cooling) is all in place.
 ## Use
