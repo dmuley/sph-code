@@ -152,7 +152,7 @@ sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
-base_sfr = 0.03
+base_sfr = 0.01
 T_FF = (3./(2 * np.pi * G * critical_density))**0.5/year
 #base star formation per free fall rate
 
@@ -301,7 +301,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			E_internal[particle_type == 0] *= E_change_coeff_1
 			T[particle_type == 0] = E_internal[particle_type == 0]/(N_PART * gamma_array * k)[particle_type == 0]
 
-			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(sb * 4 * np.pi * optd[particle_type == 2] * sizes[particle_type == 2]**2 * dt * 4e-6 * 1))**(1./6.) + t_cmb
+			T[particle_type == 2] = (rh[0][particle_type[particle_type != 1] == 2]/(optd[particle_type == 2] * 4 * np.pi * sizes[particle_type == 2]**2 * sb * 1e-5 * dt))**(1./6.)
 			E_internal[particle_type == 2] = (N_PART * k * T * gamma_array)[particle_type == 2]
 		
 			velocities[particle_type != 1] += rh[2]
@@ -315,7 +315,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			T[T >= t_max] = t_max
 			
 			area = (4 * np.pi * sizes**2)
-			N_PART = mass/(m_h * mu_array)
+			a = mass/(m_h * mu_array)
 			W6_integral = 9./area #evaluating integral of W6 kernel
 			optd = 1. - np.exp(-optical_depth * W6_integral)
 			
@@ -625,7 +625,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     star_numfrac = np.sum(float(len(particle_type[particle_type == 1]))/float(len(particle_type[particle_type != 2])))
     
     time_coord = np.append(time_coord, [age] * len(T[particle_type == 2]))
-    dust_temps = np.append(dust_temps, (E_internal/optical_depth)[particle_type == 2])
+    dust_temps = np.append(dust_temps, (T)[particle_type == 2])
     star_frac = np.append(star_frac, [star_massfrac] * len(T[particle_type == 2]))
     imf_measure = np.append(imf_measure, [star_massfrac/star_numfrac] * len(T[particle_type == 2]))
     chems_error = np.append(chems_error, [deltam_chems] * len(T[particle_type == 2]))
@@ -633,8 +633,13 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     timestep_duration = time.time() - present_time
     total_time_consumed += timestep_duration
-    
-    
+    '''
+    #summary stat plotting
+    plt.clf()
+    plt.plot(time_coord/year, dust_temps, '.', alpha=0.5)
+    plt.pause(1)
+    #summary stat plotting
+    '''
     
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
     print ("Age: " + str(age/year) + " years")

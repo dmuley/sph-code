@@ -645,7 +645,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     for ei in range(len(star_distance)):
     	lum_0 = np.nan_to_num(star_distance_2[ei] * np.sum(((gas_distance + 1.).T**-2/star_distance[ei] * blocked[ei]).T, axis=0)/np.sum((gas_distance + 1.)**-2, axis=0))
         lum_factor.append(lum_0)
-        print lum_0
+        #print lum_0
     
     lum_factor = np.array(lum_factor)
     extinction = (W6_constant * masses[ptypes != 1]/(mu_array[ptypes != 1] * amu) * cross_array[ptypes != 1]) * sizes[ptypes != 1]**(-2)
