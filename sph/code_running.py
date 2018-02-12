@@ -42,7 +42,7 @@ cooling_timescale = year * 1e6
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.])/100. + 1e-80
+cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/100. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -125,6 +125,7 @@ mass = np.append(mass, [DUST_MASS * solar_mass] * N_DUST)
 points = (np.random.rand(N_PARTICLES, 3) - 0.5) * DIAMETER
 points2 = copy.deepcopy(points)
 neighbor = nsc.neighbors(points, d)
+chems_neighbor = copy.deepcopy(neighbor)
 nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
 num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
@@ -152,7 +153,7 @@ sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
-base_sfr = 0.01
+base_sfr = 0.03
 T_FF = (3./(2 * np.pi * G * critical_density))**0.5/year
 #base star formation per free fall rate
 
@@ -212,9 +213,9 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-'''particle_type[mass >= np.sort(mass)[-3]] = 1
+particle_type[mass >= np.sort(mass)[-3]] = 1
 mass[mass >= np.sort(mass)[-3]] = np.max(mass)
-star_ages[mass >= np.sort(mass)[-3]] = 3.55e6 * year'''
+star_ages[mass >= np.sort(mass)[-3]] = 1.0e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
@@ -388,6 +389,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			#supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
 			neighbor = nsc.neighbors(points, max(sizes))
+			chems_neighbor = copy.deepcopy(neighbor)
 			#NONTRIVIAL NEIGHBORS
 			neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 			
@@ -407,7 +409,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     
     prechems_mass = np.sum(mass)
-    chems = nsc.chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
+    chems = nsc.chemisputtering_2(points, chems_neighbor, mass, f_un, mu_array, sizes, T, particle_type)
     f_un = chems[1]; mass = chems[0]
     deltam_chems = (np.sum(mass) - prechems_mass)/solar_mass
     print ("Mass error from chemisputtering: " + str(deltam_chems) + " solar masses")
@@ -438,6 +440,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     optical_depth = mass/(m_h * mu_array) * cross_array
 
     neighbor = nsc.neighbors(points, max(sizes))#find neighbors in each timestep
+    chems_neighbor = copy.deepcopy(neighbor)
     nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
     #IMPORTANT EFFICIENCY SAVINGS HERE
     neighbor = nontrivial_int
@@ -565,7 +568,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.ylim(-6, 0)
     plt.pause(1)'''
     
-    
+    '''
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
@@ -599,15 +602,13 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.xlabel('Position (parsecs)')
     plt.ylabel('Position (parsecs)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)
+    plt.pause(1)'''
     
     #END PLOTTING
-    '''
+    
     plt.clf()
-    if len(T[particle_type == 0]) == len(E_change_coeff_1):
-    	plt.plot(np.log10(T[particle_type == 0]), np.log10(E_change_coeff_0 * E_change_coeff_1), '+')
+    plt.plot(np.sort(mass[particle_type == 2]/solar_mass), '+', alpha=0.2)
     plt.pause(1)
-    '''
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
@@ -642,6 +643,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     '''
     
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
+    print ("Number of particles: " + str(np.sum((N_PART * f_un.T), axis=1)) + "solar masses")
     print ("Age: " + str(age/year) + " years")
     #print (d/AU)
     print ('Stellar mass/nondust mass = ' + str(star_massfrac))

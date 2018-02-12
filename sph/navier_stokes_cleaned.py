@@ -38,7 +38,7 @@ dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,1e-60, 0., 0., 0., 0., 0., 0., 0., 0.])/100. + 1e-80
+cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/100. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -372,9 +372,11 @@ def nontrivial_neighbors(points, mass, particle_type, neighbor):
 		x = np.array(points[np.array(neighbor[j])])
 		m = np.array(mass[np.array(neighbor[j])])
 		
-		rho = Weigh2(x, x_0, m, d) # * (particle_type[np.array(neighbor[j])] == 0)
-		nontrivial_int.append(np.array(neighbor[j])[rho > 0])
+		rho = Weigh2(x, x_0, m, d)
 		
+		final_neigh = np.unique(np.array(neighbor[j])[rho > 0])
+		
+		nontrivial_int.append(final_neigh)
 	return nontrivial_int
 
 def Weigh2(x, x_0, m, d):
@@ -966,16 +968,40 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				F_sput *= np.exp(K_u * J_u * dt)
 				F_sput[np.isnan(F_sput)] = 1.
 				F_sput[F_sput < 0.01] = 0.01 #should not sputter everything away regardless
-				F_sput[:6] = 0. #no chemisputtering of refractory species
+				F_sput[:6] = 1. #no chemisputtering of refractory species
 				
 				#print F_sput - 1
 				#effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
 				effective_mass = sph_indiv_composition
-						
-				reuptake_length = np.sum((w2g_num > 0) & (particle_type[neighbor[j]] == 0))
-				reuptake_weight = effective_mass/np.sum(effective_mass,axis=0)
-				reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
-				reuptake_weight = (reuptake_weight.T * ((w2g_num > 0) & (particle_type[neighbor[j]] == 0))).T
+				
+				#print effective_mass
+				
+				reuptake_points = (w2g_num > 0) & (particle_type[neighbor[j]] == 0)
+				reuptake_length = np.sum(reuptake_points)
+				reuptake_weight_0 = (effective_mass.T * reuptake_points)[5]
+				
+				reuptake_weight = (effective_mass.T * reuptake_points) * 0.
+				print reuptake_length
+				
+				reuptake_weight[6:] += reuptake_weight_0
+				reuptake_weight = reuptake_weight.T
+				reuptake_weight[reuptake_points] = reuptake_weight[reuptake_points]/np.sum(reuptake_weight[reuptake_points], axis=0)
+				
+				reuptake_mask = np.ones(len(f_un[0]))
+				reuptake_mask[:6] *= 0.
+				
+				reuptake_weight[reuptake_points] = reuptake_weight[reuptake_points]/np.sum(reuptake_weight[reuptake_points], axis=0)
+				if np.sum(reuptake_weight[reuptake_points]) == 0:
+					reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
+				else:
+					reuptake_weight[np.isnan(reuptake_weight)] = 0.
+				
+				reuptake_weight *= reuptake_mask
+				
+				print reuptake_weight[reuptake_points]
+				print " "
+				
+				#print F_sput - 1
 				
 				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
 				#print new_particles
