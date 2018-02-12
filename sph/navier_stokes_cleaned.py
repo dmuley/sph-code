@@ -981,7 +981,7 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				reuptake_weight_0 = (effective_mass.T * reuptake_points)[5]
 				
 				reuptake_weight = (effective_mass.T * reuptake_points) * 0.
-				print reuptake_length
+				#print reuptake_length
 				
 				reuptake_weight[6:] += reuptake_weight_0
 				reuptake_weight = reuptake_weight.T
@@ -991,29 +991,29 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				reuptake_mask[:6] *= 0.
 				
 				reuptake_weight[reuptake_points] = reuptake_weight[reuptake_points]/np.sum(reuptake_weight[reuptake_points], axis=0)
-				if np.sum(reuptake_weight[reuptake_points]) == 0:
+				#print np.sum(reuptake_weight[reuptake_points], axis=0)
+				#print reuptake_weight[reuptake_points]
+				
+				if np.sum(np.nan_to_num(reuptake_weight[reuptake_points])) < 1e-15:
 					reuptake_weight[np.isnan(reuptake_weight)] = 1./reuptake_length
 				else:
 					reuptake_weight[np.isnan(reuptake_weight)] = 0.
 				
 				reuptake_weight *= reuptake_mask
 				
-				print reuptake_weight[reuptake_points]
-				print " "
+				reuptake_weight /= np.sum(reuptake_weight[reuptake_points], axis=0)
+				reuptake_weight = np.nan_to_num(reuptake_weight)
+				#print np.sum(reuptake_weight[reuptake_points], axis=0)
+				#print " "
 				
 				#print F_sput - 1
 				
-				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
-				#print new_particles
-				#new_particles[new_particles < 0.] = 0.
+				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T * 0.99
 				particle_loss = np.sum(new_particles, axis=0) * reuptake_weight
-				ploss = copy.deepcopy(particle_loss)
-				ploss[0.99 * num_particles[neighbor[j]] < ploss] = (0.01 * num_particles[neighbor[j]])[0.99 * num_particles[neighbor[j]] < ploss]
 				
-				scale_f = np.sum(ploss, axis=0)/np.sum(new_particles, axis=0)
-				scale_f[np.isnan(scale_f)] = 1.
+				print np.sum(np.nan_to_num(new_particles - particle_loss))/np.sum(new_particles), np.sum(new_particles)
 				
-				num_particles[neighbor[j]] += np.nan_to_num(new_particles * scale_f - ploss)
+				num_particles[neighbor[j]] += np.nan_to_num(new_particles - particle_loss)
 	
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T
