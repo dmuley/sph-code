@@ -41,7 +41,7 @@ cooling_timescale = year * 1e6
 
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
-mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
+mu_specie = np.array([2.0158,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
 cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/80. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
@@ -56,7 +56,7 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 1e6 * AU
-N_PARTICLES = 2000
+N_PARTICLES = 1500
 N_INT_PER_PARTICLE = 75
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
@@ -278,11 +278,9 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			radcool_premass = np.sum(mass)
 			rc = nsc.rad_cooling(points, particle_type, mass, sizes, cross_array, f_un, neighbor, mu_array, T, dt/N_RADIATIVE)
 			
-			
-			
 			print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
 			
-			f_un = rc[0]
+			#f_un = rc[0]
 			#f_un = nsc.neutralize_cold(T, f_un, particle_type)
 			
 			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)
@@ -409,7 +407,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     
     prechems_mass = np.sum(mass)
-    chems = nsc.chemisputtering_2(points, chems_neighbor, mass, f_un, mu_array, sizes, T, particle_type)
+    chems = nsc.chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type)
     f_un = chems[1]; mass = chems[0]
     deltam_chems = (np.sum(mass) - prechems_mass)/solar_mass
     print ("Mass error from chemisputtering: " + str(deltam_chems) + " solar masses")
@@ -643,7 +641,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     '''
     
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
-    #print ("Number of particles: " + str(np.sum((N_PART * f_un.T), axis=1)) + "solar masses")
+    print ("Mass by species: " + str(np.sum((mass * ((f_un * mu_specie).T/np.sum(f_un * mu_specie, axis=1))).T, axis=0)/solar_mass) + "solar masses")
     print ("Age: " + str(age/year) + " years")
     #print (d/AU)
     print ('Stellar mass/nondust mass = ' + str(star_massfrac))

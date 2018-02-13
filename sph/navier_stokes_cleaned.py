@@ -37,7 +37,7 @@ year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
-mu_specie = np.array([2.0159,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
+mu_specie = np.array([2.0158,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
 cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/80. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
@@ -711,6 +711,9 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	rec_array = copy.deepcopy(np.nan_to_num(f_un.T)) * 0
 	rel_array = sizes * 0.
 	energy_array = copy.deepcopy(np.nan_to_num(f_un.T)) * 0
+	
+	print (f_un * mu_specie)/np.sum(f_un * mu_specie,axis=1)
+	
 	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
 	for j in jarr:
 		if np.sum(particle_type[neighbor[j]] == 0) > 0: #making sure that there are gaseous neighbors
@@ -915,10 +918,12 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 	frac_destruction = np.nan_to_num((frac_destruction.T/(mass/(mu_array * amu))).T)
 	frac_reuptake = np.nan_to_num((frac_reuptake.T/(mass/(mu_array * amu))).T)
 				
-	return frac_destruction, frac_reuptake			
-			
+	return frac_destruction, frac_reuptake
+
 def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
-	num_particles = (f_un.T * (mass/mu_array)).T
+	mubase = np.sum(f_un * mu_specie, axis=1)
+	num_particles = copy.deepcopy((f_un.T * mass/mubase).T)
+	#print np.sum(num_particles * mu_specie, axis=0)/solar_mass
 	jarr = np.arange(len(neighbor))[particle_type == 2]
 	for j in jarr:
 		if (np.sum(particle_type[neighbor[j]] == 0) > 0):
@@ -942,14 +947,15 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 			
 			rel_w2g *= (w2g_num > 0) * (particle_type[neighbor[j]] == 0)
 			rel_w2d *= (w2d > 0) * (particle_type[neighbor[j]] == 2)
+			
+			self_w2d = Weigh2_dust(x, x, mass[j], d, sizes[j])[0]
+			
 			if np.sum(w2g_num) > 0:
 				sph_indiv_composition = (w2g_num * comps.T).T * mu_specie
 				sph_composition_density = np.sum((w2g_num * comps.T).T,axis=0) * mu_specie #SPH density by composition of GAS
 			
 				sph_temperature = np.sum((w2g_num * T_local))/np.sum(w2g_num)
-			
-				dust_indiv_composition = (w2d * comps.T).T * mu_specie
-				dust_composition = np.sum((w2d * comps.T).T,axis=0) * mu_specie #SPH density of DUST
+				dust_composition = self_w2d * f_un[j] * mu_specie #local dust density
 			
 				J_u = -np.diff(mrn_constants**-0.5)/np.diff(mrn_constants**0.5)/(3 * mineral_densities)
 				J_u *= (k * sph_temperature/(2 * np.pi * mu_specie * amu))**0.5
@@ -957,7 +963,11 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				Y_H = min(max(0.5 * np.exp(-4600/sph_temperature), 1e-7),1e-3) * sputtering_yields/max(sputtering_yields)
 				Y_He = min(max(5 * np.exp(-4600/sph_temperature), 1e-6),1e-2) * sputtering_yields/max(sputtering_yields)
 				#cannot sputter more mass than exists!
-				sput_y = sph_composition_density[3] * Y_H + sph_composition_density[4] * Y_He
+				sput_y = sph_composition_density[3]/mu_specie[3] * Y_H + sph_composition_density[4] * Y_He/mu_specie[4]
+				sput_y *= mu_specie
+				
+				#print sput_y
+				#print sput_y
 				sput_y[sput_y > dust_composition] = dust_composition[sput_y > dust_composition]
 				K_u = sph_composition_density + dust_composition - sput_y
 				
@@ -969,6 +979,8 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				F_sput[np.isnan(F_sput)] = 1.
 				F_sput[F_sput < 0.01] = 0.01 #should not sputter everything away regardless
 				F_sput[:6] = 1. #no chemisputtering of refractory species
+				
+				
 				
 				#print F_sput - 1
 				#effective_mass = -(sph_indiv_composition - np.outer(sph_indiv_composition.T[3], Y_H) - np.outer(sph_indiv_composition.T[4], Y_He))
@@ -1007,30 +1019,40 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				#print np.sum(reuptake_weight[reuptake_points], axis=0)
 				reuptake_weight = reuptake_weight.astype('longdouble')
 				
+				#print reuptake_weight.shape
+				#print np.array(neighbor[j]).shape
+				
 				
 				#print F_sput - 1
 				#print " "
 				
-				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
+				new_particles = (F_sput - 1.) * num_particles[j]
+				#print new_particles.shape
 				new_particles = new_particles.astype('longdouble')
-				particle_loss = np.sum(new_particles, axis=0) * reuptake_weight
+				particle_loss = new_particles * reuptake_weight
+				#print particle_loss.shape
 				particle_loss.astype('longdouble')
 				
 				ploss = copy.deepcopy(particle_loss)
-				ploss[0.99 * num_particles[neighbor[j]] < ploss] = (0.01 * num_particles[neighbor[j]])[0.99 * num_particles[neighbor[j]] < ploss]
-				
-				scale_loss = np.sum(ploss, axis=0)
-				scale_gain = np.sum(new_particles, axis=0)
-				
-				scale_f = scale_loss/scale_gain
-				scale_f[(scale_loss == 0) | (scale_gain == 0)] = 0.
+				ploss[num_particles[neighbor[j]] - ploss < 0.01 * num_particles[neighbor[j]]] = (0.99 * num_particles[neighbor[j]])[num_particles[neighbor[j]] - ploss < 0.01 * num_particles[neighbor[j]]]
+				new_particles = np.sum(ploss, axis = 0)
+				new_particles[new_particles + num_particles[j] < 0.01 * num_particles[j]] = -0.99 * num_particles[j][new_particles + num_particles[j] < 0.01 * num_particles[j]]
+				ploss = new_particles * reuptake_weight
+				new_particles = np.sum(ploss, axis = 0)
 				
 				#print np.sum(np.nan_to_num(new_particles * scale_f - ploss)), np.sum(np.nan_to_num(ploss))
-				num_particles[neighbor[j]] += np.nan_to_num(new_particles * scale_f - ploss)
+				#print num_particles[neighbor[j]]
+				num_particles[neighbor[j]] += np.nan_to_num(-ploss)
+				#print num_particles[neighbor[j]]
+				num_particles[j] += new_particles
+				
+				#print new_particles * mu_specie - np.sum(ploss * mu_specie, axis=0)
+	
 	
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T
-	f_un_new[f_un_new < 0] == 0
+	
+	#print np.sum(num_particles * mu_specie, axis=0)/solar_mass
 	
 	return mass_new, f_un_new
 	
