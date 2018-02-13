@@ -280,7 +280,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 			
 			print('Mass error from radiative cooling: ' + str((np.sum(mass) - radcool_premass)/solar_mass) + ' solar masses')
 			
-			#f_un = rc[0]
+			f_un = rc[0]
 			#f_un = nsc.neutralize_cold(T, f_un, particle_type)
 			
 			mu_array = np.sum(f_un * mu_specie, axis=1)/np.sum(f_un, axis=1)

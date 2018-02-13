@@ -595,6 +595,9 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
 #THE ENERGY/DUST PRODUCTION IMPARTED BY SUPERNOVAE ARE ALSO PLACED HERE.
 
 def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T, dt):
+    
+    print np.sum(((f_un * mu_specie).T/np.sum(f_un * mu_specie, axis=1)) * masses, axis=1)/solar_mass
+    
     random_stars = positions[ptypes == 1]
     rs2 = np.array([])
     rs2 = random_stars
@@ -679,10 +682,11 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     atoms_destroyed = ((weighted_interception * frac_dest)[ptypes != 1].T * n_photons).T
     atoms_total = (f_un[ptypes != 1].T * mols).T
     
-    frac_destroyed_0 = atoms_destroyed/atoms_total
+    frac_destroyed_0 = np.nan_to_num(copy.deepcopy(atoms_destroyed/atoms_total))
     #print frac_destroyed_0
-    frac_destroyed_1 = np.exp(np.nan_to_num(-atoms_destroyed/atoms_total))
-    frac_destroyed_by_species = 1. - frac_destroyed_1
+    frac_destroyed_1 = np.exp(-frac_destroyed_0) * 0.99
+    frac_destroyed_by_species = np.nan_to_num(0.99 - frac_destroyed_1)
+    frac_destroyed_by_species[atoms_total < 1e5] = 0.
     #print frac_destroyed_by_species
     
     new_fun = copy.deepcopy(f_un.T)
@@ -699,7 +703,10 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     new_fun2[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun2[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
     
-    new_fun2 /= np.sum(new_fun2,axis=0)    
+    new_fun2 /= np.sum(new_fun2,axis=0)
+    
+    print np.sum(((new_fun2.T * mu_specie).T/np.sum(new_fun2.T * mu_specie, axis=1)) * masses, axis=1)/solar_mass
+    
     #energy, composition change, impulse
     return lf2, new_fun2.T, momentum, extinction
 
@@ -711,9 +718,7 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	rec_array = copy.deepcopy(np.nan_to_num(f_un.T)) * 0
 	rel_array = sizes * 0.
 	energy_array = copy.deepcopy(np.nan_to_num(f_un.T)) * 0
-	
-	print (f_un * mu_specie)/np.sum(f_un * mu_specie,axis=1)
-	
+	print np.sum(((f_un * mu_specie).T/np.sum(f_un * mu_specie, axis=1)) * masses, axis=1)/solar_mass
 	jarr = np.arange(len(neighbor))[particle_type[np.arange(len(neighbor))] == 0]
 	for j in jarr:
 		if np.sum(particle_type[neighbor[j]] == 0) > 0: #making sure that there are gaseous neighbors
@@ -818,23 +823,32 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	energy = (energy_array[3] * final_comp[3] + energy_array[4] * final_comp[4])
 	#energy = final_comp[5] * rec_array[5] * k * T * (1.5)
 	
-	final_comp[0] += H2_plus_frac/2.
-	final_comp[1] += He_plus_frac
-	final_comp[2] += H_plus_frac - H2_plus_frac
+	condition_set = copy.deepcopy((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))
 	
-	final_comp[3] -= H_plus_frac * (final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0)
-	final_comp[4] -= He_plus_frac * (final_comp[5] - elec_frac > 0) * (final_comp[3] - H_plus_frac > 0) * (final_comp[4] - He_plus_frac > 0)
-	final_comp[5] -= elec_frac * (final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0)
 	
-	final_comp[3][~((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))] *= 0
-	final_comp[4][~((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))] *= 0
-	final_comp[5][~((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))] *= 0
+	#impose some condition here to ensure constancy of masses
+	#while still "regulating" the radiative heating
+	final_comp[0] += H2_plus_frac/2. * condition_set
+	final_comp[1] += He_plus_frac * condition_set
+	final_comp[2] += (H_plus_frac - H2_plus_frac) * condition_set
+	
+	final_comp[3] -= H_plus_frac * condition_set
+	final_comp[4] -= He_plus_frac * condition_set
+	final_comp[5] -= elec_frac * condition_set
+	
+	#final_comp[3][~condition_set] *= 0
+	#final_comp[4][~condition_set] *= 0
+	#final_comp[5][~condition_set] *= 0
+	
+	#should conserve mass for now
 	
 	#print "Frac rec max: " + str(np.max(rec_array))
 	
+	print np.sum(((final_comp.T * mu_specie).T/np.sum(final_comp.T * mu_specie, axis=1)) * masses, axis=1)/solar_mass
+	
 	final_comp /= np.sum(final_comp, axis=0)
 	
-	return final_comp.T, energy, rec_array #temporary fudge factor
+	return final_comp.T, energy, rec_array
 	
 def neutralize_cold(T, f_un, particle_type):
 	#neutralize all particles for which the temperature has fallen to <3 kelvins
