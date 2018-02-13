@@ -596,7 +596,7 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
 
 def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T, dt):
     
-    print np.sum(((f_un * mu_specie).T/np.sum(f_un * mu_specie, axis=1)) * masses, axis=1)/solar_mass
+    #print np.sum(((f_un * mu_specie).T/np.sum(f_un * mu_specie, axis=1)) * masses, axis=1)/solar_mass
     
     random_stars = positions[ptypes == 1]
     rs2 = np.array([])
@@ -686,11 +686,16 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     #print frac_destroyed_0
     frac_destroyed_1 = np.exp(-frac_destroyed_0) * 0.99
     frac_destroyed_by_species = np.nan_to_num(0.99 - frac_destroyed_1)
-    frac_destroyed_by_species[atoms_total < 1e5] = 0.
-    #print frac_destroyed_by_species
+    frac_destroyed_by_species[atoms_total/amu < 1e-10] = 0.
+    frac_destroyed_by_species[atoms_total/amu < 0] = 0.99
+    #print "maximal fraction destroyed"
+    #print np.max(frac_destroyed_by_species)
     
     new_fun = copy.deepcopy(f_un.T)
-    new_fun2 = copy.deepcopy(new_fun)
+    new_fun2 = copy.deepcopy(f_un.T)
+    
+    #print "Negative compositions before"
+    #print len(new_fun2[new_fun2 < 0])
     
     #forward reactions
     new_fun2[2][ptypes != 1] += new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0] * 2.
@@ -702,10 +707,13 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     new_fun2[0][ptypes != 1] -= new_fun[0][ptypes != 1] * frac_destroyed_by_species.T[0]
     new_fun2[1][ptypes != 1] -= new_fun[1][ptypes != 1] * frac_destroyed_by_species.T[1]
     new_fun2[2][ptypes != 1] -= new_fun[2][ptypes != 1] * frac_destroyed_by_species.T[2]
+
+    #print "Negative compositions after"
+    #print len(new_fun2[new_fun2 < 0])
     
     new_fun2 /= np.sum(new_fun2,axis=0)
     
-    print np.sum(((new_fun2.T * mu_specie).T/np.sum(new_fun2.T * mu_specie, axis=1)) * masses, axis=1)/solar_mass
+    #print np.sum(((new_fun2.T * mu_specie).T/np.sum(new_fun2.T * mu_specie, axis=1)) * masses, axis=1)/solar_mass
     
     #energy, composition change, impulse
     return lf2, new_fun2.T, momentum, extinction
@@ -809,10 +817,19 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	rec_array = np.nan_to_num(rec_array)
 	#print np.min(rec_array), np.max(rec_array)
 		
-	H2_plus_frac = final_comp[2] * rec_array[2]
 	H_plus_frac = final_comp[5] * rec_array[3]
 	He_plus_frac = final_comp[5] * rec_array[4]
 	elec_frac = final_comp[5] * rec_array[5]
+	
+	mult_factor = np.maximum(np.nan_to_num(H_plus_frac/final_comp[3]), np.nan_to_num(He_plus_frac/final_comp[4]), np.nan_to_num(elec_frac/final_comp[5]))
+	mf2 = copy.deepcopy(mult_factor)
+	mult_factor[mf2 > 0.9999] = 0.9999/mf2[mf2 > 0.9999]
+	mult_factor[mf2 < 0.9999] = 1.
+	mult_factor[final_comp[5] < 1e-10] = 0.
+	
+	#print "Multiplicative factor"
+	#print max(mult_factor), min(mult_factor)
+	
 	'''
 	print "===Final compensation==="
 	print(np.sum((final_comp[5] < elec_frac)))
@@ -822,19 +839,29 @@ def rad_cooling(positions, particle_type, masses, sizes, cross_array, f_un, neig
 	
 	energy = (energy_array[3] * final_comp[3] + energy_array[4] * final_comp[4])
 	#energy = final_comp[5] * rec_array[5] * k * T * (1.5)
-	
-	condition_set = copy.deepcopy((final_comp[5] - elec_frac > 0) * (final_comp[4] - He_plus_frac > 0) * (final_comp[3] - H_plus_frac > 0))
-	
-	
+		
 	#impose some condition here to ensure constancy of masses
 	#while still "regulating" the radiative heating
-	final_comp[0] += H2_plus_frac/2. * condition_set
-	final_comp[1] += He_plus_frac * condition_set
-	final_comp[2] += (H_plus_frac - H2_plus_frac) * condition_set
+	#final_comp[0] += H2_plus_frac/2.
 	
-	final_comp[3] -= H_plus_frac * condition_set
-	final_comp[4] -= He_plus_frac * condition_set
-	final_comp[5] -= elec_frac * condition_set
+	#print "Negative compositions before"
+	#print len(final_comp[final_comp < 0])
+	
+	final_comp[1] += He_plus_frac * mult_factor
+	final_comp[2] += (H_plus_frac * mult_factor)
+	
+	final_comp[3] -= H_plus_frac * mult_factor
+	final_comp[4] -= He_plus_frac * mult_factor
+	final_comp[5] -= elec_frac * mult_factor
+	
+	rec_array[2] = np.minimum(rec_array[2], np.zeros(len(rec_array[2])) + 0.9999)
+	H2_plus_frac = final_comp[2] * rec_array[2]
+	
+	final_comp[0] += H2_plus_frac/2.
+	final_comp[2] -= H2_plus_frac
+
+	#print "Negative compositions after"
+	#print len(final_comp[final_comp < 0])
 	
 	#final_comp[3][~condition_set] *= 0
 	#final_comp[4][~condition_set] *= 0
@@ -937,6 +964,9 @@ def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, si
 def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle_type):
 	mubase = np.sum(f_un * mu_specie, axis=1)
 	num_particles = copy.deepcopy((f_un.T * mass/mubase).T)
+	
+	print "negative compositions before"
+	print len(num_particles[num_particles < 0])
 	#print np.sum(num_particles * mu_specie, axis=0)/solar_mass
 	jarr = np.arange(len(neighbor))[particle_type == 2]
 	for j in jarr:
@@ -1049,10 +1079,11 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				
 				ploss = copy.deepcopy(particle_loss)
 				ploss[num_particles[neighbor[j]] - ploss < 0.01 * num_particles[neighbor[j]]] = (0.99 * num_particles[neighbor[j]])[num_particles[neighbor[j]] - ploss < 0.01 * num_particles[neighbor[j]]]
+				ploss[(num_particles[neighbor[j]] < 1e10) & (ploss > 0)] = 0.
 				new_particles = np.sum(ploss, axis = 0)
 				new_particles[new_particles + num_particles[j] < 0.01 * num_particles[j]] = -0.99 * num_particles[j][new_particles + num_particles[j] < 0.01 * num_particles[j]]
 				ploss = new_particles * reuptake_weight
-				new_particles = np.sum(ploss, axis = 0)
+				new_particles = np.sum(np.nan_to_num(ploss), axis = 0)
 				
 				#print np.sum(np.nan_to_num(new_particles * scale_f - ploss)), np.sum(np.nan_to_num(ploss))
 				#print num_particles[neighbor[j]]
@@ -1065,6 +1096,9 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 	
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T
+	
+	print "negative compositions after"
+	print len(num_particles[num_particles < 0])
 	
 	#print np.sum(num_particles * mu_specie, axis=0)/solar_mass
 	
