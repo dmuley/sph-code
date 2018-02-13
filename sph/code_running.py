@@ -213,9 +213,9 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass >= np.sort(mass)[-3]] = 1
+'''particle_type[mass >= np.sort(mass)[-3]] = 1
 mass[mass >= np.sort(mass)[-3]] = np.max(mass)
-star_ages[mass >= np.sort(mass)[-3]] = 1.0e6 * year
+star_ages[mass >= np.sort(mass)[-3]] = 1.0e6 * year'''
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
