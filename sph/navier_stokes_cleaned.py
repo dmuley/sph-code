@@ -1003,17 +1003,30 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				
 				reuptake_weight /= np.sum(reuptake_weight[reuptake_points], axis=0)
 				reuptake_weight = np.nan_to_num(reuptake_weight)
+				reuptake_weight[~reuptake_points] = 0.
 				#print np.sum(reuptake_weight[reuptake_points], axis=0)
-				#print " "
+				reuptake_weight = reuptake_weight.astype('longdouble')
+				
 				
 				#print F_sput - 1
+				#print " "
 				
-				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T * 0.99
+				new_particles = (((F_sput - 1.) * num_particles[neighbor[j]]).T * (w2d > 0)).T
+				new_particles = new_particles.astype('longdouble')
 				particle_loss = np.sum(new_particles, axis=0) * reuptake_weight
+				particle_loss.astype('longdouble')
 				
-				print np.sum(np.nan_to_num(new_particles - particle_loss))/np.sum(new_particles), np.sum(new_particles)
+				ploss = copy.deepcopy(particle_loss)
+				ploss[0.99 * num_particles[neighbor[j]] < ploss] = (0.01 * num_particles[neighbor[j]])[0.99 * num_particles[neighbor[j]] < ploss]
 				
-				num_particles[neighbor[j]] += np.nan_to_num(new_particles - particle_loss)
+				scale_loss = np.sum(ploss, axis=0)
+				scale_gain = np.sum(new_particles, axis=0)
+				
+				scale_f = scale_loss/scale_gain
+				scale_f[(scale_loss == 0) | (scale_gain == 0)] = 0.
+				
+				#print np.sum(np.nan_to_num(new_particles * scale_f - ploss)), np.sum(np.nan_to_num(ploss))
+				num_particles[neighbor[j]] += np.nan_to_num(new_particles * scale_f - ploss)
 	
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T

@@ -643,7 +643,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     '''
     
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
-    print ("Number of particles: " + str(np.sum((N_PART * f_un.T), axis=1)) + "solar masses")
+    #print ("Number of particles: " + str(np.sum((N_PART * f_un.T), axis=1)) + "solar masses")
     print ("Age: " + str(age/year) + " years")
     #print (d/AU)
     print ('Stellar mass/nondust mass = ' + str(star_massfrac))
