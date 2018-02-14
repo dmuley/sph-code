@@ -1079,7 +1079,9 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				
 				ploss = copy.deepcopy(particle_loss)
 				ploss[num_particles[neighbor[j]] - ploss < 0.01 * num_particles[neighbor[j]]] = (0.99 * num_particles[neighbor[j]])[num_particles[neighbor[j]] - ploss < 0.01 * num_particles[neighbor[j]]]
-				ploss[(num_particles[neighbor[j]] < 1e10) & (ploss > 0)] = 0.
+				#clearing up negative compositions
+				ploss[num_particles[neighbor[j]] < 0] = num_particles[neighbor[j]][num_particles[neighbor[j]] < 0]
+				
 				new_particles = np.sum(ploss, axis = 0)
 				new_particles[new_particles + num_particles[j] < 0.01 * num_particles[j]] = -0.99 * num_particles[j][new_particles + num_particles[j] < 0.01 * num_particles[j]]
 				ploss = new_particles * reuptake_weight
@@ -1093,14 +1095,22 @@ def chemisputtering_2(points, neighbor, mass, f_un, mu_array, sizes, T, particle
 				
 				#print new_particles * mu_specie - np.sum(ploss * mu_specie, axis=0)
 	
-	
+	#now self-corrects negative compositions
+	for wx in np.arange(len(num_particles.T)):
+		pos_comps = np.sum(num_particles.T[wx][num_particles.T[wx] > 0])
+		neg_comps = np.sum(num_particles.T[wx][num_particles.T[wx] < 0])
+		
+		if neg_comps < 0:
+			num_particles.T[wx][num_particles.T[wx] < 0] = 0.
+			num_particles.T[wx][num_particles.T[wx] > 0] *= (1. + neg_comps/pos_comps)
+			
 	mass_new = np.sum(num_particles * mu_specie,axis=1)
 	f_un_new = (num_particles.T/np.sum(num_particles,axis=1)).T
 	
 	print "negative compositions after"
 	print len(num_particles[num_particles < 0])
 	
-	#print np.sum(num_particles * mu_specie, axis=0)/solar_mass
+	print np.sum(num_particles * mu_specie, axis=0)/solar_mass
 	
 	return mass_new, f_un_new
 	

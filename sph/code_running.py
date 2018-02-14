@@ -147,7 +147,7 @@ T = 10 * (np.ones([N_PARTICLES]) + np.random.rand(N_PARTICLES)) #20 kelvins max 
 fgas = np.array([specie_fraction_array] * N_PARTICLES).T * (particle_type == 0)
 fdust = np.array([dust_base] * N_PARTICLES).T * (particle_type == 2)
 
-f_un = (fgas + fdust).T
+f_un = (fgas + fdust).T + 1e-20
 f_un = f_un.astype('longdouble')
 sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
@@ -428,7 +428,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     mass += mass_change
     print ("Number of negative masses: " + str(np.sum((mass < 0))))
     
-    
+    print np.min(np.append(np.array(f_un[f_un < 0]), 0))
     
     #mass = np.nan_to_num(mass)
     mass[mass < 0] = crit_mass/200.
@@ -641,7 +641,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     '''
     
     print ("Total mass of system: " + str(np.sum(mass)/solar_mass) + " solar masses")
-    print ("Mass by species: " + str(np.sum((mass * ((f_un * mu_specie).T/np.sum(f_un * mu_specie, axis=1))).T, axis=0)/solar_mass) + "solar masses")
+    print ("Mass by species in gas: " + str(np.sum(((f_un[particle_type == 0] * mu_specie).T * mass[particle_type == 0]/np.sum(f_un[particle_type == 0] * mu_specie, axis=1)), axis=1)/solar_mass) + "solar masses")
     print ("Age: " + str(age/year) + " years")
     #print (d/AU)
     print ('Stellar mass/nondust mass = ' + str(star_massfrac))
