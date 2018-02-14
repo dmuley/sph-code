@@ -147,7 +147,7 @@ T = 10 * (np.ones([N_PARTICLES]) + np.random.rand(N_PARTICLES)) #20 kelvins max 
 fgas = np.array([specie_fraction_array] * N_PARTICLES).T * (particle_type == 0)
 fdust = np.array([dust_base] * N_PARTICLES).T * (particle_type == 2)
 
-f_un = (fgas + fdust).T + 1e-20
+f_un = (fgas + fdust).T
 f_un = f_un.astype('longdouble')
 sizes[particle_type == 2] = d
 mass = mass.astype('longdouble')
