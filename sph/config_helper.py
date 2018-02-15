@@ -86,12 +86,28 @@ timestep_gas_mass_by_species = copy.deepcopy(destruction_energies) * 0
 timestep_star_mass_by_species = copy.deepcopy(destruction_energies) * 0
 timestep_dust_mass_by_species = copy.deepcopy(destruction_energies) * 0
 
+timestep_time_coord = np.array([])
+timestep_dust_temps = np.array([])
+timestep_star_frac = np.array([])
+timestep_imf_measure = np.array([])
+timestep_chems_error = np.array([])
+timestep_sup_error = np.array([])
+
+
 for savefile_name in os.listdir(absolute_path_to_outputs):
 	array_file = np.load(unicode(absolute_path_to_outputs + '/' + savefile_name));
 	AGB_list = array_file['AGB_list']
 	AGB_time_until = array_file['AGB_time_until']
 	AGB_metallicity = array_file['AGB_metallicity']
 	AGB_comp = array_file['AGB_composition']
+	
+	time_coord = array_file['time_coord']
+	dust_temps = array_file['dust_temps']
+	star_frac = array_file['star_fracs']
+	imf_measure = array_file['imf_measure']
+	chems_error = array_file['chems_error']
+	sup_error = array_file['sup_error']
+	
 	#print AGB_comp
 	
 	timestep_AGB_list = np.append(timestep_AGB_list, AGB_list)
@@ -102,6 +118,13 @@ for savefile_name in os.listdir(absolute_path_to_outputs):
 	timestep_gas_mass_by_species += array_file['gas_mass_by_species']
 	timestep_star_mass_by_species += array_file['star_mass_by_species']
 	timestep_dust_mass_by_species += array_file['dust_mass_by_species']
+	
+	timestep_time_coord = np.append(timestep_time_coord, time_coord)
+    timestep_dust_temps = np.append(timestep_dust_temps, dust_temps)
+    timestep_star_frac = np.append(timestep_star_frac, star_frac)
+    timestep_imf_measure = np.append(timestep_imf_measure, imf_measure)
+    timestep_chems_error = np.append(timestep_chems_error, chems_error)
+    timestep_sup_error = np.append(timestep_sup_error, sup_error)
 	
 	array_file.close()
 
@@ -250,7 +273,7 @@ overall_AGB_composition = (overall_AGB_composition_2/np.sum(overall_AGB_composit
 #because only 0.5% of the galaxy's mass is subject to "processing" at any given time.
 
 #increment OVERALL_AGE by TIMESTEP and write everything to the next output file
-np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER + 1))), specie_fraction_array = overall_gas_number_composition, dust_base_frac = overall_dust_number_composition, DUST_FRAC = new_dustfrac, OVERALL_AGE = OVERALL_AGE + TIMESTEP, overall_AGB_list = overall_AGB_list, overall_AGB_time_until = overall_AGB_time_until, overall_AGB_metallicity = overall_AGB_metallicity, overall_AGB_composition = overall_AGB_composition)
+np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER + 1))), specie_fraction_array = overall_gas_number_composition, dust_base_frac = overall_dust_number_composition, DUST_FRAC = new_dustfrac, OVERALL_AGE = OVERALL_AGE + TIMESTEP, overall_AGB_list = overall_AGB_list, overall_AGB_time_until = overall_AGB_time_until, overall_AGB_metallicity = overall_AGB_metallicity, overall_AGB_composition = overall_AGB_composition, timestep_time_coord = timestep_time_coord, timestep_dust_temps = timestep_dust_temps, timestep_star_frac = timestep_star_frac, timestep_imf_measure = timestep_imf_measure, timestep_chems_error = timestep_chems_error, timestep_sup_error = timestep_sup_error)
 
 #LIST OF VARIABLES IN config_## file:
 #specie_fraction_array = overall_gas_number_composition
@@ -261,5 +284,13 @@ np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER 
 #overall_AGB_time_until = overall_AGB_time_until
 #overall_AGB_metallicity = overall_AGB_metallicity
 #overall_AGB_composition = overall_AGB_composition
+#timestep_time_coord = timestep_time_coord
+#timestep_dust_temps = timestep_dust_temps
+#timestep_star_frac = timestep_star_fracs
+#timestep_imf_measure = timestep_imf_measure
+#timestep_chems_error = timestep_chems_measure
+#timestep_sup_error = timestep_sup_error
+
+
 ##These need to be bootstrapped initially
 #This is it! The loop is now closed.

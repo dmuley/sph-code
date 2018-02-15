@@ -23,4 +23,11 @@ overall_AGB_time_until = np.array([1e20 * 60 * 60 * 24 * 365, 1e20 * 60 * 60 * 2
 overall_AGB_list = np.array([1.1, 1.1])
 overall_AGB_composition = np.vstack([overall_gas_number_composition] * 2)
 
-np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER + 1))), specie_fraction_array = overall_gas_number_composition, dust_base_frac = overall_dust_number_composition, DUST_FRAC = new_dustfrac, OVERALL_AGE = OVERALL_AGE, overall_AGB_list = overall_AGB_list, overall_AGB_time_until = overall_AGB_time_until, overall_AGB_metallicity = overall_AGB_metallicity, overall_AGB_composition = overall_AGB_composition)
+timestep_time_coord = np.array([0.])
+timestep_dust_temps = np.array([0.])
+timestep_star_frac = np.array([0.])
+timestep_imf_measure = np.array([1.])
+timestep_chems_error = np.array([0.])
+timestep_sup_error = np.array([0.])
+
+np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER + 1))), specie_fraction_array = overall_gas_number_composition, dust_base_frac = overall_dust_number_composition, DUST_FRAC = new_dustfrac, OVERALL_AGE = OVERALL_AGE, overall_AGB_list = overall_AGB_list, overall_AGB_time_until = overall_AGB_time_until, overall_AGB_metallicity = overall_AGB_metallicity, overall_AGB_composition = overall_AGB_composition, timestep_time_coord = timestep_time_coord, timestep_dust_temps = timestep_dust_temps, timestep_star_frac = timestep_star_frac, timestep_imf_measure = timestep_imf_measure, timestep_chems_error = timestep_chems_error, timestep_sup_error = timestep_sup_error)

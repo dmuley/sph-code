@@ -604,9 +604,9 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     
     #END PLOTTING
     
-    plt.clf()
+    '''plt.clf()
     plt.plot(np.sort(mass[particle_type == 2]/solar_mass), '+', alpha=0.2)
-    plt.pause(1)
+    plt.pause(1)'''
     
     star_ages[(particle_type == 1) & (star_ages > -2)] += dt
     #print star_ages[(particle_type == 1)]/year
@@ -674,7 +674,7 @@ list_of_outputs = np.append(os.listdir(unicode(absolute_path_to_outputs)), '-1.n
 output_number = np.max(np.array([bm[:-4] for bm in list_of_outputs]).astype('int'))
 #save all the above to a Numpy binary which will then be read in by config_helper.py to create a new single config file
 #we can add some of the "diagnostic" files to this to make sure everything works properly, and to extract info like power spectra as well.
-np.savez(unicode(absolute_path_to_outputs + '/' + str(output_number + 1)), gas_mass_by_species = gas_mass_by_species, star_mass_by_species = star_mass_by_species, dust_mass_by_species = dust_mass_by_species, AGB_condition = AGB_condition, AGB_list = AGB_list, AGB_time_until = AGB_time_until, AGB_metallicity = AGB_metallicity, AGB_composition = AGB_composition)
+np.savez(unicode(absolute_path_to_outputs + '/' + str(output_number + 1)), gas_mass_by_species = gas_mass_by_species, star_mass_by_species = star_mass_by_species, dust_mass_by_species = dust_mass_by_species, AGB_condition = AGB_condition, AGB_list = AGB_list, AGB_time_until = AGB_time_until, AGB_metallicity = AGB_metallicity, AGB_composition = AGB_composition, time_coord = time_coord, dust_temps = dust_temps, star_frac = star_frac, imf_measure = imf_measure, chems_error = chems_error, sup_error = sup_error)
 
 '''
 utime = np.unique(time_coord)
