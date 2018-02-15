@@ -12,11 +12,11 @@ from time import sleep
 import navier_stokes_cleaned as nsc
 import os
 import time
-'''
+
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
-size = comm.Get_size()'''
+size = comm.Get_size()
 
 G = constants.G
 k = constants.Boltzmann
@@ -55,8 +55,8 @@ cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_speci
 
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1e5 * AU
-N_PARTICLES = 150
+DIAMETER = 1e6 * AU
+N_PARTICLES = 1500
 N_INT_PER_PARTICLE = 75
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
