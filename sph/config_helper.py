@@ -103,7 +103,7 @@ for savefile_name in os.listdir(absolute_path_to_outputs):
 	
 	time_coord = array_file['time_coord']
 	dust_temps = array_file['dust_temps']
-	star_frac = array_file['star_fracs']
+	star_frac = array_file['star_frac']
 	imf_measure = array_file['imf_measure']
 	chems_error = array_file['chems_error']
 	sup_error = array_file['sup_error']
