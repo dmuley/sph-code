@@ -75,6 +75,8 @@ overall_AGB_time_until = latest_file['overall_AGB_time_until']
 overall_AGB_metallicity = latest_file['overall_AGB_metallicity']
 overall_AGB_composition = latest_file['overall_AGB_composition']
 
+print overall_AGB_composition
+print ""
 #Create array of AGB stars, loading in each file one at a time. This is a bit slow, but is most accurate.
 #append to the end of this and compute later amount created
 timestep_AGB_list = np.array([])
@@ -130,6 +132,8 @@ for savefile_name in os.listdir(absolute_path_to_outputs):
 
 timestep_AGB_composition = timestep_AGB_composition[1:] #removing dummy element
 #append these to overall_lists, found in latest file in output folder
+print ""
+print timestep_AGB_composition
 
 def interpolate_amounts(absolute_path_to_nsc):
 	#assume equal fractions of C, S, and M stars, or rather, assume each star is 1/3 each
@@ -206,7 +210,9 @@ def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_d
 overall_AGB_list = np.append(overall_AGB_list, timestep_AGB_list)
 overall_AGB_time_until = np.append(overall_AGB_time_until, timestep_AGB_time_until)
 overall_AGB_metallicity = np.append(overall_AGB_metallicity, timestep_AGB_metallicity)
-overall_AGB_composition = np.append(overall_AGB_composition, timestep_AGB_composition)
+
+overall_AGB_composition = np.append(overall_AGB_composition, timestep_AGB_composition, axis=0)
+print overall_AGB_composition
 
 #calculate how much dust is produced by AGBs during the NEXT timestep, and remove all AGBs that have passed already
 #compute dust production ONLY for those stars whose time has come, don't needlessly store for others
