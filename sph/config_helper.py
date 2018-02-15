@@ -203,7 +203,9 @@ def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_d
 	AGB_gas_comp_number[3] -= ionized_amount
 	AGB_gas_comp_number[5] -= ionized_amount
 	
-	gas_mass_composition = (AGB_gas_comp_number.T * mu_specie)/np.sum(AGB_gas_comp_number.T * mu_specie, axis=1)
+	gas_mass_composition = (AGB_gas_comp_number.T * mu_specie).T/np.sum(AGB_gas_comp_number.T * mu_specie, axis=1)
+	gas_mass_composition = gas_mass_composition.T
+	print gas_mass_composition
 	
 	return dust_mass_created, (gas_mass_composition.T * gas_mass_created).T
 
@@ -297,6 +299,7 @@ np.savez(unicode(absolute_path_to_config + '/config_' + str(int(TIMESTEP_NUMBER 
 #timestep_chems_error = timestep_chems_measure
 #timestep_sup_error = timestep_sup_error
 
-
 ##These need to be bootstrapped initially
 #This is it! The loop is now closed.
+
+print OVERALL_AGE/year
