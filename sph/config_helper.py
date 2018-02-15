@@ -178,11 +178,11 @@ def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_d
 	mass_WD = (0.55 + (AGB_masses/solar_mass - 1.) * 0.45/(7. - 1.)) * solar_mass #based on Dominguez et al. 1999
 	
 	for pos in range(len(AGB_masses)):
-		mass_created[pos][mapto] = np.array([float(splines[obj](AGB_metallicities[pos], AGB_masses[pos])) for obj in range(len(splines))])
+		dust_mass_created[pos][mapto] = np.array([float(splines[obj](AGB_metallicities[pos], AGB_masses[pos])) for obj in range(len(splines))])
 		print pos
 		
 	dust_mass_created /= AGB_divisor
-	dust_mass_created[mass_created < 0.] = 0.
+	dust_mass_created[dust_mass_created < 0.] = 0.
 	
 	gas_mass_created = AGB_masses - np.sum(dust_mass_created, axis=1) - mass_WD
 	#move 10% of hydrogen to helium---fusion happens!
@@ -201,7 +201,7 @@ def calculate_interpolation(AGB_masses, AGB_metallicities, splines, mapto, AGB_d
 	
 	gas_mass_composition = (AGB_gas_comp_number.T * mu_specie)/np.sum(AGB_gas_comp_number.T * mu_specie, axis=1)
 	
-	return mass_created, (gas_mass_composition.T * gas_mass_created).T
+	return dust_mass_created, (gas_mass_composition.T * gas_mass_created).T
 
 overall_AGB_list = np.append(overall_AGB_list, timestep_AGB_list)
 overall_AGB_time_until = np.append(overall_AGB_time_until, timestep_AGB_time_until)
