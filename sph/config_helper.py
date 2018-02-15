@@ -117,14 +117,14 @@ for savefile_name in os.listdir(absolute_path_to_outputs):
 		
 	timestep_gas_mass_by_species += array_file['gas_mass_by_species']
 	timestep_star_mass_by_species += array_file['star_mass_by_species']
-	timestep_dust_mass_by_species += array_file['dust_mass_by_species']
+	timestep_dust_mass_by_species += array_file['dust_mass_by_species']	
 	
 	timestep_time_coord = np.append(timestep_time_coord, time_coord)
-    timestep_dust_temps = np.append(timestep_dust_temps, dust_temps)
-    timestep_star_frac = np.append(timestep_star_frac, star_frac)
-    timestep_imf_measure = np.append(timestep_imf_measure, imf_measure)
-    timestep_chems_error = np.append(timestep_chems_error, chems_error)
-    timestep_sup_error = np.append(timestep_sup_error, sup_error)
+	timestep_dust_temps = np.append(timestep_dust_temps, dust_temps)
+	timestep_star_frac = np.append(timestep_star_frac, star_frac)
+	timestep_imf_measure = np.append(timestep_imf_measure, imf_measure)
+	timestep_chems_error = np.append(timestep_chems_error, chems_error)
+	timestep_sup_error = np.append(timestep_sup_error, sup_error)
 	
 	array_file.close()
 
