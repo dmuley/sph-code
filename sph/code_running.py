@@ -12,13 +12,13 @@ from time import sleep
 import navier_stokes_cleaned as nsc
 import os
 import time
-
+'''
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-np.random.seed(seed=int(time.time() * rank) % 4294967294)
+np.random.seed(seed=int(time.time() * rank) % 4294967294)'''
 
 G = constants.G
 k = constants.Boltzmann
@@ -44,7 +44,7 @@ cooling_timescale = year * 1e6
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0158,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/80. + 1e-80
+cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/60. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -568,7 +568,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.ylim(-6, 0)
     plt.pause(1)'''
     
-    '''
+    
     #PLOTTING: THIS CAN BE ADDED OR REMOVED AT WILL
     xpts = points.T[1:][0][particle_type == 0]/constants.parsec
     ypts = points.T[1:][1][particle_type == 0]/constants.parsec
@@ -602,7 +602,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     plt.xlabel('Position (parsecs)')
     plt.ylabel('Position (parsecs)')
     plt.title('Temperature in H II region (t = ' + str(age/year/1e6) + ' Myr)')
-    plt.pause(1)'''
+    plt.pause(1)
     
     #END PLOTTING
     
