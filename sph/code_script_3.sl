@@ -15,4 +15,5 @@ export OMP_PROC_BIND=spread
 
 
 #run the application:
+module load python/2.7-anaconda
 srun -n 10 -c 6 --cpu_bind=cores python code_running.py

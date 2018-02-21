@@ -18,7 +18,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-np.random.seed(seed=int(time.time() * rank))
+np.random.seed(seed=int(time.time() * rank) % 4294967294)
 
 G = constants.G
 k = constants.Boltzmann
