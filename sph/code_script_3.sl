@@ -5,7 +5,7 @@
 #SBATCH -J dust_sph
 #SBATCH --mail-user=dmuley@berkeley.edu
 #SBATCH --mail-type=ALL
-#SBATCH -t 03:00:00
+#SBATCH -t 01:30:00
 #SBATCH -A m2218
 
 #OpenMP settings:
