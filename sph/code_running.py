@@ -185,7 +185,8 @@ cluster_masses = np.array([np.sum(mass[ai]) for ai in initial_clusters])
 cluster_powers = np.abs(np.random.normal(size = len(cluster_masses)))
 
 #total_turb_energy = sum(1/2 mi * vi^2)
-absolute_turb_vels = (2 * total_turb_energy/np.sum(cluster_powers) * cluster_powers/cluster_masses)**(0.5)
+#but reducing turbulent energy to ensure collapse rather than expansion
+absolute_turb_vels = 0.9 * (2 * total_turb_energy/np.sum(cluster_powers) * cluster_powers/cluster_masses)**(0.5)
 print "Turbulent velocities: " + str(absolute_turb_vels)
 
 for uvw in range(len(initial_clusters)):
