@@ -12,13 +12,13 @@ from time import sleep
 import navier_stokes_cleaned as nsc
 import os
 import time
-
+'''
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-np.random.seed(seed=int(time.time() * rank) % 4294967294)
+np.random.seed(seed=int(time.time() * rank) % 4294967294)'''
 
 G = constants.G
 k = constants.Boltzmann
@@ -44,7 +44,7 @@ cooling_timescale = year * 1e6
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0158,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/80. + 1e-80
+cross_sections = np.array([1.e-22, 1.e-22, 1.e-22, 1e-60, 1e-60,6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.])/1. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -54,25 +54,27 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
-
+raise_factor = 100
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 1e6 * AU
-N_PARTICLES = 1500
-N_INT_PER_PARTICLE = 75
+DIAMETER = 3.5e6 * AU
+
+N_PARTICLES = 40000 * raise_factor
+N_INT_PER_PARTICLE = 80
 V = (DIAMETER)**3
-d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.)
+d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.) * raise_factor**(1./3.)
 nsc.d = d
 d_sq = d**2
 d_0 = 1e5 * AU
 nsc.d_0 = 1e5 * AU
+
 dt = dt_0
 nsc.dt = dt
 nsc.dt_0 = dt_0
-DUST_MASS = 0.05000000001 #mass of each dust SPH particle
+DUST_MASS = 0.05000000001/raise_factor #mass of each dust SPH particle
 N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
-crit_mass = 0.0001 * solar_mass #setting a minimum dust mass to help avoid numerical errors!
+crit_mass = 0.0001 * solar_mass/raise_factor #setting a minimum dust mass to help avoid numerical errors!
 critical_density = 1000 * amu * 10**6 #critical density of star formation
 
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
@@ -116,7 +118,7 @@ imf /= np.sum(imf)
 mass_ind = np.random.choice(np.arange(len(base_imf)), N_PARTICLES, p = imf)
 mass = base_imf[mass_ind]
 diff_mass = np.random.rand(len(mass)) * d_base_imf[mass_ind]
-mass = (mass + diff_mass) * solar_mass
+mass = (mass + diff_mass) * solar_mass / raise_factor / 2.
 
 N_DUST = max(int(DUST_FRAC/(1. - DUST_FRAC) * np.sum(mass)/(DUST_MASS * solar_mass)), 1)
 particle_type = np.zeros([N_PARTICLES]) #0 for gas, 1 for stars, 2 for dust
@@ -125,9 +127,9 @@ particle_type = np.append(particle_type, [2] * N_DUST)
 mass = np.append(mass, [DUST_MASS * solar_mass] * N_DUST)
 
 points = (np.random.rand(N_PARTICLES, 3) - 0.5) * DIAMETER
-points2 = copy.deepcopy(points)
-neighbor = nsc.neighbors(points, d)
-chems_neighbor = copy.deepcopy(neighbor)
+points2 = np.array(list(points))
+neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(d/raise_factor**(1./3.) * np.ones(len(points)), np.ones(len(points))))
+chems_neighbor = list(neighbor)
 nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
 num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
@@ -151,7 +153,7 @@ fdust = np.array([dust_base] * N_PARTICLES).T * (particle_type == 2)
 
 f_un = (fgas + fdust).T
 f_un = f_un.astype('longdouble')
-sizes[particle_type == 2] = d
+sizes[particle_type == 2] = d/raise_factor**(1./3.)
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
@@ -168,13 +170,13 @@ optical_depth = mass/(m_h * mu_array) * cross_array
 
 critical_density = 1000 * amu * 10**6 #critical density of star formation
 
-densities = nsc.density(points,mass,particle_type,neighbor)
+densities = nsc.density(points,mass,particle_type,nontrivial_int)
 densities_0 = copy.deepcopy(densities)
-dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
-delp = nsc.del_pressure(points,mass,particle_type,neighbor,E_internal,gamma_array)
+dust_densities = nsc.dust_density(points,mass,nontrivial_int,particle_type,sizes)
+delp = nsc.del_pressure(points,mass,particle_type,nontrivial_int,E_internal,gamma_array)
 
 #Introduce turbulence at the largest scales
-initial_clusters, grav_potential = nsc.grav_force_calculation(mass, points, sizes)[2:]
+initial_clusters, grav_potential = nsc.grav_force_calculation(mass, points, sizes, d, neighbor_tree)[2:]
 #print np.sum(grav_potential)
 #apply the virial theorem that 2<V> + (2/3)<E_internal> = -<U>
 #mostly turbulent support
@@ -216,9 +218,9 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-'''particle_type[mass >= np.sort(mass)[-3]] = 1
-mass[mass >= np.sort(mass)[-3]] = np.max(mass)
-star_ages[mass >= np.sort(mass)[-3]] = 1.0e6 * year'''
+particle_type[mass >= np.sort(mass)[-3]] = 1
+mass[mass >= np.sort(mass)[-1]] = np.max(mass) * raise_factor
+star_ages[mass >= np.sort(mass)[-1]] = 1.0e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
@@ -389,8 +391,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 				supernova_pos = []
 			#supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
-			neighbor = nsc.neighbors(points, max(sizes))
-			chems_neighbor = copy.deepcopy(neighbor)
+			neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(d/raise_factor**(1./3.) * np.ones(len(points)), sizes))
+			chems_neighbor = list(neighbor)
 			#NONTRIVIAL NEIGHBORS
 			neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 			
@@ -440,8 +442,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
     optical_depth = mass/(m_h * mu_array) * cross_array
 
-    neighbor = nsc.neighbors(points, max(sizes))#find neighbors in each timestep
-    chems_neighbor = copy.deepcopy(neighbor)
+    neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(d/raise_factor**(1./3.) * np.ones(len(points)), sizes))#find neighbors in each timestep
+    chems_neighbor = list(neighbor)
     nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
     #IMPORTANT EFFICIENCY SAVINGS HERE
     neighbor = nontrivial_int
@@ -455,7 +457,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     print(" ")
     
     age += dt
-    gfcalc = nsc.grav_force_calculation(mass, points, sizes);
+    gfcalc = nsc.grav_force_calculation(mass, points, sizes, d, neighbor_tree);
     grav_accel = gfcalc[0]
     
     densities = nsc.density(points,mass,particle_type,neighbor)
@@ -545,7 +547,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     	new_smoothing = 1.
     sizes[particle_type == 0] = (new_smoothing * sizes)[particle_type == 0]
     sizes[(particle_type == 0) & (sizes > d)] = d #set a maximum length scale here to avoid uncontrolled growth
-    sizes[particle_type == 2] = d
+    sizes[particle_type == 2] = d/raise_factor**(1./3.)
     
     densities_0 = copy.deepcopy(densities)
     '''
@@ -721,9 +723,9 @@ plt.xlabel('Position (parsecs)')
 plt.ylabel('Position (parsecs)')
 plt.title('Temperature in H II region')
 
-[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
-#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.1)]
+[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[1][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.05)]
+#[plt.scatter(points.T[0][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.05)]
+#[plt.scatter(points.T[1][particle_type == 0]/AU, points.T[2][particle_type == 0]/AU, c = np.log10(densities/critical_density)[particle_type == 0], s=30, edgecolor='none', alpha=0.05)]
 [plt.colorbar()]
 [plt.scatter(points.T[0][particle_type == 2]/AU, points.T[1][particle_type == 2]/AU, c = 'black', s=30, edgecolor='face', alpha=0.02)]
 [plt.scatter(points.T[0][particle_type == 1]/AU, points.T[1][particle_type == 1]/AU, c = 'black', s=(mass[particle_type == 1]/solar_mass), alpha=1)]

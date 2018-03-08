@@ -248,27 +248,32 @@ def overall_spectrum(base_imf, imf):
 #WHICH ARE INTENDED TO BE OF APPROXIMATELY EQUAL MASS. EACH OF THESE BINS THEN EXERTS A
 #GRAVITATIONAL FORCE (dampened by the length scale of each bin) ON ALL OTHER ITEMS.
 
-def grav_force_calculation(mass, points, sizes):
+def grav_force_calculation(mass, points, sizes, dist_f, kdt):
 #NO LONGER USES A GRID METHOD
 #DYNAMICALLY GENERATES SUB-CLUSTERS WHICH INTERACT WITH EACH OTHER USING A SMOOTHED GRAVITATIONAL FORCE
 #WHILE INTERNAL FORCES ARE COMPUTED JUST AS N^2 INTERACTIONS
 	pts_added = []
 	pts_init = np.arange(len(points))
-	kdt = spatial.cKDTree(points)
+	#kdt = spatial.cKDTree(points)
 	uniq = 0
 	for vwx in pts_init:
 		#kdt = spatial.cKDTree(points[pts_init])
-		distances, nbrs = kdt.query(points[vwx], int(np.sqrt(len(np.append(pts_init, 1))) + 1), distance_upper_bound = d)
+		distances, nbrs = kdt.query(points[vwx], int(np.sqrt(len(points))), distance_upper_bound = dist_f)
 		red_nbrs = np.array(nbrs)[np.array(distances) < d]
 	
 		pts_init_base = np.unique(np.append(pts_init, red_nbrs))
 		pts_init_2 = np.unique(np.setdiff1d(pts_init_base, red_nbrs))
 		uniq += len(pts_init) - len(pts_init_2)
-		#print uniq
-	
-		pts_added.append(np.setdiff1d(pts_init, pts_init_2))
+		print uniq
+		
+		if len(np.setdiff1d(pts_init, pts_init_2)) > 0:
+			pts_added.append(np.setdiff1d(pts_init, pts_init_2))
 	
 		pts_init = pts_init_2
+		if len(points) == uniq:
+			break
+	
+	print len(pts_added)
 	
 	clusters = np.array(pts_added)[np.array([len(aide) for aide in pts_added]) != 0]
 	n_parts = np.array([len(tree_el) for tree_el in clusters])
@@ -276,11 +281,14 @@ def grav_force_calculation(mass, points, sizes):
 	center_of_mass = []
 	squared_distance_com = []
 	mean_size = []
+	cluster_point = 0
 	for xkz in clusters:
 		total_mass.append(np.sum(mass[xkz]))
 		center_of_mass.append(np.sum((points[xkz].T * mass[xkz]), axis=1)/np.sum(mass[xkz]))
 		squared_distance_com.append(np.sum((points[xkz].T**2 * mass[xkz]), axis=1)/np.sum(mass[xkz]))
 		mean_size.append(np.median(sizes[xkz]**3)**(1./3.))
+		cluster_point += 1
+		print cluster_point
 
 	squared_distance_com = np.array(squared_distance_com)
 	center_of_mass = np.array(center_of_mass)
@@ -302,6 +310,9 @@ def grav_force_calculation(mass, points, sizes):
 		
 		grav_potential += (-G * potential_dist**-1 * total_mass[int_cluster] * mass)
 		grav_potential[cluster_el] += (G * potential_dist**-1 * total_mass[int_cluster] * mass)[cluster_el]
+		
+		print int_cluster
+		
 		#handles internal acceleration as well as a harmonic oscillator potential
 	
 	return grav_accels, center_of_mass, clusters, grav_potential
@@ -359,11 +370,15 @@ def compute_gravitational_force(particle_positions, grid_com, grid_masses, lengt
 #LITERATURE IN THE FIELD (Monaghan 1993 for artificial viscosity, for instance) AND SOME ORIGINAL CONTRIBUTIONS
 #TO HANDLE DUST.
 
-def neighbors(points, dist):
-    kdt = spatial.cKDTree(points)  
-    qbp = kdt.query_ball_point(points, dist, p=2, eps=0.1)
-    
-    return qbp
+def neighbors(points, dist):                                         
+	kdt = spatial.cKDTree(points)
+	neighbors_array = []
+	for u in range(len(dist)): 
+		qbp = kdt.query_ball_point(points[u], dist[u], p=2, eps=0.1)
+		neighbors_array.append(qbp)
+		print u
+	print "done"
+	return neighbors_array, kdt
     
 def nontrivial_neighbors(points, mass, particle_type, neighbor):
 	nontrivial_int = []
@@ -377,6 +392,7 @@ def nontrivial_neighbors(points, mass, particle_type, neighbor):
 		final_neigh = np.unique(np.array(neighbor[j])[rho > 0])
 		
 		nontrivial_int.append(final_neigh)
+		print j
 	return nontrivial_int
 
 def Weigh2(x, x_0, m, d):
