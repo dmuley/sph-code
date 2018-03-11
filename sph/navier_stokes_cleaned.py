@@ -348,7 +348,7 @@ def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
 	
 	unique_largetree = np.vstack({tuple(row[:-(tree_depth - scale_res + 1)]) for row in combos})
 	expanded_unique_largetree = np.append(unique_largetree, np.zeros((len(unique_largetree),tree_depth - scale_res + 1)), axis=1)
-	smoothing_scale = np.average(sizes)
+	smoothing_scale = 1.
 	combo_pos = 0.
 	overall_accels = np.copy(points * 0.)
 	for combo in combos:
@@ -373,7 +373,9 @@ def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
 			local_masses = masses_list[gridel][combo_idx]
 			local_com = com_list[gridel][combo_idx]
 			
-			accel_local = G * local_masses/(np.sum((local_com - combo_points)**2) + smoothing_scale**2)**(3./2.) * (local_com - combo_points)
+			#print np.sum(mass)/local_masses
+			
+			accel_local = (G * local_masses/(np.sum((local_com - combo_points)**2, axis=1) + smoothing_scale**2)**(3./2.) * (local_com - combo_points).T).T
 			combo_accels += accel_local
 			if gridel == 0:
 				#include "local acceleration" from other nearby particles as well!
@@ -381,7 +383,7 @@ def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
 				combo_2_idx = np.sum(2**np.arange(len(local_combo))[::-1] * local_combo_2)
 				local_mass_2 = masses_list[gridel][combo_2_idx]
 				local_com_2 = com_list[gridel][combo_2_idx]
-				accel_local_2 = G * local_masses/(np.sum((local_com_2 - combo_points)**2) + smoothing_scale**2)**(3./2.) * (local_com_2 - combo_points)
+				accel_local_2 = (G * local_masses/(np.sum((local_com_2 - combo_points)**2, axis=1) + smoothing_scale**2)**(3./2.) * (local_com_2 - combo_points).T).T
 				combo_accels += accel_local_2
 		
 			
