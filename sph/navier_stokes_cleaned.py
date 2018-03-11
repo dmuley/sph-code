@@ -248,6 +248,152 @@ def overall_spectrum(base_imf, imf):
 #WHICH ARE INTENDED TO BE OF APPROXIMATELY EQUAL MASS. EACH OF THESE BINS THEN EXERTS A
 #GRAVITATIONAL FORCE (dampened by the length scale of each bin) ON ALL OTHER ITEMS.
 
+def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
+	#use a tree-based gravity solver
+	size_leaves = min(len(points)**0.4, len(points)/10000)
+	points_kdtree = spatial.KDTree(points, leafsize=size_leaves)
+	#recursively traverse tree to generate array of hierarchical indices
+	base_tree = points_kdtree.tree
+	def kdtree_to_list(kdtree):
+		try: 
+			kdtree.greater
+			kdtree.less
+			return [kdtree.greater, kdtree.less]
+		except AttributeError:
+			try:
+				kdtree.idx
+				return kdtree.idx
+			except AttributeError:
+				pass;
+		if type(kdtree) == list:
+			return [kdtree_to_list(q) for q in kdtree]
+		if (type(kdtree) == np.ndarray):
+			return kdtree
+	
+	new_tree = base_tree
+	for uv in range(int(np.log(len(points)/size_leaves)/np.log(2)) + 5): #millions of subtrees, more than enough
+		new_tree_new = kdtree_to_list(new_tree)
+		#print (new_tree == new_tree_new)
+		new_tree = new_tree_new
+		ravnew = np.ravel(new_tree)
+		print len(ravnew)
+		
+	#We know that the above tree uniquely contains all points, allowing us to calculate gravity
+	depth = lambda L: isinstance(L, list) and max(map(depth, L))+1
+	tree_depth = depth(new_tree)
+	
+	combos = np.array(map(list, itertools.product([0, 1], repeat=tree_depth)))
+		
+	#this sets an upper limit on the sizes of gravitational tree elements, to avoid excessively low resolution
+	scale_res = 2
+	masses_list = np.vstack([np.zeros(len(combos))]*(tree_depth - scale_res))
+	com_list = np.array([np.zeros((len(combos), 3))]*(tree_depth - scale_res))
+	
+	for gridel in range(tree_depth - scale_res):
+		if gridel > 0:
+			truncated_combos = combos.T[:-gridel].T
+		else:
+			truncated_combos = combos
+		unique_combos = np.vstack({tuple(row) for row in truncated_combos})
+		time_init = time.time()
+		subtree_length = 0
+		for item in unique_combos:
+			rpos_list = list(item)
+			#EXTREMELY BAD CODING PRACTICE FOLLOWS---SHOULD BE REPLACED AS SOON AS POSSIBLE,
+			#BUT I CAN'T THINK OF ANY OTHER ALTERNATIVE
+			rpos_string = 'new_tree'
+			for obj in rpos_list:
+				rpos_string += '['+str(obj)+']'
+			
+			subtree_positions = eval('np.hstack(np.ravel('+rpos_string+'))')
+			subtree_length += len(subtree_positions)
+			subtree_final_pos = np.where((truncated_combos == item).all(axis=1))[0]
+			#print subtree_final_pos
+			
+			subt_m = mass[subtree_positions]
+			pts_m = points[subtree_positions]
+			
+			subtree_masses = np.sum(subt_m)
+			subtree_com = np.sum((subt_m * pts_m.T),axis=1)/subtree_masses
+			masses_list[gridel][subtree_final_pos] = subtree_masses
+			com_list[gridel][subtree_final_pos] = subtree_com
+			#print subtree_length
+			
+			#after this, just flip each "bit" in the index for all
+		print len(unique_combos), time.time() - time_init
+	
+	#	TIME TO TRAVERSE THE TREE WE HAVE CREATED. IN ORDER, USE THE FOLLOWING TO COMPUTE GRAVITATIONAL FORCES:
+	#
+	#	1. 	GRAVITATIONAL FORCE FROM NEIGHBORS. FOR COMPUTATIONAL EFFICIENCY JUST USE CENTER OF MASS OF "LOCAL"
+	#		ELEMENT IN WHICH THE PARTICLE EXISTS; OTHERWISE WE WOULD HAVE TO CARRY OUT COMPUTATION DOWN TO INDIVIDUAL
+	#		BOXES FOR KD-TREES (INFEASIBLE FOR OUR PROBLEM!!!) SMOOTH THIS FORCE.
+	#
+	#	2.	GRAVITATIONAL FORCE FROM "OPPOSITE NEIGHBORS" i. e. CONVERT ONES TO ZEROS AND ZEROS TO ONES IN OUR KD-TREE
+	#		INDICES (BECAUSE WE WANT TO LOOK OVER REGIONS NOT CONTAINING THE PARTICLE IN QUESTION). THIS ONLY REQUIRES A
+	#		SMALL NUMBER OF SUMMATIONS, THE MAIN COMPUTATIONAL COST HAPPENED ALREADY WITH BUILDING THE TREE ABOVE.
+	#
+	#	3.	GRAVITATIONAL FORCE FROM LARGEST-SCALE STRUCTURES IN THE SIMULATION (2^(scale_res) boxes of mass) OUTSIDE THE
+	#		PARTICLE WHOSE POSITION IS BEING PREDICTED. THIS REPRESENTS A HIGH-SCALE CUTOFF THAT IS SMALLER THAN THE LARGEST
+	#		PARTITIONS OF THE SYSTEM (the cutting into half, fourth, eighth, etc. by the KD-Tree).
+	#
+	#		OUR METHOD IS LESS ACCURATE THAN PURE BARNES-HUT ON THE SMALLEST SCALE (since we impose a cutoff for bin size
+	#		larger than individual particles, for computational efficiency) BUT MORE ACCURATE FOR THE lARGEST SCALE
+	#		(provided that the largest structures used for gravitational computation are smaller than the smallest in Barnes-Hut
+	#		i. e. 2^scale_res > 8, because Barnes-Hut uses an octree in 3 dimensions).
+	#
+	#######################################################
+	
+	#looping through all elements of combos and applying the above to their respective elements
+	#this is an O(n) process, the tree creation was already O(n log n)
+	
+	unique_largetree = np.vstack({tuple(row[:-(tree_depth - scale_res + 1)]) for row in combos})
+	expanded_unique_largetree = np.append(unique_largetree, np.zeros((len(unique_largetree),tree_depth - scale_res + 1)), axis=1)
+	smoothing_scale = np.average(sizes)
+	combo_pos = 0.
+	overall_accels = np.copy(points * 0.)
+	for combo in combos:
+		combo_pos += 1
+		rpos_string = 'new_tree'
+		for obj in combo:
+			rpos_string += '['+str(obj)+']'
+			
+		combo_positions = eval('np.hstack(np.ravel('+rpos_string+'))')
+		combo_points = points[combo_positions]
+		combo_masses = mass[combo_positions]
+		combo_accels = np.zeros((len(combo_positions), 3))
+		
+		#make lists of points over here and then add gravitational forces from each level to each point
+		for gridel in range(tree_depth - scale_res - 1):
+			local_combo = np.copy(combo)
+			local_combo[-gridel - 1] = 1 - local_combo[-gridel - 1]
+			#easy way to find combo element!
+			combo_idx = np.sum(2**np.arange(len(local_combo))[::-1] * local_combo)
+			
+			#uv = masses_list[gridel][np.sum(combos == local_combo, axis=1) == len(local_combo)], com_list[gridel][np.sum(combos == local_combo, axis=1) == len(local_combo)]
+			local_masses = masses_list[gridel][combo_idx]
+			local_com = com_list[gridel][combo_idx]
+			
+			accel_local = G * local_masses/(np.sum((local_com - combo_points)**2) + smoothing_scale**2)**(3./2.) * (local_com - combo_points)
+			combo_accels += accel_local
+			if gridel == 0:
+				#include "local acceleration" from other nearby particles as well!
+				local_combo_2 = np.copy(combo)
+				combo_2_idx = np.sum(2**np.arange(len(local_combo))[::-1] * local_combo_2)
+				local_mass_2 = masses_list[gridel][combo_2_idx]
+				local_com_2 = com_list[gridel][combo_2_idx]
+				accel_local_2 = G * local_masses/(np.sum((local_com_2 - combo_points)**2) + smoothing_scale**2)**(3./2.) * (local_com_2 - combo_points)
+				combo_accels += accel_local_2
+		
+			
+			#print uv[0] - vu[0], uv[1] - vu[1]
+			#"true" selection and expedited selection via index computation are identical!
+			#now we can do computations with these
+		
+		largescale_combos = expanded_unique_largetree[(unique_largetree != combo[:-(tree_depth - scale_res + 1)])]
+		#compute forces here
+		overall_accels[combo_positions] += combo_accels
+		print combo_pos
+	
 def grav_force_calculation(mass, points, sizes, dist_f, kdt):
 #NO LONGER USES A GRID METHOD
 #DYNAMICALLY GENERATES SUB-CLUSTERS WHICH INTERACT WITH EACH OTHER USING A SMOOTHED GRAVITATIONAL FORCE
@@ -316,7 +462,7 @@ def grav_force_calculation(mass, points, sizes, dist_f, kdt):
 		#handles internal acceleration as well as a harmonic oscillator potential
 	
 	return grav_accels, center_of_mass, clusters, grav_potential
-	
+
 def bin_generator(masses, positions, subdivisions):
     #posmin = np.where(mass == min(mass))[0][0]
     positional_masses = np.array([masses[np.argsort(positions.T[b])] for b in range(len(subdivisions))])

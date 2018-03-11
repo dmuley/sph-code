@@ -12,13 +12,13 @@ from time import sleep
 import navier_stokes_cleaned as nsc
 import os
 import time
-'''
+
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-np.random.seed(seed=int(time.time() * rank) % 4294967294)'''
+np.random.seed(seed=int(time.time() * rank) % 4294967294)
 
 G = constants.G
 k = constants.Boltzmann
@@ -44,7 +44,7 @@ cooling_timescale = year * 1e6
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3, SiC)in that order
 species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
 mu_specie = np.array([2.0158,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.e-22, 1.e-22, 1.e-22, 1e-60, 1e-60,6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.])/1. + 1e-80
+cross_sections = np.array([6.e-22, 6.e-22, 6.e-22, 1e-60, 1e-60,6.65e-25, 0., 0., 0., 0., 0., 0., 0., 0.])/1. + 1e-80
 destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
 mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
 sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
@@ -54,13 +54,13 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
-raise_factor = 100
+raise_factor = 800
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 3.5e6 * AU
+DIAMETER = 2.e6 * AU
 
-N_PARTICLES = 40000 * raise_factor
-N_INT_PER_PARTICLE = 80
+N_PARTICLES = 10000 * raise_factor
+N_INT_PER_PARTICLE = np.sqrt(N_PARTICLES)
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.) * raise_factor**(1./3.)
 nsc.d = d
@@ -617,7 +617,7 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     #print star_ages[(particle_type == 1)]/year
     
     #T_FF = (3./(2 * np.pi * G * np.sum(mass[particle_type == 0])/V))**0.5/year
-    probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF)
+    probability = base_sfr * (densities/critical_density)**(1.6) * ((dt/year)/T_FF) * 0. #NO STAR FORMATION, THIS IS INACCURATE
     #np.random.seed(time.time() + time.time() * present_time * (dt/year))
     diceroll = np.random.rand(len(probability))
     particle_type[(particle_type == 0) & (exp_neighbor_count + num_nontrivial - 1 > 1)] = ((diceroll < probability).astype('float'))[(particle_type == 0) & (exp_neighbor_count + num_nontrivial - 1 > 1)]
