@@ -253,7 +253,7 @@ def grav_force_calculation_new(mass, points, sizes):
 	#use a tree-based gravity solver
 	
 	time_tree_creation = time.time()
-	size_leaves = min(len(points)**0.4, len(points)/10000)
+	size_leaves = 990
 	points_kdtree = spatial.KDTree(points, leafsize=size_leaves)
 	#recursively traverse tree to generate array of hierarchical indices
 	base_tree = points_kdtree.tree

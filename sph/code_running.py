@@ -54,12 +54,12 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
-raise_factor = 800 #8 million keeps the array non jagged, so maintain this number!
+raise_factor = 1000 #8 million keeps the array non jagged, so maintain this number!
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 2.e6 * AU
 
-N_PARTICLES = 10000 * raise_factor
+N_PARTICLES = 12000 * raise_factor
 N_INT_PER_PARTICLE = N_PARTICLES/2000.
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.) * raise_factor**(1./3.)
@@ -168,7 +168,7 @@ critical_density = 1000 * amu * 10**6 #critical density of star formation
 
 neighbor, neighbor_tree = nsc.neighbors(points, sizes)
 chems_neighbor = list(neighbor)
-nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+nontrivial_int = neighbor #nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
 num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
