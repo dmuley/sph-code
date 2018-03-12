@@ -54,13 +54,13 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
-raise_factor = 1000
+raise_factor = 800 #8 million keeps the array non jagged, so maintain this number!
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 2.e6 * AU
 
 N_PARTICLES = 10000 * raise_factor
-N_INT_PER_PARTICLE = np.sqrt(N_PARTICLES)
+N_INT_PER_PARTICLE = N_PARTICLES/2000.
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.) * raise_factor**(1./3.)
 nsc.d = d
@@ -118,7 +118,7 @@ imf /= np.sum(imf)
 mass_ind = np.random.choice(np.arange(len(base_imf)), N_PARTICLES, p = imf)
 mass = base_imf[mass_ind]
 diff_mass = 0. #np.random.rand(len(mass)) * d_base_imf[mass_ind]
-mass = (mass + diff_mass) * solar_mass / raise_factor / 2.
+mass = (mass + diff_mass) * solar_mass / raise_factor
 
 N_DUST = max(int(DUST_FRAC/(1. - DUST_FRAC) * np.sum(mass)/(DUST_MASS * solar_mass)), 1)
 particle_type = np.zeros([N_PARTICLES]) #0 for gas, 1 for stars, 2 for dust
@@ -135,11 +135,6 @@ velocities = np.random.normal(size=(N_PARTICLES, 3)) * 0.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 sizes = (mass/m_0)**(1./3.) * d
 
-neighbor, neighbor_tree = nsc.neighbors(points, sizes)
-chems_neighbor = list(neighbor)
-nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
-num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
 mu_array = np.zeros([N_PARTICLES])#array of all mu
 E_internal = np.zeros([N_PARTICLES]) #array of all Energy
@@ -170,6 +165,12 @@ E_internal = gamma_array * mass * k * T/(mu_array * m_h)
 optical_depth = mass/(m_h * mu_array) * cross_array
 
 critical_density = 1000 * amu * 10**6 #critical density of star formation
+
+neighbor, neighbor_tree = nsc.neighbors(points, sizes)
+chems_neighbor = list(neighbor)
+nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
+num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
 densities = nsc.density(points,mass,particle_type,nontrivial_int)
 densities_0 = copy.deepcopy(densities)
