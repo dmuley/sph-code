@@ -14,6 +14,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy import spatial, stats
 import copy
 from time import sleep
+import time
 
 #These constants should be exclusively PHYSICAL---they should be independent
 #of any properties of a particular SPH simulation
@@ -248,8 +249,10 @@ def overall_spectrum(base_imf, imf):
 #WHICH ARE INTENDED TO BE OF APPROXIMATELY EQUAL MASS. EACH OF THESE BINS THEN EXERTS A
 #GRAVITATIONAL FORCE (dampened by the length scale of each bin) ON ALL OTHER ITEMS.
 
-def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
+def grav_force_calculation_new(mass, points, sizes):
 	#use a tree-based gravity solver
+	
+	time_tree_creation = time.time()
 	size_leaves = min(len(points)**0.4, len(points)/10000)
 	points_kdtree = spatial.KDTree(points, leafsize=size_leaves)
 	#recursively traverse tree to generate array of hierarchical indices
@@ -278,6 +281,9 @@ def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
 		ravnew = np.ravel(new_tree)
 		print len(ravnew)
 		
+	print "Time to generate tree: ",
+	print time.time() - time_tree_creation
+	
 	#We know that the above tree uniquely contains all points, allowing us to calculate gravity
 	depth = lambda L: isinstance(L, list) and max(map(depth, L))+1
 	tree_depth = depth(new_tree)
@@ -285,7 +291,7 @@ def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
 	combos = np.array(map(list, itertools.product([0, 1], repeat=tree_depth)))
 		
 	#this sets an upper limit on the sizes of gravitational tree elements, to avoid excessively low resolution
-	scale_res = 2
+	scale_res = 6
 	masses_list = np.vstack([np.zeros(len(combos))]*(tree_depth - scale_res))
 	com_list = np.array([np.zeros((len(combos), 3))]*(tree_depth - scale_res))
 	
@@ -346,9 +352,10 @@ def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
 	#looping through all elements of combos and applying the above to their respective elements
 	#this is an O(n) process, the tree creation was already O(n log n)
 	
+	time_start_tree_traversal = time.time()
 	unique_largetree = np.vstack({tuple(row[:-(tree_depth - scale_res + 1)]) for row in combos})
 	expanded_unique_largetree = np.append(unique_largetree, np.zeros((len(unique_largetree),tree_depth - scale_res + 1)), axis=1)
-	smoothing_scale = 1.
+	smoothing_scale = np.median(sizes)
 	combo_pos = 0.
 	overall_accels = np.copy(points * 0.)
 	for combo in combos:
@@ -391,10 +398,21 @@ def grav_force_calculation_new(mass, points, sizes, dist_f, kdt):
 			#"true" selection and expedited selection via index computation are identical!
 			#now we can do computations with these
 		
-		largescale_combos = expanded_unique_largetree[(unique_largetree != combo[:-(tree_depth - scale_res + 1)])]
+		largescale_blocks = np.all(unique_largetree == combo[:-(tree_depth - scale_res + 1)], axis=1)
+		largescale_combos = expanded_unique_largetree[largescale_blocks]
+		largescale_positions = np.sum((largescale_combos * 2**np.arange(len(local_combo))[::-1]), axis=1)
+		
+		for position in largescale_positions:
+			local_accels_3 = (G * masses_list[-1][position]/(np.sum((com_list[-1][position] - combo_points)**2, axis=1) + smoothing_scale**2)**(3./2.) * (com_list[-1][position] - combo_points).T).T
+			combo_accels += local_accels_3
 		#compute forces here
 		overall_accels[combo_positions] += combo_accels
-		print combo_pos
+		#print combo_pos
+	
+	print "Time required to traverse tree: ",
+	print time.time() - time_start_tree_traversal
+	
+	return overall_accels
 	
 def grav_force_calculation(mass, points, sizes, dist_f, kdt):
 #NO LONGER USES A GRID METHOD
@@ -520,12 +538,14 @@ def compute_gravitational_force(particle_positions, grid_com, grid_masses, lengt
 
 def neighbors(points, dist):                                         
 	kdt = spatial.cKDTree(points)
+	neighbor_time = time.time()
 	neighbors_array = []
-	for u in range(len(dist)): 
+	for u in range(len(dist)):
 		qbp = kdt.query_ball_point(points[u], dist[u], p=2, eps=0.1)
 		neighbors_array.append(qbp)
-		print u
-	print "done"
+		if u % 1000 == 0:
+			print u
+	print "Neighbor time: ", time.time() - neighbor_time
 	return neighbors_array, kdt
     
 def nontrivial_neighbors(points, mass, particle_type, neighbor):

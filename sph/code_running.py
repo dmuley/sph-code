@@ -54,7 +54,7 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
-raise_factor = 800
+raise_factor = 1000
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 2.e6 * AU
@@ -109,15 +109,15 @@ OVERALL_AGE = latest_file['OVERALL_AGE']
 ############################
 
 dust_base = dust_base_frac/np.sum(dust_base_frac)
-base_imf = np.logspace(np.log10(0.10),np.log10(40.), 200)
-d_base_imf = np.append(np.diff(base_imf)[0], np.diff(base_imf))
-imf = nsc.kroupa_imf(base_imf) * d_base_imf
+base_imf = np.array([0.4]) #np.logspace(np.log10(0.10),np.log10(40.), 200)
+d_base_imf = np.array([1.]) #np.append(np.diff(base_imf)[0], np.diff(base_imf))
+imf = base_imf * d_base_imf #nsc.kroupa_imf(base_imf) * d_base_imf
 imf /= np.sum(imf)
 
 #np.random.seed(rank*time.time())
 mass_ind = np.random.choice(np.arange(len(base_imf)), N_PARTICLES, p = imf)
 mass = base_imf[mass_ind]
-diff_mass = np.random.rand(len(mass)) * d_base_imf[mass_ind]
+diff_mass = 0. #np.random.rand(len(mass)) * d_base_imf[mass_ind]
 mass = (mass + diff_mass) * solar_mass / raise_factor / 2.
 
 N_DUST = max(int(DUST_FRAC/(1. - DUST_FRAC) * np.sum(mass)/(DUST_MASS * solar_mass)), 1)
@@ -128,17 +128,18 @@ mass = np.append(mass, [DUST_MASS * solar_mass] * N_DUST)
 
 points = (np.random.rand(N_PARTICLES, 3) - 0.5) * DIAMETER
 points2 = np.array(list(points))
-neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(d/raise_factor**(1./3.) * np.ones(len(points)), np.ones(len(points))))
-chems_neighbor = list(neighbor)
-nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
-num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
 #print(nbrs)
 #print(points)
 velocities = np.random.normal(size=(N_PARTICLES, 3)) * 0.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 sizes = (mass/m_0)**(1./3.) * d
+
+neighbor, neighbor_tree = nsc.neighbors(points, sizes)
+chems_neighbor = list(neighbor)
+nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
+num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
 
 mu_array = np.zeros([N_PARTICLES])#array of all mu
 E_internal = np.zeros([N_PARTICLES]) #array of all Energy
@@ -157,7 +158,7 @@ sizes[particle_type == 2] = d/raise_factor**(1./3.)
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
-base_sfr = 0.03
+base_sfr = 0.00 #no star formation in new sim!!!
 T_FF = (3./(2 * np.pi * G * critical_density))**0.5/year
 #base star formation per free fall rate
 
@@ -176,25 +177,10 @@ dust_densities = nsc.dust_density(points,mass,nontrivial_int,particle_type,sizes
 delp = nsc.del_pressure(points,mass,particle_type,nontrivial_int,E_internal,gamma_array)
 
 #Introduce turbulence at the largest scales
-initial_clusters, grav_potential = nsc.grav_force_calculation(mass, points, sizes, d, neighbor_tree)[2:]
+grav_accels = nsc.grav_force_calculation_new(mass, points, sizes)
 #print np.sum(grav_potential)
 #apply the virial theorem that 2<V> + (2/3)<E_internal> = -<U>
 #mostly turbulent support
-
-gpot = np.sum(grav_potential)
-total_turb_energy = max(0,(-gpot - np.sum(E_internal/gamma_array)))/2.
-cluster_masses = np.array([np.sum(mass[ai]) for ai in initial_clusters])
-cluster_powers = np.abs(np.random.normal(size = len(cluster_masses)))
-
-#total_turb_energy = sum(1/2 mi * vi^2)
-#but reducing turbulent energy to ensure collapse rather than expansion
-absolute_turb_vels = 0.9 * (2 * total_turb_energy/np.sum(cluster_powers) * cluster_powers/cluster_masses)**(0.5)
-print "Turbulent velocities: " + str(absolute_turb_vels)
-
-for uvw in range(len(initial_clusters)):
-	unit_sphere = np.random.normal(size=(len(initial_clusters[uvw]), 3))
-	unit_sphere = (unit_sphere.T/np.sum(unit_sphere**2, axis=1)**0.5).T
-	velocities[initial_clusters[uvw]] += absolute_turb_vels[uvw] * unit_sphere
 	
 velocities[particle_type == 2] *= 0.
 velocities += np.random.normal(size=(N_PARTICLES, 3)) * 50.
@@ -391,10 +377,10 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 				supernova_pos = []
 			#supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
-			neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(d/raise_factor**(1./3.) * np.ones(len(points)), sizes))
+			neighbor, neighbor_tree = nsc.neighbors(points, np.max(sizes) * len(sizes))
 			chems_neighbor = list(neighbor)
 			#NONTRIVIAL NEIGHBORS
-			neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+			#neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 			
         
         
@@ -442,9 +428,9 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
     optical_depth = mass/(m_h * mu_array) * cross_array
 
-    neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(d/raise_factor**(1./3.) * np.ones(len(points)), sizes))#find neighbors in each timestep
+    neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(sizes) * len(sizes))#find neighbors in each timestep
     chems_neighbor = list(neighbor)
-    nontrivial_int = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+    nontrivial_int = neighbor; #nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
     #IMPORTANT EFFICIENCY SAVINGS HERE
     neighbor = nontrivial_int
     num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
@@ -457,8 +443,8 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     print(" ")
     
     age += dt
-    gfcalc = nsc.grav_force_calculation(mass, points, sizes, d, neighbor_tree);
-    grav_accel = gfcalc[0]
+    gfcalc = nsc.grav_force_calculation_new(mass, points, sizes);
+    grav_accel = gfcalc
     
     densities = nsc.density(points,mass,particle_type,neighbor)
     dust_densities = nsc.dust_density(points,mass,neighbor,particle_type,sizes)
