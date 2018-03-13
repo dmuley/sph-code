@@ -253,7 +253,7 @@ def grav_force_calculation_new(mass, points, sizes):
 	#use a tree-based gravity solver
 	
 	time_tree_creation = time.time()
-	size_leaves = 990
+	size_leaves = int(len(points)/16384 * 1.5)
 	points_kdtree = spatial.KDTree(points, leafsize=size_leaves)
 	#recursively traverse tree to generate array of hierarchical indices
 	base_tree = points_kdtree.tree
@@ -802,7 +802,7 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
     random_gas = positions[ptypes != 1]
     rg2 = np.array([])
     if len(random_gas > 0):
-        gas_selection = (np.random.rand(len(random_gas)) < len(random_gas)**-0.5)
+        gas_selection = (np.random.rand(len(random_gas)) < len(random_gas)**-0.65)
         rg2 = random_gas[gas_selection]
         if len(rs2) == 0:
             rg2 = random_gas
@@ -817,6 +817,8 @@ def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_p
             
             blocked[i][j] += blocking_kernel
             star_distance[i][j] = np.sum((ray[1] - ray[0])**2)**0.5
+            
+            print j
     
     star_distance_2 = np.zeros((len(rs2), len(random_gas)))
     gas_distance = np.zeros((len(rg2), len(random_gas)))

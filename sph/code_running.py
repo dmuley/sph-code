@@ -54,13 +54,13 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
-raise_factor = 1000 #8 million keeps the array non jagged, so maintain this number!
+raise_factor = 1250 #8 million keeps the array non jagged, so maintain this number!
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
-DIAMETER = 2.e6 * AU
+DIAMETER = 1.25e6 * AU
 
-N_PARTICLES = 12000 * raise_factor
-N_INT_PER_PARTICLE = N_PARTICLES/2000.
+N_PARTICLES = 3000 * raise_factor
+N_INT_PER_PARTICLE = N_PARTICLES/raise_factor * 3
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.) * raise_factor**(1./3.)
 nsc.d = d
@@ -135,7 +135,6 @@ velocities = np.random.normal(size=(N_PARTICLES, 3)) * 0.
 total_accel = np.random.rand(N_PARTICLES, 3) * 0.
 sizes = (mass/m_0)**(1./3.) * d
 
-
 mu_array = np.zeros([N_PARTICLES])#array of all mu
 E_internal = np.zeros([N_PARTICLES]) #array of all Energy
 #copy of generate_E_array
@@ -205,9 +204,10 @@ print("Estimated free fall time: " + str(T_FF) + " y")
 plt.ion()
 #RUNNING SIMULATION FOR SPECIFIED TIME!
 #simulating supernova asap
-particle_type[mass >= np.sort(mass)[-3]] = 1
-mass[mass >= np.sort(mass)[-1]] = np.max(mass) * raise_factor
-star_ages[mass >= np.sort(mass)[-1]] = 1.0e6 * year
+norm_dist = np.sum(points**2, axis=1)
+particle_type[norm_dist == np.min(norm_dist)] = 1
+mass[norm_dist == np.min(norm_dist)] = 9 * solar_mass
+star_ages[norm_dist == np.min(norm_dist)] = 0.000001e6 * year
 #fig, ax = plt.subplots(nrows=1, ncols = 2)
 while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_mass)]) > 0.)):
     #Even if we've gone over, we still want to resolve any remaining possible supernovae here
