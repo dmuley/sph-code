@@ -54,13 +54,13 @@ gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.
 W6_constant = (3 * np.pi/80)
 mrn_constants = np.array([50e-10, 5000e-10]) #minimum and maximum radii for MRN distribution
 cross_sections += nsc.sigma_effective(mineral_densities, mrn_constants, mu_specie)
-raise_factor = 1250 #8 million keeps the array non jagged, so maintain this number!
+raise_factor = 853 #8 million keeps the array non jagged, so maintain this number!
 #### AND NOW THE FUN BEGINS! THIS IS WHERE THE SIMULATION RUNS HAPPEN. ####
 #SETTING VALUES OF BASIC SIMULATION PARAMETERS HERE (TO REPLACE DUMMY VALUES AT BEGINNING)
 DIAMETER = 1.25e6 * AU
 
 N_PARTICLES = 3000 * raise_factor
-N_INT_PER_PARTICLE = N_PARTICLES/raise_factor * 3
+N_INT_PER_PARTICLE = N_PARTICLES/raise_factor
 V = (DIAMETER)**3
 d = (V/N_PARTICLES * N_INT_PER_PARTICLE)**(1./3.) * raise_factor**(1./3.)
 nsc.d = d
@@ -76,6 +76,7 @@ N_RADIATIVE = 1 #number of timesteps for radiative transfer, deprecated
 MAX_AGE = 3e7 * year #don't want to see any AGB stars undergoing supernovae inadvertently
 crit_mass = 0.0001 * solar_mass/raise_factor #setting a minimum dust mass to help avoid numerical errors!
 critical_density = 1000 * amu * 10**6 #critical density of star formation
+N_NEIGH = 40
 
 specie_fraction_array = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0])
 dust_base_frac = np.array([.0,.0,0.,0.,0.,0.,0.025,0.025,0.025,0.025,0.025,0.025,0.025,0.025])
@@ -148,7 +149,7 @@ fdust = np.array([dust_base] * N_PARTICLES).T * (particle_type == 2)
 
 f_un = (fgas + fdust).T
 f_un = f_un.astype('longdouble')
-sizes[particle_type == 2] = d/raise_factor**(1./3.)
+#sizes[particle_type == 2] = d/raise_factor**(2./3.)
 mass = mass.astype('longdouble')
 
 #based on http://iopscience.iop.org/article/10.1088/0004-637X/729/2/133/meta
@@ -165,11 +166,10 @@ optical_depth = mass/(m_h * mu_array) * cross_array
 
 critical_density = 1000 * amu * 10**6 #critical density of star formation
 
-neighbor, neighbor_tree = nsc.neighbors(points, sizes)
-chems_neighbor = list(neighbor)
+neighbor, neighbor_tree, neighbor_dist, num_nontrivial, sizes = nsc.neighbors(points, (base_imf[0] * solar_mass/m_0)**(1./3.) * d, N_NEIGH)#now a numpy array---so much faster!
+chems_neighbor = np.copy(neighbor)
 nontrivial_int = neighbor #nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
-num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
+num_neighbors = N_NEIGH * np.ones(len(points))
 
 densities = nsc.density(points,mass,particle_type,nontrivial_int)
 densities_0 = copy.deepcopy(densities)
@@ -378,10 +378,10 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
 				supernova_pos = []
 			#supernova_pos = np.where(star_ages/nsc.luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1)/(year * 1e10) > 1.)[0]
 
-			neighbor, neighbor_tree = nsc.neighbors(points, np.max(sizes) * len(sizes))
-			chems_neighbor = list(neighbor)
-			#NONTRIVIAL NEIGHBORS
-			#neighbor = nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+			neighbor, neighbor_tree, neighbor_dist, num_nontrivial, sizes = nsc.neighbors(points, base_imf[0]/m_0 * d, N_NEIGH)#now a numpy array---so much faster!
+			chems_neighbor = np.copy(neighbor)
+			nontrivial_int = neighbor #nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+			num_neighbors = N_NEIGH * np.ones(len(points))
 			
         
         
@@ -429,14 +429,10 @@ while ((age < MAX_AGE) or (len(mass[(particle_type == 1) & (mass >= 7. * solar_m
     cross_array = np.sum(f_un * cross_sections, axis = 1)/np.sum(f_un, axis=1)
     optical_depth = mass/(m_h * mu_array) * cross_array
 
-    neighbor, neighbor_tree = nsc.neighbors(points, np.maximum(sizes) * len(sizes))#find neighbors in each timestep
-    chems_neighbor = list(neighbor)
-    nontrivial_int = neighbor; #nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
-    #IMPORTANT EFFICIENCY SAVINGS HERE
-    neighbor = nontrivial_int
-    num_neighbors = np.array([len(adjoining) for adjoining in neighbor])
-    num_nontrivial = np.array([len(adj) for adj in nontrivial_int])
-    
+	neighbor, neighbor_tree, neighbor_dist, num_nontrivial, sizes = nsc.neighbors(points, base_imf[0]/m_0 * d, N_NEIGH)#now a numpy array---so much faster!
+	chems_neighbor = np.copy(neighbor)
+	nontrivial_int = neighbor #nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
+	num_neighbors = N_NEIGH * np.ones(len(points))    
     #variable smoothing length in SPH    
     #sizes[particle_type == 0] = ((new_smoothing + 1.)/2. * sizes)[particle_type == 0]
     #sizes[particle_type == 2] = d

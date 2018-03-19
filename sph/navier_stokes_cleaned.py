@@ -413,7 +413,8 @@ def grav_force_calculation_new(mass, points, sizes):
 	print time.time() - time_start_tree_traversal
 	
 	return overall_accels
-	
+
+#All of these functions are deprecated---do not use!	
 def grav_force_calculation(mass, points, sizes, dist_f, kdt):
 #NO LONGER USES A GRID METHOD
 #DYNAMICALLY GENERATES SUB-CLUSTERS WHICH INTERACT WITH EACH OTHER USING A SMOOTHED GRAVITATIONAL FORCE
@@ -530,39 +531,115 @@ def compute_gravitational_force(particle_positions, grid_com, grid_masses, lengt
         forces += ((np.sum((particle_positions - grid_com[i]).T**2, axis=0) + (length_scale)**2)**-1.5 * -(particle_positions - grid_com[i]).T * grid_masses[i] * G)
         
     return (forces)
+#end deprecated functions
 
 #### SMOOTHED PARTICLE HYDRODYNAMICS ####
 #THESE FUNCTIONS ARE USED TO SIMULATE THE HYDRODYNAMICS OF OUR SYSTEM. THEY ARE BASED BOTH ON THE ESTABLISHED
 #LITERATURE IN THE FIELD (Monaghan 1993 for artificial viscosity, for instance) AND SOME ORIGINAL CONTRIBUTIONS
 #TO HANDLE DUST.
 
-def neighbors(points, dist):                                         
+def neighbors(points, dist, N_NEIGH):                                         
 	kdt = spatial.cKDTree(points)
 	neighbor_time = time.time()
-	neighbors_array = []
-	for u in range(len(dist)):
-		qbp = kdt.query_ball_point(points[u], dist[u], p=2, eps=0.1)
-		neighbors_array.append(qbp)
-		if u % 1000 == 0:
-			print u
+	neighbors_array = kdt.query(points, N_NEIGH, 0.1, 2, dist)
+	nontriv = np.sum(neighbors_array[0] < np.inf, axis=1)
+	
+	neighbors_array[0][neighbors_array[0] == np.inf] = 0
+	new_sizes = np.max(neighbors_array[0], axis=1)
+	#perhaps include old sizes just as an averaging mechanism? capped at maximum size
+	
 	print "Neighbor time: ", time.time() - neighbor_time
-	return neighbors_array, kdt
-    
-def nontrivial_neighbors(points, mass, particle_type, neighbor):
-	nontrivial_int = []
-	for j in range(len(neighbor)):
-		x_0 = points[j]
-		x = np.array(points[np.array(neighbor[j])])
-		m = np.array(mass[np.array(neighbor[j])])
-		
-		rho = Weigh2(x, x_0, m, d)
-		
-		final_neigh = np.unique(np.array(neighbor[j])[rho > 0])
-		
-		nontrivial_int.append(final_neigh)
-		print j
-	return nontrivial_int
+	return neighbors_array[1], kdt, neighbors_array[0], nontriv, new_sizes
 
+
+#### NEED TO VECTORIZE ALL OF THESE OPERATIONS ####
+def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array, gamma_array, velocities):
+	#neighbors is an array of all points with nearest neighbors
+	base_kernel_time =time.time()
+	pts_2 = np.append(points, [points[-1]*1e10],axis=0).T #including last dummy index
+	mas_2 = np.append(mass, 0.)
+	vels_2 = np.append(velocities, [velocities[-1] * 0.],axis=0).T
+	sizes_2 = np.append(sizes, 0.)
+	temp_2 = np.append(T, 0)
+	f_un_2 = np.append(f_un, f_un[-1], axis=0).T
+	
+	delt_x = np.zeros(np.append(len(pts_2), neighbor.shape))
+	delt_vels = np.zeros(np.append(len(vels_2), neighbor.shape))
+	#fun_new = np.zeros(np.append(len(f), neighbor.shape))
+	
+	for j in range(len(pts_2)):
+		delt_x[j] = (pts_2[j][neighbor.T] - pts_2[j][neighbor.T[0]]).T
+		delt_vels[j] = (vels_2[j][neighbor.T] - vels_2[j][neighbor.T[0]]).T
+		
+	#for k in range(len(f_un_2)):
+	#	fun_new[k] = f_un_2[j][neighbor.T]
+		
+	distances = np.sum(delt_x**2, axis=0)**(1./2.)
+	neigh_sizes = sizes_2[neighbor]
+	W6_kernel = 315./(64 * np.pi * (neigh_sizes.T)**9) * ((neigh_sizes.T)**2 - (distances.T)**2)**3
+	W6_kernel[W6_kernel < 0] = 0.
+	W6_kernel = W6_kernel.T
+	W6_grad_b = (-1. * 6. * 315./(64. * np.pi * (neigh_sizes.T)**9) * ((neigh_sizes.T)**2 - (distances.T)**2)**2).T * delt_x
+	W6_grad_a = (-1. * 6. * 315./(64. * np.pi * (sizes)**9) * ((sizes)**2 - (distances.T)**2)**2).T * delt_x
+	
+	print time.time() - base_kernel_time
+	
+	hydro_calc_time = time.time()
+	nptype = (particle_type[neighbor] == 0)
+	dust_nptype = (particle_type[neighbor] == 2)
+	mas_neigh = mas_2[neighbor]
+	mu_neigh = mu_array[neighbor]
+	gamma_neigh = gamma_array[neighbor]
+	t2_neigh = temp_2[neighbor]
+	
+	#density of gas evaluated AT the location of that particle
+	density_calc = np.sum(mas_neigh * nptype * W6_kernel, axis=1)
+	#dust_density_calc = np.sum(mas_neigh * dust_nptype * W6_kernel, axis=1)
+	num_density_calc = np.sum(mas_neigh * nptype * W6_kernel/amu/mu_neigh,axis=1)
+	pressure = np.sum(mas_neigh * nptype * W6_kernel, axis=1)
+	
+	pressure_grad_symmetrized = -np.sum((mas_neigh/mu_neigh/amu * k * t2_neigh * nptype * W6_grad_b + np.swapaxes(mass/mu_array/amu * k * T * np.swapaxes(W6_grad_a,1,2),2,1))/2., axis=2)
+	
+	print time.time() - hydro_calc_time
+	
+	hydro_accel = (pressure_grad_symmetrized/density_calc).T
+	
+	#impulse from dust onto gas---this might end up being important on small scales and work its way up larger
+	#but we are ignoring for the purposes of this simulation---no way of accurately accounting for all forces
+	#in a totally accurate way, except with a simple analytical model which may not hold water
+	
+	#artificial viscosity is essential for supernova shock handling, so we implement it
+	
+	dens_2 = np.append(density_calc, 0)
+	
+	alpha = 1.
+	beta = 2.
+	mu_ab = neigh_sizes.T * np.sum(delt_vels * delt_x,axis=0).T/(np.sum(delt_x**2,axis=0).T + 0.01 * (neigh_sizes.T)**2)
+	
+	rho_avg_ab = (dens_2[neighbor.T] + density_calc)/2.
+	c_sound_ab = (1./2.) * (((gamma_neigh * k * t2_neigh/mu_neigh/amu)**(1./2.)).T + (gamma_array * k * T/(mu_array * amu))**(1./2.))
+	
+	artificial_viscosity_Pi = np.sum((-alpha * c_sound_ab * mu_ab + beta + mu_ab**2)/(rho_avg_ab) * (mu_ab < 0), axis=0)
+	
+	visc_accel = -np.sum(mas_neigh * artificial_viscosity_Pi[neighbor] * W6_grad_b, axis=2)
+	
+	#Next task---treating dust grain accretion and sputtering. This is much easier in vector form and where the sizes
+	#of dust particles are comparable to those of gas, as now.
+	
+	#### PROCEDURE ####
+	# Find dust particles in list of all particles, should at most be in the hundreds of thousands rather than millions
+	# Compute SPH number density by species of dust, at the locations of intersecting gas particles
+	## Use (particle_type == 2) to identify dust particles
+	## Use "reverse SPH" to find density of dust at each intersecting gas particle
+	## Sputtering is bilinear in dust density and gas density, so just add based on local characteristics (not SPH computed density)
+	## Return new compositions of all elements based on their masses, see how well it matches analytical solutions
+	
+	#Final step---radiative cooling
+	#Use the cooling laws in Draine in order to determine recombinations
+	#Will take place in radiative transfer section---t_rec is too short to work here!
+	
+	return hydro_accel, visc_accel.T, density_calc, num_density_calc
+	
 def Weigh2(x, x_0, m, d):
     norms_sq = np.sum((x - x_0)**2, axis=1)
     W = m * 315*(m_0/m)**3*((m/m_0)**(2./3.)*d**2-norms_sq)**3/(64*np.pi*d**9)
@@ -582,6 +659,7 @@ def grad_weight(x, x_0, m, d, type_particle):
     #checks if SPH particles intersect or not
     return((np.nan_to_num(W.astype('float') * ((m/m_0)**(2./3.)*d**2-norms_sq > 0))).T)
 
+### VECTORIZED AND DEPRECATED----DO NOT USE
 def density(points,mass,particle_type,neighbor):
 	final_density = np.zeros(len(points))
 	for j in range(len(neighbor)):
@@ -706,7 +784,9 @@ def artificial_viscosity(neighbor, points, particle_type, sizes, mass, densities
 			visc_heat[j] = heat_i
 	
 	return visc_accel, visc_heat
-    
+### VECTORIZED AND DEPRECATED----DO NOT USE
+
+#### VECTORIZE ALL OF THE ABOVE ####
 def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
     #should make parametric later, and should include Nozawa 03 material
     #supernova_pos = np.arange(len(star_ages))[(star_ages > luminosity_relation(mass/solar_mass, np.ones(len(mass)), 1) * year * 10e10)]
@@ -777,6 +857,8 @@ def supernova_explosion(mass,points,velocities,E_internal,supernova_pos, f_un):
 #SPH PARTICLES TO CHANGE THEIR OVERALL OPACITIES AS STARS HEAT THEM UP.
 
 #THE ENERGY/DUST PRODUCTION IMPARTED BY SUPERNOVAE ARE ALSO PLACED HERE.
+
+#NEED TO VECTORIZE ALL OF THE BELOW
 
 def rad_heating(positions, ptypes, masses, sizes, cross_array, f_un, supernova_pos, mu_array, T, dt):
     
@@ -1091,8 +1173,11 @@ def supernova_impulse(points, masses, supernova_pos, ptypes):
 	
 	return d_vels.T, selected_points
 
+#NEED TO VECTORIZE ALL OF THE BELOW
+
 #### PHYSICS OF DUST ####
-# VERY SIMILAR IN PURPOSE TO THE SPH SECTION, BUT WITH A SPECIAL EMPHASIS ON DUST.			 								 
+# VERY SIMILAR IN PURPOSE TO THE SPH SECTION, BUT WITH A SPECIAL EMPHASIS ON DUST.
+# PUT THIS IN THE HYDRO UPDATE TO SAVE ON ENERGY		 								 
 def supernova_destruction(points, velocities, neighbor, mass, f_un, mu_array, sizes, densities, particle_type):
 	#Indexes over all gas particles and sees if they intersect a dust,
 	#rather than the other way around as previously, because gas particles
