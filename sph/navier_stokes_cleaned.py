@@ -37,14 +37,14 @@ m_0 = 10**1.5 * solar_mass #solar masses, maximum mass in the kroupa IMF
 year = 60. * 60. * 24. * 365.
 dt_0 = year * 250000.
 #properties for species in each SPH particle, (H2, He, H,H+,He+,e-,Mg2SiO4,SiO2,C,Si,Fe,MgSiO3,FeSiO3)in that order
-species_labels = np.array(['H2', 'He', 'H','H+','He+','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
-mu_specie = np.array([2.0158,4.0026,1.0079,1.0074,4.0021,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
-cross_sections = np.array([1.25e-22, 1.25e-22, 1.25e-22, 1e-60, 1e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/80. + 1e-80
-destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
-mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
-sputtering_yields = np.array([0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
+species_labels = np.array(['H2', 'He', 'H','H+','He+', 'He++','e-','Mg2SiO4','SiO2','C','Si','Fe','MgSiO3','FeSiO3', 'SiC'])
+mu_specie = np.array([2.0158,4.0026,1.0079,1.0074,4.0021, 4.0016,0.0005,140.69,60.08,12.0107,28.0855,55.834,100.39,131.93, 40.096])
+cross_sections = np.array([6.3e-22, 6.3e-22, 6.3e-22, 1e-60, 1e-60, 1.e-60,6.65e-60 * 80, 0., 0., 0., 0., 0., 0., 0., 0.])/80. + 1e-80
+destruction_energies = np.array([7.2418e-19, 3.93938891e-18, 2.18e-18, 10000, 10000, 8.71584082e-18, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000])
+mineral_densities = np.array([1.e19, 1e19,1e19,1e19,1e19,1e19,1e19, 3320,2260,2266,2329,7870,3250,3250., 3166.])
+sputtering_yields = np.array([0,0,0,0,0,0,0,0.137,0.295,0.137,0.295,0.137,0.137,0.137, 0.137])
 f_u = np.array([.86,.14,0,0,0,0,0,0,0,0,0,0,0,0,0]) #relative abundance for species in each SPH particle, an array of arrays
-gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.,10.])#the polytropes of species in each SPH, an array of arrays
+gamma = np.array([7./5,5./3,5./3,5./3,5./3,5./3,5./3,15.6354113,4.913,1.0125,2.364,3.02,10.,10.,10.])#the polytropes of species in each SPH, an array of arrays
 W6_constant = (3 * np.pi/80)
 critical_density = 1000*amu*10**6 #critical density of star formation
 crit_mass = 0.0001 * solar_mass #setting a minimum dust mass to help avoid numerical errors!
@@ -555,24 +555,33 @@ def neighbors(points, dist, N_NEIGH):
 #### NEED TO VECTORIZE ALL OF THESE OPERATIONS ####
 def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array, gamma_array, velocities):
 	#neighbors is an array of all points with nearest neighbors
+	#neighbor = neighbor.astype('float64')
+	points = points.astype('float64')
+	sizes = sizes.astype('float64')
+	f_un = f_un.astype('float64')
+	T = T.astype('float64')
+	mu_array = mu_array.astype('float64')
+	gamma_array = gamma_array.astype('float64')
+	velocities = velocities.astype('float64')
+	
 	base_kernel_time =time.time()
 	pts_2 = np.append(points, [points[-1]*1e10],axis=0).T #including last dummy index
 	mas_2 = np.append(mass, 0.)
 	vels_2 = np.append(velocities, [velocities[-1] * 0.],axis=0).T
 	sizes_2 = np.append(sizes, 0.)
 	temp_2 = np.append(T, 0)
-	f_un_2 = np.append(f_un, f_un[-1], axis=0).T
+	f_un_2 = np.append(f_un, np.array([f_un[-1]]), axis=0).T
 	
 	delt_x = np.zeros(np.append(len(pts_2), neighbor.shape))
 	delt_vels = np.zeros(np.append(len(vels_2), neighbor.shape))
-	#fun_new = np.zeros(np.append(len(f), neighbor.shape))
+	fun_new = np.zeros(np.append(len(f_un_2), neighbor.shape))
 	
 	for j in range(len(pts_2)):
 		delt_x[j] = (pts_2[j][neighbor.T] - pts_2[j][neighbor.T[0]]).T
 		delt_vels[j] = (vels_2[j][neighbor.T] - vels_2[j][neighbor.T[0]]).T
 		
-	#for k in range(len(f_un_2)):
-	#	fun_new[k] = f_un_2[j][neighbor.T]
+	for k in range(len(f_un_2)):
+		fun_new[k] = f_un_2[k][neighbor]
 		
 	distances = np.sum(delt_x**2, axis=0)**(1./2.)
 	neigh_sizes = sizes_2[neighbor]
@@ -585,22 +594,34 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	print time.time() - base_kernel_time
 	
 	hydro_calc_time = time.time()
-	nptype = (particle_type[neighbor] == 0)
+	'''nptype = (particle_type[neighbor] == 0)
 	dust_nptype = (particle_type[neighbor] == 2)
-	mas_neigh = mas_2[neighbor]
+	mas_neigh = mas_2[neighbor]'''
 	mu_neigh = mu_array[neighbor]
 	gamma_neigh = gamma_array[neighbor]
 	t2_neigh = temp_2[neighbor]
 	
 	#density of gas evaluated AT the location of that particle
-	density_calc = np.sum(mas_neigh * nptype * W6_kernel, axis=1)
+	density_calc = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel, axis=1)
+	dust_density_calc = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel, axis=1)
+	num_density_calc = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel/amu/mu_neigh, axis=1)
+	#pressure = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel/amu/mu_neigh, axis=1)
+	
+	#density_calc = np.sum(mas_neigh * nptype * W6_kernel, axis=1)
 	#dust_density_calc = np.sum(mas_neigh * dust_nptype * W6_kernel, axis=1)
-	num_density_calc = np.sum(mas_neigh * nptype * W6_kernel/amu/mu_neigh,axis=1)
-	pressure = np.sum(mas_neigh * nptype * W6_kernel, axis=1)
+	#num_density_calc = np.sum(mas_neigh * nptype * W6_kernel/amu/mu_neigh,axis=1)
+	#pressure = np.sum(mas_neigh * nptype * W6_kernel, axis=1)
 	
-	pressure_grad_symmetrized = -np.sum((mas_neigh/mu_neigh/amu * k * t2_neigh * nptype * W6_grad_b + np.swapaxes(mass/mu_array/amu * k * T * np.swapaxes(W6_grad_a,1,2),2,1))/2., axis=2)
-	
+	pressure_grad_symmetrized = -np.sum((mas_2[neighbor]/mu_neigh/amu * k * t2_neigh * (particle_type[neighbor] == 0) * W6_grad_b + np.swapaxes(mass/mu_array/amu * k * T * (particle_type == 0) * np.swapaxes(W6_grad_a,1,2),2,1))/2., axis=2)
 	print time.time() - hydro_calc_time
+	
+	fun_neighbor_time =time.time()
+	f_un_neighbor = np.zeros((len(fun_new), len(points)))
+	for item in range(len(fun_new)):
+		f_un_neighbor[item] = np.sum((mas_2[neighbor]/mu_neigh/amu * (particle_type[neighbor] == 0) * fun_new[item] * W6_kernel),axis=1)
+		#should help conserve memory somewhat
+	print time.time() - fun_neighbor_time
+	
 	
 	hydro_accel = (pressure_grad_symmetrized/density_calc).T
 	
@@ -617,11 +638,13 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	mu_ab = neigh_sizes.T * np.sum(delt_vels * delt_x,axis=0).T/(np.sum(delt_x**2,axis=0).T + 0.01 * (neigh_sizes.T)**2)
 	
 	rho_avg_ab = (dens_2[neighbor.T] + density_calc)/2.
-	c_sound_ab = (1./2.) * (((gamma_neigh * k * t2_neigh/mu_neigh/amu)**(1./2.)).T + (gamma_array * k * T/(mu_array * amu))**(1./2.))
+	c_sound_ab = (1./2.) * (((gamma_neigh * k * t2_neigh/mu_neigh/amu * (particle_type[neighbor] == 0))**(1./2.)).T + (gamma_array * k * T/(mu_array * amu) * (particle_type == 0))**(1./2.))
 	
 	artificial_viscosity_Pi = np.sum((-alpha * c_sound_ab * mu_ab + beta + mu_ab**2)/(rho_avg_ab) * (mu_ab < 0), axis=0)
 	
-	visc_accel = -np.sum(mas_neigh * artificial_viscosity_Pi[neighbor] * W6_grad_b, axis=2)
+	visc_accel = -np.sum((mas_2[neighbor] * artificial_viscosity_Pi[neighbor] * (particle_type[neighbor] == 0) * W6_grad_b + np.swapaxes(mass * artificial_viscosity_Pi * (particle_type == 0) * np.swapaxes(W6_grad_a,1,2),2,1))/2., axis=2)
+	visc_heat = np.sum((mas_2[neighbor] * artificial_viscosity_Pi[neighbor] * (particle_type[neighbor] == 0) * W6_grad_b + np.swapaxes(mass * artificial_viscosity_Pi * (particle_type == 0) * np.swapaxes(W6_grad_a,1,2),2,1))/2. * delt_vels, axis=(0,2))
+	visc_heat *= mass/2.
 	
 	#Next task---treating dust grain accretion and sputtering. This is much easier in vector form and where the sizes
 	#of dust particles are comparable to those of gas, as now.
@@ -638,7 +661,7 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	#Use the cooling laws in Draine in order to determine recombinations
 	#Will take place in radiative transfer section---t_rec is too short to work here!
 	
-	return hydro_accel, visc_accel.T, density_calc, num_density_calc
+	return hydro_accel, visc_accel.T, density_calc, num_density_calc, f_un_neighbor
 	
 def Weigh2(x, x_0, m, d):
     norms_sq = np.sum((x - x_0)**2, axis=1)
