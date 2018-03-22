@@ -580,8 +580,8 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 		delt_x[j] = (pts_2[j][neighbor.T] - pts_2[j][neighbor.T[0]]).T
 		delt_vels[j] = (vels_2[j][neighbor.T] - vels_2[j][neighbor.T[0]]).T
 		
-	for k in range(len(f_un_2)):
-		fun_new[k] = f_un_2[k][neighbor]
+	for lm in range(len(f_un_2)):
+		fun_new[lm] = f_un_2[lm][neighbor]
 		
 	distances = np.sum(delt_x**2, axis=0)**(1./2.)
 	neigh_sizes = sizes_2[neighbor]
@@ -603,7 +603,7 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	
 	#density of gas evaluated AT the location of that particle
 	density_calc = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel, axis=1)
-	dust_density_calc = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel, axis=1)
+	dust_density_calc = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 2) * W6_kernel, axis=1)
 	num_density_calc = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel/amu/mu_neigh, axis=1)
 	#pressure = np.sum(mas_2[neighbor] * (particle_type[neighbor] == 0) * W6_kernel/amu/mu_neigh, axis=1)
 	
@@ -614,6 +614,11 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	
 	pressure_grad_symmetrized = -np.sum((mas_2[neighbor]/mu_neigh/amu * k * t2_neigh * (particle_type[neighbor] == 0) * W6_grad_b + np.swapaxes(mass/mu_array/amu * k * T * (particle_type == 0) * np.swapaxes(W6_grad_a,1,2),2,1))/2., axis=2)
 	print time.time() - hydro_calc_time
+	#print pressure_grad_symmetrized
+	
+	hydro_accel = (pressure_grad_symmetrized/density_calc).T
+	
+	#return density_calc, dust_density_calc, num_density_calc, hydro_accel
 	
 	fun_neighbor_time =time.time()
 	f_un_neighbor = np.zeros((len(fun_new), len(points)))
@@ -635,14 +640,16 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	
 	alpha = 1.
 	beta = 2.
-	mu_ab = neigh_sizes.T * np.sum(delt_vels * delt_x,axis=0).T/(np.sum(delt_x**2,axis=0).T + 0.01 * (neigh_sizes.T)**2)
+	w_ab = np.sum(delt_vels * delt_x,axis=0).T/(np.sum(delt_x**2,axis=0).T + 0.01 * (neigh_sizes.T)**2)**0.5
+	w_ab[w_ab > 0.] = 0.
 	
 	rho_avg_ab = (dens_2[neighbor.T] + density_calc)/2.
 	c_sound_ab = (1./2.) * (((gamma_neigh * k * t2_neigh/mu_neigh/amu * (particle_type[neighbor] == 0))**(1./2.)).T + (gamma_array * k * T/(mu_array * amu) * (particle_type == 0))**(1./2.))
 	
-	artificial_viscosity_Pi = np.sum((-alpha * c_sound_ab * mu_ab + beta + mu_ab**2)/(rho_avg_ab) * (mu_ab < 0), axis=0)
-	
+	artificial_viscosity_Pi = np.sum(-alpha/2. * (c_sound_ab * 2 - 3 * w_ab) * w_ab/rho_avg_ab)
+		
 	visc_accel = -np.sum((mas_2[neighbor] * artificial_viscosity_Pi[neighbor] * (particle_type[neighbor] == 0) * W6_grad_b + np.swapaxes(mass * artificial_viscosity_Pi * (particle_type == 0) * np.swapaxes(W6_grad_a,1,2),2,1))/2., axis=2)
+	visc_accel = visc_accel.T
 	visc_heat = np.sum((mas_2[neighbor] * artificial_viscosity_Pi[neighbor] * (particle_type[neighbor] == 0) * W6_grad_b + np.swapaxes(mass * artificial_viscosity_Pi * (particle_type == 0) * np.swapaxes(W6_grad_a,1,2),2,1))/2. * delt_vels, axis=(0,2))
 	visc_heat *= mass/2.
 	
@@ -661,7 +668,7 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	#Use the cooling laws in Draine in order to determine recombinations
 	#Will take place in radiative transfer section---t_rec is too short to work here!
 	
-	return hydro_accel, visc_accel.T, density_calc, num_density_calc, f_un_neighbor
+	return hydro_accel, visc_accel, visc_heat, density_calc, num_density_calc, f_un_neighbor, dust_density_calc
 	
 def Weigh2(x, x_0, m, d):
     norms_sq = np.sum((x - x_0)**2, axis=1)

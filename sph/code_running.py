@@ -173,19 +173,22 @@ chems_neighbor = np.copy(neighbor)
 nontrivial_int = neighbor #nsc.nontrivial_neighbors(points, mass, particle_type, neighbor)
 num_neighbors = N_NEIGH * np.ones(len(points))
 
+velocities[particle_type == 2] *= 0.
+velocities += np.random.normal(size=(N_PARTICLES, 3)) * 1000.
+
+hydro_accel, visc_accel, visc_heat, densities, num_densities, fun_densities, dust_densities = nsc.hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array, gamma_array, velocities)
+
+'''
 densities = nsc.density(points,mass,particle_type,nontrivial_int)
 densities_0 = copy.deepcopy(densities)
 dust_densities = nsc.dust_density(points,mass,nontrivial_int,particle_type,sizes)
 delp = nsc.del_pressure(points,mass,particle_type,nontrivial_int,E_internal,gamma_array)
-
+'''
 #Introduce turbulence at the largest scales
 grav_accels = nsc.grav_force_calculation_new(mass, points, sizes)
 #print np.sum(grav_potential)
 #apply the virial theorem that 2<V> + (2/3)<E_internal> = -<U>
 #mostly turbulent support
-	
-velocities[particle_type == 2] *= 0.
-velocities += np.random.normal(size=(N_PARTICLES, 3)) * 50.
 
 new_smoothing = 1.
 
