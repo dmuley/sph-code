@@ -646,7 +646,7 @@ def hydro_update(neighbor, points, mass, sizes, f_un, particle_type, T, mu_array
 	rho_avg_ab = (dens_2[neighbor.T] + density_calc)/2.
 	c_sound_ab = (1./2.) * (((gamma_neigh * k * t2_neigh/mu_neigh/amu * (particle_type[neighbor] == 0))**(1./2.)).T + (gamma_array * k * T/(mu_array * amu) * (particle_type == 0))**(1./2.))
 	
-	artificial_viscosity_Pi = np.sum(-alpha/2. * (c_sound_ab * 2 - 3 * w_ab) * w_ab/rho_avg_ab)
+	artificial_viscosity_Pi = np.sum(-alpha/2. * (c_sound_ab * 2 - 3 * w_ab) * w_ab/rho_avg_ab,axis=1)
 		
 	visc_accel = -np.sum((mas_2[neighbor] * artificial_viscosity_Pi[neighbor] * (particle_type[neighbor] == 0) * W6_grad_b + np.swapaxes(mass * artificial_viscosity_Pi * (particle_type == 0) * np.swapaxes(W6_grad_a,1,2),2,1))/2., axis=2)
 	visc_accel = visc_accel.T
